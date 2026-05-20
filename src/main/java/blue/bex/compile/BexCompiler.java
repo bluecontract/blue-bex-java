@@ -185,8 +185,11 @@ public final class BexCompiler {
     }
 
     private CompiledStatement compileStatement(FrozenNode statement, CompileScope scope, String pointer) {
-        if (statement == null || statement.getProperties() == null) {
-            throw new BexException("Statement must be an operator object");
+        if (statement == null || statement.isEmptyNode()) {
+            return sourceStatement(currentFunction, pointer, "$return", new ReturnStatement(null));
+        }
+        if (statement.getProperties() == null) {
+            throw new BexException("Statement must be an operator object at " + pointer);
         }
         int count = 0;
         String op = null;
@@ -199,7 +202,7 @@ public final class BexCompiler {
             }
         }
         if (count != 1 || statement.getProperties().size() != 1) {
-            throw new BexException("Statement must have exactly one $ operator");
+            throw new BexException("Statement must have exactly one $ operator at " + pointer);
         }
         String bodyPointer = pointer + "/" + escape(op);
         CompiledStatement compiled;

@@ -19,6 +19,9 @@ public final class BexNodeWriter {
         if (value.isNull()) {
             return new Node();
         }
+        if (value instanceof NodeBexValue || value instanceof FrozenNodeBexValue) {
+            return value.toNode();
+        }
         if (value.isScalar()) {
             return value.toNode();
         }
