@@ -43,6 +43,8 @@ public final class BexEngine {
     }
 
     private BexCompiledProgram compile(BexProgramSource source, BexMetrics metrics) {
+        long start = System.nanoTime();
+        try {
         BexCompiledProgramKey key = key(source);
         BexCompiledProgram cached = cache.get(key);
         if (cached != null) {
@@ -53,6 +55,9 @@ public final class BexEngine {
         BexCompiledProgram program = new BexCompiler(metrics).compile(source);
         cache.put(key, program);
         return program;
+        } finally {
+            metrics.addCompileNanos(System.nanoTime() - start);
+        }
     }
 
     public BexExecutionResult execute(BexCompiledProgram program, BexExecutionContext context) {
@@ -63,8 +68,15 @@ public final class BexEngine {
     }
 
     private BexExecutionResult execute(BexCompiledProgram program, BexExecutionContext context, BexMetrics metrics) {
+        long start = System.nanoTime();
         BexRuntime runtime = new BexRuntime(program, context, gasSchedule, metrics, pointerCache);
-        return runtime.execute();
+        BexExecutionResult result = runtime.execute();
+        metrics.addExecuteNanos(System.nanoTime() - start);
+        return new BexExecutionResult(result.value(),
+                result.changeset(),
+                result.events(),
+                result.gasUsed(),
+                metrics);
     }
 
     public BexExecutionResult compileAndExecute(BexProgramSource source, BexExecutionContext context) {

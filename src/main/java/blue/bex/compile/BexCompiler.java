@@ -49,7 +49,8 @@ public final class BexCompiler {
             compiledFunctions.put(name, compileFunction(name, functionNodes.get(name)));
         }
 
-        String entryName = source.entry().orElse(text(prop(step, "entry")));
+        FrozenNode stepExpr = meaningful(prop(step, "expr"));
+        String entryName = source.entry().orElse(text(meaningful(prop(step, "entry"))));
         BexCompiledProgram.CompiledFunction root;
         int rootFrameSize = 0;
         if (entryName != null && !entryName.isEmpty()) {
@@ -62,14 +63,14 @@ public final class BexCompiler {
                             new ReturnStatement(sourceExpr("$root", "/entry/$call", "$call",
                                     new CallExpr(entryName, new String[0], new CompiledExpression[0]))))),
                     null, 0);
-        } else if (prop(step, "expr") != null) {
+        } else if (stepExpr != null) {
             currentFunction = "$root";
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<String>emptyList(),
-                    Collections.<CompiledStatement>emptyList(), compileExpr(prop(step, "expr"), new CompileScope(), "/expr"), 0);
+                    Collections.<CompiledStatement>emptyList(), compileExpr(stepExpr, new CompileScope(), "/expr"), 0);
         } else {
             CompileScope scope = new CompileScope();
             currentFunction = "$root";
-            List<CompiledStatement> statements = compileStatements(prop(step, "do"), scope, "/do");
+            List<CompiledStatement> statements = compileStatements(meaningful(prop(step, "do")), scope, "/do");
             rootFrameSize = scope.frameSize();
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<String>emptyList(), statements, null, rootFrameSize);
         }
@@ -90,9 +91,10 @@ public final class BexCompiler {
                 scope.declareOrGetSlot(arg);
             }
         }
-        CompiledExpression expression = prop(functionNode, "expr") != null ? compileExpr(prop(functionNode, "expr"), scope, "/functions/" + escape(name) + "/expr") : null;
+        FrozenNode functionExpr = meaningful(prop(functionNode, "expr"));
+        CompiledExpression expression = functionExpr != null ? compileExpr(functionExpr, scope, "/functions/" + escape(name) + "/expr") : null;
         List<CompiledStatement> statements = expression == null
-                ? compileStatements(prop(functionNode, "do"), scope, "/functions/" + escape(name) + "/do")
+                ? compileStatements(meaningful(prop(functionNode, "do")), scope, "/functions/" + escape(name) + "/do")
                 : Collections.<CompiledStatement>emptyList();
         currentFunction = previousFunction;
         return new BexCompiledProgram.CompiledFunction(name, Collections.unmodifiableList(args),
@@ -465,6 +467,16 @@ public final class BexCompiler {
             return scalarNode(node.getValue());
         }
         return null;
+    }
+
+    private FrozenNode meaningful(FrozenNode node) {
+        if (node == null) {
+            return null;
+        }
+        boolean hasPayload = node.getValue() != null
+                || (node.getItems() != null && !node.getItems().isEmpty())
+                || (node.getProperties() != null && !node.getProperties().isEmpty());
+        return hasPayload ? node : null;
     }
 
     private FrozenNode required(FrozenNode node, String label) {
