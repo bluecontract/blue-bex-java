@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.0 - 2026-05-23
+
 - Made `BexValues.node(Node)` deprecated and snapshot-safe.
 - Added explicit `nodeSnapshot` and `nodeCursorTrustedImmutable` documentation
   and tests.
