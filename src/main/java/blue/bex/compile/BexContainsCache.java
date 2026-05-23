@@ -3,6 +3,7 @@ package blue.bex.compile;
 import blue.bex.result.BexMetrics;
 import blue.language.snapshot.FrozenNode;
 
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -10,14 +11,15 @@ import java.util.Map;
  * Shared cache for detecting whether a frozen subtree contains any BEX operator.
  */
 public final class BexContainsCache {
-    private final Map<String, Boolean> cache;
+    private final Map<String, Boolean> blueIdCache;
+    private final IdentityHashMap<FrozenNode, Boolean> identityCache = new IdentityHashMap<>();
 
     public BexContainsCache() {
         this(8192);
     }
 
     public BexContainsCache(final int capacity) {
-        this.cache = new LinkedHashMap<String, Boolean>(capacity, 0.75f, true) {
+        this.blueIdCache = new LinkedHashMap<String, Boolean>(capacity, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
                 return size() > capacity;
@@ -29,8 +31,8 @@ public final class BexContainsCache {
         if (node == null) {
             return false;
         }
-        String key = node.blueId() != null ? "blueId:" + node.blueId() : "identity:" + System.identityHashCode(node);
-        Boolean cached = cache.get(key);
+        String blueId = node.blueId();
+        Boolean cached = blueId != null ? blueIdCache.get(blueId) : identityCache.get(node);
         if (cached != null) {
             if (metrics != null) {
                 metrics.incrementContainsBexCacheHits();
@@ -42,7 +44,11 @@ public final class BexContainsCache {
             metrics.incrementContainsBexScans();
         }
         boolean result = scan(node);
-        cache.put(key, result);
+        if (blueId != null) {
+            blueIdCache.put(blueId, result);
+        } else {
+            identityCache.put(node, result);
+        }
         return result;
     }
 

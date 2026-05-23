@@ -5,6 +5,13 @@ tags:
 - types
 - $is
 - blueId
+blueDefinitions:
+  HotelOrderType: |
+    status:
+      type: Text
+  RestaurantOrderType: |
+    restaurantStatus:
+      type: Text
 context:
   documentScope: /
   rootDocumentSource: |

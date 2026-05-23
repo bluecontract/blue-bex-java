@@ -1,6 +1,8 @@
 package blue.bex.compile;
 
 import blue.language.snapshot.FrozenNode;
+import blue.language.model.Node;
+import blue.language.model.Schema;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,6 +38,12 @@ final class BexNodeFingerprint {
         updateField(digest, "description", node.getDescription());
         updateField(digest, "referenceBlueId", node.getReferenceBlueId());
         updateField(digest, "blueId", node.blueId());
+        if (node.isInlineValue()) {
+            updateField(digest, "inlineValue", "true");
+        }
+        updateField(digest, "mergePolicy", node.getMergePolicy());
+        updateField(digest, "previousBlueId", node.getPreviousBlueId());
+        updateField(digest, "position", node.getPosition());
         if (node.getValue() != null) {
             update(digest, "value:");
             update(digest, node.getValue().getClass().getName());
@@ -44,9 +52,22 @@ final class BexNodeFingerprint {
             update(digest, ";");
         }
         if (node.getType() != null) {
-            update(digest, "type{");
-            updateNode(digest, node.getType());
-            update(digest, "}");
+            updateNodeField(digest, "type", node.getType());
+        }
+        if (node.getItemType() != null) {
+            updateNodeField(digest, "itemType", node.getItemType());
+        }
+        if (node.getKeyType() != null) {
+            updateNodeField(digest, "keyType", node.getKeyType());
+        }
+        if (node.getValueType() != null) {
+            updateNodeField(digest, "valueType", node.getValueType());
+        }
+        if (node.getBlue() != null) {
+            updateNodeField(digest, "blue", node.getBlue());
+        }
+        if (node.getSchema() != null) {
+            updateSchema(digest, node.getSchema());
         }
         if (node.getItems() != null) {
             update(digest, "items[");
@@ -68,12 +89,69 @@ final class BexNodeFingerprint {
         }
     }
 
+    private static void updateNodeField(MessageDigest digest, String name, FrozenNode value) {
+        update(digest, name);
+        update(digest, "{");
+        updateNode(digest, value);
+        update(digest, "}");
+    }
+
+    private static void updateSchema(MessageDigest digest, Schema schema) {
+        update(digest, "schema{");
+        updateSchemaNodeField(digest, "required", schema.getRequired());
+        updateSchemaNodeField(digest, "allowMultiple", schema.getAllowMultiple());
+        updateSchemaNodeField(digest, "minLength", schema.getMinLength());
+        updateSchemaNodeField(digest, "maxLength", schema.getMaxLength());
+        updateSchemaNodeField(digest, "minimum", schema.getMinimum());
+        updateSchemaNodeField(digest, "maximum", schema.getMaximum());
+        updateSchemaNodeField(digest, "exclusiveMinimum", schema.getExclusiveMinimum());
+        updateSchemaNodeField(digest, "exclusiveMaximum", schema.getExclusiveMaximum());
+        updateSchemaNodeField(digest, "multipleOf", schema.getMultipleOf());
+        updateSchemaNodeField(digest, "minItems", schema.getMinItems());
+        updateSchemaNodeField(digest, "maxItems", schema.getMaxItems());
+        updateSchemaNodeField(digest, "uniqueItems", schema.getUniqueItems());
+        updateSchemaNodeField(digest, "minFields", schema.getMinFields());
+        updateSchemaNodeField(digest, "maxFields", schema.getMaxFields());
+        updateSchemaNodeListField(digest, "enum", schema.getEnum());
+        updateSchemaNodeListField(digest, "options", schema.getOptions());
+        update(digest, "}");
+    }
+
+    private static void updateSchemaNodeField(MessageDigest digest, String name, Node value) {
+        if (value == null) {
+            return;
+        }
+        update(digest, name);
+        update(digest, "{");
+        updateNode(digest, FrozenNode.fromResolvedNode(value));
+        update(digest, "}");
+    }
+
+    private static void updateSchemaNodeListField(MessageDigest digest, String name, List<Node> values) {
+        if (values == null) {
+            return;
+        }
+        update(digest, name);
+        update(digest, "[");
+        for (Node value : values) {
+            updateNode(digest, FrozenNode.fromResolvedNode(value));
+            update(digest, ",");
+        }
+        update(digest, "]");
+    }
+
     private static void updateField(MessageDigest digest, String name, String value) {
         if (value != null) {
             update(digest, name);
             update(digest, ":");
             update(digest, value);
             update(digest, ";");
+        }
+    }
+
+    private static void updateField(MessageDigest digest, String name, Object value) {
+        if (value != null) {
+            updateField(digest, name, String.valueOf(value));
         }
     }
 

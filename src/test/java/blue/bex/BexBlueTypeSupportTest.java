@@ -800,6 +800,16 @@ class BexBlueTypeSupportTest {
     }
 
     @Test
+    void nodeWriterRejectsUnknownSchemaFields() {
+        BexValue value = BexValues.fromSimple(m(
+                "schema", m("minLenght", 3)));
+
+        BexException ex = assertThrows(BexException.class, () -> BexNodeWriter.toNode(value));
+        assertTrue(ex.getMessage().contains("Unsupported Blue schema field: minLenght"));
+        assertThrows(BexException.class, () -> BexFrozenWriter.toFrozen(value));
+    }
+
+    @Test
     void nodeWriterRejectsListControlFields() {
         assertThrows(BexException.class, () -> BexNodeWriter.toNode(BexValues.fromSimple(m(
                 "$previous", "abc"))));

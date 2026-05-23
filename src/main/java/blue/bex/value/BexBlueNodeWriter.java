@@ -5,13 +5,18 @@ import blue.language.model.Node;
 import blue.language.model.Schema;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Boundary writer from BEX values to Blue nodes using Blue language keys.
  */
 public final class BexBlueNodeWriter {
+    private static final Set<String> SCHEMA_KEYS = schemaKeys();
+
     private BexBlueNodeWriter() {
     }
 
@@ -182,6 +187,7 @@ public final class BexBlueNodeWriter {
         if (!value.isObject()) {
             throw new BexException("Blue schema field must be an object");
         }
+        validateSchemaKeys(value);
         Schema schema = new Schema();
         setSchemaNode(schema, value, "required");
         setSchemaNode(schema, value, "allowMultiple");
@@ -253,5 +259,33 @@ public final class BexBlueNodeWriter {
         } else if ("options".equals(key)) {
             schema.options(nodes);
         }
+    }
+
+    private static void validateSchemaKeys(BexValue value) {
+        for (String key : value.keys()) {
+            if (!SCHEMA_KEYS.contains(key)) {
+                throw new BexException("Unsupported Blue schema field: " + key);
+            }
+        }
+    }
+
+    private static Set<String> schemaKeys() {
+        return new LinkedHashSet<>(Arrays.asList(
+                "required",
+                "allowMultiple",
+                "minLength",
+                "maxLength",
+                "minimum",
+                "maximum",
+                "exclusiveMinimum",
+                "exclusiveMaximum",
+                "multipleOf",
+                "minItems",
+                "maxItems",
+                "uniqueItems",
+                "minFields",
+                "maxFields",
+                "enum",
+                "options"));
     }
 }

@@ -545,6 +545,11 @@ metrics.frozenDocumentReads();
 metrics.nodeMaterializations();
 ```
 
+The deterministic gas rules are specified in [docs/GAS.md](docs/GAS.md). The
+portable fixture format is documented in [docs/FIXTURES.md](docs/FIXTURES.md).
+The rich fixture suite includes exact gas conformance fixtures under
+`src/test/resources/rich-fixtures/gas/`.
+
 ## Tests
 
 ```bash
