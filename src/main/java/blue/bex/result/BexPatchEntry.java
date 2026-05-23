@@ -1,6 +1,8 @@
 package blue.bex.result;
 
+import blue.bex.BexException;
 import blue.bex.value.BexValue;
+import blue.bex.value.BexValues;
 import blue.language.utils.JsonPointer;
 
 import java.util.Collections;
@@ -19,10 +21,13 @@ public final class BexPatchEntry {
 
     public BexPatchEntry(String op, String authoredPath, String absolutePath, BexValue val) {
         this.op = Objects.requireNonNull(op, "op");
+        if (!"add".equals(op) && !"replace".equals(op) && !"remove".equals(op)) {
+            throw new BexException("Unsupported patch op: " + op);
+        }
         this.authoredPath = Objects.requireNonNull(authoredPath, "authoredPath");
         this.absolutePath = JsonPointer.canonicalize(Objects.requireNonNull(absolutePath, "absolutePath"));
         this.absoluteSegments = Collections.unmodifiableList(JsonPointer.split(this.absolutePath));
-        this.val = val;
+        this.val = val != null ? val : BexValues.undefined();
     }
 
     public String op() {

@@ -143,6 +143,24 @@ final class ForEachStatement extends Stmt {
     }
 }
 
+final class BexStatementEffects {
+    private BexStatementEffects() {
+    }
+
+    static void appendChange(CompiledFrame frame, BexPatchEntry entry) {
+        frame.runtime().gas().chargeValue(frame.runtime().gas().schedule().appendChangeBase, entry.val());
+        frame.accumulator().appendChange(entry);
+    }
+
+    static void appendEvent(CompiledFrame frame, BexValue value) {
+        if (value.isUndefined()) {
+            throw new BexException("Undefined cannot be emitted as an event");
+        }
+        frame.runtime().gas().chargeValue(frame.runtime().gas().schedule().appendEventBase, value);
+        frame.accumulator().appendEvent(value);
+    }
+}
+
 final class AppendChangeStatement extends Stmt {
     private final TextOperand op;
     private final PointerOperand pointer;
@@ -157,16 +175,16 @@ final class AppendChangeStatement extends Stmt {
     @Override
     protected Control doExec(CompiledFrame frame) {
         String operation = op.get(frame);
-        if (!"add".equals(operation) && !"replace".equals(operation) && !"remove".equals(operation)) {
-            throw new BexException("Unsupported patch op: " + operation);
+        boolean requiresVal = BexPatchEntryParser.requiresValue(operation);
+        BexValue value = BexValues.undefined();
+        if (requiresVal) {
+            if (val == null) {
+                throw new BexException("Patch op " + operation + " requires val");
+            }
+            value = val.eval(frame);
         }
-        BexValue value = "remove".equals(operation) ? BexValues.undefined() : val.eval(frame);
-        if (!"remove".equals(operation) && value.isUndefined()) {
-            throw new BexException("Undefined cannot be emitted as a patch value");
-        }
-        String absolute = pointer.absolute(frame);
-        frame.runtime().gas().charge(frame.runtime().gas().schedule().appendChangeBase + frame.runtime().gas().estimatedSize(value) / 64);
-        frame.accumulator().appendChange(new BexPatchEntry(operation, pointer.authored(frame), absolute, value));
+        BexStatementEffects.appendChange(frame,
+                BexPatchEntryParser.fromFields(frame, operation, pointer.authored(frame), val != null, value));
         return Control.CONTINUE;
     }
 }
@@ -183,14 +201,8 @@ final class AppendChangesStatement extends Stmt {
         BexValue list = expr.eval(frame);
         if (!list.isList()) throw new BexException("$appendChanges requires a list");
         for (int i = 0; i < list.size(); i++) {
-            BexValue entry = list.get(String.valueOf(i));
-            String op = entry.get("op").asText();
-            String path = entry.get("path").asText();
-            BexValue val = "remove".equals(op) ? BexValues.undefined() : entry.get("val");
-            if (!"remove".equals(op) && val.isUndefined()) {
-                throw new BexException("Undefined cannot be emitted as a patch value");
-            }
-            frame.accumulator().appendChange(new BexPatchEntry(op, path, frame.runtime().resolvePointer(path), val));
+            BexStatementEffects.appendChange(frame,
+                    BexPatchEntryParser.fromValue(frame, list.get(String.valueOf(i))));
         }
         return Control.CONTINUE;
     }
@@ -205,10 +217,7 @@ final class AppendEventStatement extends Stmt {
 
     @Override
     protected Control doExec(CompiledFrame frame) {
-        BexValue value = expr.eval(frame);
-        if (value.isUndefined()) throw new BexException("Undefined cannot be emitted as an event");
-        frame.runtime().gas().charge(frame.runtime().gas().schedule().appendEventBase + frame.runtime().gas().estimatedSize(value) / 64);
-        frame.accumulator().appendEvent(value);
+        BexStatementEffects.appendEvent(frame, expr.eval(frame));
         return Control.CONTINUE;
     }
 }
@@ -225,7 +234,7 @@ final class AppendEventsStatement extends Stmt {
         BexValue list = expr.eval(frame);
         if (!list.isList()) throw new BexException("$appendEvents requires a list");
         for (int i = 0; i < list.size(); i++) {
-            frame.accumulator().appendEvent(list.get(String.valueOf(i)));
+            BexStatementEffects.appendEvent(frame, list.get(String.valueOf(i)));
         }
         return Control.CONTINUE;
     }

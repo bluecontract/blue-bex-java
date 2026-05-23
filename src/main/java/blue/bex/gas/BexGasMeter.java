@@ -40,4 +40,12 @@ public final class BexGasMeter {
     public long estimatedSize(BexValue value) {
         return sizeEstimator.estimate(value);
     }
+
+    public void chargeValue(long base, BexValue value) {
+        charge(base + estimatedSize(value));
+    }
+
+    public void chargePointerValue(long base, int pathSegments, BexValue value) {
+        charge(base + Math.max(0, pathSegments) + estimatedSize(value));
+    }
 }

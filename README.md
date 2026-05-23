@@ -103,6 +103,18 @@ BexProgramSource source = BexProgramSource.withDefinition(
 );
 ```
 
+## Constants
+
+`$const` must reference a declared program constant. Unknown constants fail at
+compile time instead of evaluating to undefined:
+
+```yaml
+constants:
+  amount: 400
+expr:
+  $const: amount
+```
+
 ## Function Arguments And Blue Patterns
 
 BEX function arguments may declare Blue type or shape patterns. BEX does not
@@ -262,6 +274,44 @@ Hosts often provide common bindings such as `event`, `steps`, and
 
 For every other host binding, use `$binding`.
 
+## Pointer Kinds
+
+BEX has two pointer contexts.
+
+Document pointers are resolved relative to the current document scope:
+
+- `$document`;
+- `$resultValue`;
+- `$appendChange.path`;
+- `$appendChanges` entry `path`.
+
+Value pointers are resolved inside the selected value and are not affected by
+the document scope:
+
+- `$event`;
+- `$currentContract`;
+- `$steps.path`;
+- `$binding.path`;
+- `$pointerGet.path`;
+- `$pointerSet.path`.
+
+Static omitted/default paths may intentionally read a root/default location.
+Dynamic pointer expressions that evaluate to `null` or undefined fail instead
+of silently becoming the current document scope or root value.
+
+Use `$pointerJoin` when building document paths from dynamic path segments. Each
+item is treated as one JSON Pointer segment and escaped safely:
+
+```yaml
+$pointerJoin:
+  - orders
+  - $var: orderId
+  - status
+```
+
+If `orderId` is `abc/def~ghi`, the result is
+`/orders/abc~1def~0ghi/status`.
+
 ## Expression Operators
 
 BEX operators are Blue objects whose single key starts with `$`.
@@ -307,6 +357,7 @@ $is:
 | Operator | Purpose |
 |---|---|
 | `$concat` | Concatenate text. |
+| `$pointerJoin` | Safely build a JSON Pointer from path segments. |
 | `$join` | Join list items with a separator. |
 | `$split` | Split text. |
 | `$startsWith` | Check a prefix. |
@@ -401,6 +452,14 @@ BEX-looking operators inside Blue type-definition fields such as `type`,
 
 BEX computes these values only. The host decides whether patches are applied,
 events are emitted, or accumulators are treated as ordinary data.
+
+`$appendChanges` validates each patch entry the same way as `$appendChange`.
+Supported patch operations are `add`, `replace`, and `remove`. `add` and
+`replace` require a non-undefined `val`; `remove` does not include a value.
+
+`$appendEvents` validates each item the same way as `$appendEvent`. Undefined
+event values are rejected. BEX core does not require events to be objects; hosts
+decide what event shape they accept.
 
 ## Determinism
 

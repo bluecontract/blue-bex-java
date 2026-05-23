@@ -50,7 +50,10 @@ public final class BexCompiledProgram {
 
     public BexValue constant(String name) {
         BexValue value = constants.get(name);
-        return value != null ? value : BexValues.undefined();
+        if (value == null) {
+            throw new BexException("Unknown constant: " + name);
+        }
+        return value;
     }
 
     /**

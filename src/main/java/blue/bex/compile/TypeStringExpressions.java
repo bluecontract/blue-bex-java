@@ -152,6 +152,35 @@ final class JoinExpr extends Expr {
     }
 }
 
+final class PointerJoinExpr extends Expr {
+    private final List<CompiledExpression> segments;
+
+    PointerJoinExpr(List<CompiledExpression> segments) {
+        this.segments = segments;
+    }
+
+    @Override
+    protected BexValue doEval(CompiledFrame frame) {
+        if (segments.isEmpty()) {
+            return BexValues.scalar("/");
+        }
+        StringBuilder out = new StringBuilder();
+        for (CompiledExpression expression : segments) {
+            BexValue value = expression.eval(frame);
+            if (value.isUndefined() || value.isNull()) {
+                throw new BexException("$pointerJoin segment cannot be null or undefined");
+            }
+            out.append('/');
+            out.append(escapeSegment(value.asText()));
+        }
+        return BexValues.scalar(out.toString());
+    }
+
+    private String escapeSegment(String segment) {
+        return segment.replace("~", "~0").replace("/", "~1");
+    }
+}
+
 final class SplitExpr extends Expr {
     private final CompiledExpression text;
     private final CompiledExpression separator;
