@@ -82,7 +82,7 @@ final class FrozenNodeBexValue extends AbstractBexValue {
 
     @Override
     public BexValue at(List<String> pointerSegments) {
-        FrozenNode selected = node.at(pointerSegments);
+        FrozenNode selected = node.at(JsonPointer.toPointer(pointerSegments));
         if (selected != null) {
             return BexValues.frozen(selected);
         }
