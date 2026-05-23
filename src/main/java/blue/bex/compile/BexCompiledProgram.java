@@ -1,5 +1,6 @@
 package blue.bex.compile;
 
+import blue.bex.BexException;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.runtime.CompiledStatement;
@@ -7,7 +8,9 @@ import blue.bex.runtime.Control;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.snapshot.FrozenNode;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,35 +58,42 @@ public final class BexCompiledProgram {
      */
     public static final class CompiledFunction {
         private final String name;
-        private final List<String> args;
-        private final Map<String, Integer> argSlotByName;
+        private final List<ArgSpec> args;
+        private final Map<String, ArgSpec> argByName;
+        private final ArgSpec[] argBySlot;
         private final List<CompiledStatement> statements;
         private final CompiledExpression expression;
         private final int frameSize;
 
         public CompiledFunction(String name,
-                                List<String> args,
+                                List<ArgSpec> args,
                                 List<CompiledStatement> statements,
                                 CompiledExpression expression,
                                 int frameSize) {
             this.name = name;
-            this.args = args;
-            LinkedHashMap<String, Integer> argSlots = new LinkedHashMap<>();
-            for (int i = 0; i < args.size(); i++) {
-                argSlots.put(args.get(i), i);
+            this.args = Collections.unmodifiableList(args);
+            LinkedHashMap<String, ArgSpec> argSpecs = new LinkedHashMap<>();
+            this.argBySlot = new ArgSpec[frameSize];
+            for (ArgSpec arg : args) {
+                argSpecs.put(arg.name(), arg);
+                if (arg.slot() >= 0 && arg.slot() < argBySlot.length) {
+                    argBySlot[arg.slot()] = arg;
+                }
             }
-            this.argSlotByName = Collections.unmodifiableMap(argSlots);
+            this.argByName = Collections.unmodifiableMap(argSpecs);
             this.statements = statements;
             this.expression = expression;
             this.frameSize = frameSize;
         }
 
         public String name() { return name; }
-        public List<String> args() { return args; }
+        public Collection<ArgSpec> args() { return args; }
         public int frameSize() { return frameSize; }
+        public boolean hasArg(String name) { return argByName.containsKey(name); }
+        public ArgSpec arg(String name) { return argByName.get(name); }
         public int argSlot(String name) {
-            Integer slot = argSlotByName.get(name);
-            return slot != null ? slot : -1;
+            ArgSpec arg = argByName.get(name);
+            return arg != null ? arg.slot() : -1;
         }
 
         public BexValue invokeRoot(BexRuntime runtime) {
@@ -97,6 +107,14 @@ public final class BexCompiledProgram {
             for (int i = 0; i < slots.length; i++) {
                 if (slots[i] >= 0) {
                     BexValue value = values[i];
+                    ArgSpec arg = slots[i] < argBySlot.length ? argBySlot[slots[i]] : null;
+                    if (arg != null && arg.typed()
+                            && !runtime.typeMatcher().matches(value, arg.pattern())) {
+                        throw new BexException("Function " + name
+                                + " argument " + arg.name()
+                                + " does not match declared Blue pattern at "
+                                + arg.sourcePointer());
+                    }
                     frame.set(slots[i], value != null ? value : BexValues.undefined());
                 }
             }
@@ -110,5 +128,27 @@ public final class BexCompiledProgram {
             }
             return runtime.defaultResultValue();
         }
+    }
+
+    public static final class ArgSpec {
+        private final String name;
+        private final int slot;
+        private final FrozenNode pattern;
+        private final boolean typed;
+        private final String sourcePointer;
+
+        public ArgSpec(String name, int slot, FrozenNode pattern, String sourcePointer) {
+            this.name = name;
+            this.slot = slot;
+            this.pattern = pattern;
+            this.typed = pattern != null && !pattern.isEmptyNode();
+            this.sourcePointer = sourcePointer;
+        }
+
+        public String name() { return name; }
+        public int slot() { return slot; }
+        public FrozenNode pattern() { return pattern; }
+        public boolean typed() { return typed; }
+        public String sourcePointer() { return sourcePointer; }
     }
 }

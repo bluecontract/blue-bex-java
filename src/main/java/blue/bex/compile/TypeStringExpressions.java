@@ -5,6 +5,7 @@ import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.snapshot.FrozenNode;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -75,6 +76,22 @@ final class UnaryExpr extends Expr {
     }
 }
 
+final class IsExpr extends Expr {
+    private final CompiledExpression valueExpression;
+    private final FrozenNode pattern;
+
+    IsExpr(CompiledExpression valueExpression, FrozenNode pattern) {
+        this.valueExpression = valueExpression;
+        this.pattern = pattern;
+    }
+
+    @Override
+    protected BexValue doEval(CompiledFrame frame) {
+        BexValue value = valueExpression.eval(frame);
+        return BexValues.scalar(frame.runtime().typeMatcher().matches(value, pattern));
+    }
+}
+
 enum VariadicOp { CONCAT, LIST_CONCAT, MERGE }
 
 final class VariadicExpr extends Expr {
@@ -124,7 +141,7 @@ final class JoinExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         BexValue list = items.eval(frame);
-        if (!list.isList()) throw new BexException("$join items must be a list");
+        if (!list.isList()) throw new BexException("$join list must be a list");
         String sep = separator.eval(frame).asText();
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < list.size(); i++) {

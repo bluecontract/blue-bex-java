@@ -103,6 +103,102 @@ BexProgramSource source = BexProgramSource.withDefinition(
 );
 ```
 
+## Function Arguments And Blue Patterns
+
+BEX function arguments may declare Blue type or shape patterns. BEX does not
+have a separate type enum or type system; declared argument patterns are Blue
+nodes and runtime values are checked with Blue's node/type matcher.
+
+```yaml
+functions:
+  capture:
+    args:
+      amount:
+        type: Integer
+      hotelOrder:
+        blueId: HotelOrderBlueId
+      request:
+        customerName:
+          type: Text
+          schema:
+            required: true
+        nights:
+          type: Integer
+          schema:
+            required: true
+    expr:
+      amount:
+        $var: amount
+      order:
+        $var: hotelOrder
+```
+
+All declared function arguments are required by the function call ABI for now.
+Unknown functions, extra argument names, and missing declared arguments fail at
+compile time. Typed arguments are checked after their call expressions are
+evaluated; a runtime mismatch throws `BexException`.
+
+Text `"400"` does not match the Blue `Integer` pattern. Use an explicit
+conversion when conversion is intended:
+
+```yaml
+$call:
+  function: capture
+  args:
+    amount:
+      $integer:
+        $event: /message/request/amount
+```
+
+Untyped required arguments remain supported by declaring an empty pattern:
+
+```yaml
+args:
+  input: {}
+```
+
+When BEX converts computed values back to Blue nodes for `$is`, function
+argument checks, or output conversion, Blue language keys keep their Blue
+meaning. For example, this computed value is a node with a `type` field and a
+`status` property, not an object with an ordinary property named `type`:
+
+```yaml
+type:
+  blueId: HotelOrderType
+status: confirmed
+```
+
+A bare `blueId` object is a Blue reference pattern:
+
+```yaml
+blueId: HotelOrderType
+```
+
+Do not combine `blueId` with sibling fields to describe a typed instance. Use
+`type: { blueId: ... }` for typed values.
+
+BEX programs are Blue documents, so BEX syntax must use valid Blue authoring
+forms. For user-defined name containers such as `functions`, `constants`,
+`args`, and `$call.args`, do not use Blue language keys as names. This includes
+`value`, `items`, `blueId`, `type`, `schema`, `name`, `description`,
+`itemType`, `keyType`, `valueType`, `mergePolicy`, `constraints`, `contracts`,
+`properties`, `$previous`, and `$pos`.
+
+For operator bodies, payload/reference/control keys such as `value`, `items`,
+`blueId`, `properties`, `$previous`, and `$pos` cannot be used as ordinary
+multi-field operands. Use BEX operand names such as `node`, `list`, `input`,
+`pattern`, `object`, `key`, `path`, `val`, `cond`, `then`, and `else`.
+
+Metadata keys such as `name`, `description`, `type`, `schema`, `itemType`,
+`keyType`, and `valueType` are legal Blue language fields, but they are not
+ordinary object properties. An operator may use one of them only when the BEX
+compiler explicitly supports that field.
+
+Function argument patterns and `$is.pattern` are static Blue patterns. BEX does
+not evaluate expressions inside those patterns, and it does not emulate Blue
+authoring sugar such as inline `type: Integer` preprocessing for computed type
+fields.
+
 ## Document Views
 
 `BexDocumentView` owns document pointer resolution, canonical reads, resolved
@@ -188,12 +284,23 @@ BEX operators are Blue objects whose single key starts with `$`.
 | Operator | Purpose |
 |---|---|
 | `$unwrap` | Unwrap Blue scalar wrapper values. |
+| `$is` | Return whether a value matches a Blue pattern. |
 | `$text` | Convert to text. |
 | `$integer` | Convert to exact integer. |
 | `$number` | Convert to exact decimal/number. |
 | `$boolean` | Convert to boolean. |
 | `$object` | Require an object, or default undefined to an empty object. |
 | `$list` | Require a list, or default undefined to an empty list. |
+
+`$is.pattern` is static Blue pattern data, not a BEX expression:
+
+```yaml
+$is:
+  node:
+    $event: /message/request/amount
+  pattern:
+    type: Integer
+```
 
 ### Strings
 
@@ -204,6 +311,14 @@ BEX operators are Blue objects whose single key starts with `$`.
 | `$split` | Split text. |
 | `$startsWith` | Check a prefix. |
 | `$sliceAfter` | Return text after a prefix. |
+
+```yaml
+$join:
+  list:
+    - a
+    - b
+  separator: ":"
+```
 
 ### Logic And Comparison
 
@@ -253,6 +368,10 @@ BEX operators are Blue objects whose single key starts with `$`.
 | `$choose` | Conditional expression. |
 | `$call` | Call a local function. |
 | `$literal` | Return payload without compiling nested operators. |
+
+`$literal` prevents normal expression compilation, but BEX still rejects
+BEX-looking operators inside Blue type-definition fields such as `type`,
+`itemType`, `keyType`, `valueType`, `blue`, and `schema`.
 
 ## Statement Operators
 

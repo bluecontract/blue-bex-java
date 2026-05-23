@@ -47,6 +47,16 @@ public final class BexContainsCache {
     }
 
     private boolean scan(FrozenNode node) {
+        if (node == null) {
+            return false;
+        }
+        if (scan(node.getType())
+                || scan(node.getItemType())
+                || scan(node.getKeyType())
+                || scan(node.getValueType())
+                || scan(node.getBlue())) {
+            return true;
+        }
         if (node.getProperties() != null) {
             if (node.getProperties().size() == 1) {
                 String key = node.getProperties().keySet().iterator().next();
