@@ -161,9 +161,9 @@ fun determineProjectVersion(): String {
             .find(tomlFile.readText())
             ?.groupValues
             ?.get(1)
-            ?: "0.1.0"
+            ?: "1.0.0"
     } else {
-        "0.1.0"
+        "1.0.0"
     }
     return baseVersion + if (System.getenv("CI") == null) "-SNAPSHOT" else ""
 }
