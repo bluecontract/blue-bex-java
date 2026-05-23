@@ -6,6 +6,7 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.BexCompiledProgramKey;
 import blue.bex.compile.BexNodeIdentity;
 import blue.bex.compile.LruBexCompiledProgramCache;
+import blue.language.Blue;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,8 @@ import static blue.bex.test.BexTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BexCompiledProgramCacheTest {
+    private final Blue blue = new Blue();
+
     @Test
     void differentNodesWithoutBlueIdDoNotCollide() {
         FrozenNode first = frozen(stepExpr(op("$document", "/status")));
@@ -46,5 +49,149 @@ class BexCompiledProgramCacheTest {
 
         assertNotEquals(BexCompiledProgramKey.from(BexProgramSource.withDefinition(step, definition, "a")),
                 BexCompiledProgramKey.from(BexProgramSource.withDefinition(step, definition, "b")));
+    }
+
+    @Test
+    void schemaDifferencesParticipateInCacheKeyAndCompiledBehavior() {
+        BexProgramSource minLengthOne = source(String.join("\n",
+                "type: Blue/BEX Program",
+                "functions:",
+                "  f:",
+                "    args:",
+                "      input:",
+                "        type: Text",
+                "        schema:",
+                "          minLength: 1",
+                "    expr:",
+                "      $var: input",
+                "expr:",
+                "  $call:",
+                "    function: f",
+                "    args:",
+                "      input: abc"));
+        BexProgramSource minLengthFive = source(String.join("\n",
+                "type: Blue/BEX Program",
+                "functions:",
+                "  f:",
+                "    args:",
+                "      input:",
+                "        type: Text",
+                "        schema:",
+                "          minLength: 5",
+                "    expr:",
+                "      $var: input",
+                "expr:",
+                "  $call:",
+                "    function: f",
+                "    args:",
+                "      input: abc"));
+
+        assertNotEquals(BexNodeIdentity.stable(minLengthOne.programNode()),
+                BexNodeIdentity.stable(minLengthFive.programNode()));
+        assertNotEquals(BexCompiledProgramKey.from(minLengthOne), BexCompiledProgramKey.from(minLengthFive));
+
+        BexEngine engine = BexEngine.builder()
+                .blue(blue)
+                .cache(new LruBexCompiledProgramCache())
+                .build();
+
+        assertEquals("abc", engine.compileAndExecute(minLengthOne, defaultContext()).value().toSimple());
+        assertThrows(BexException.class, () -> engine.compileAndExecute(minLengthFive, defaultContext()));
+    }
+
+    @Test
+    void valueTypeDifferencesParticipateInCacheKey() {
+        BexProgramSource integerValueType = source(String.join("\n",
+                "type: Blue/BEX Program",
+                "expr:",
+                "  valueType:",
+                "    type: Integer"));
+        BexProgramSource textValueType = source(String.join("\n",
+                "type: Blue/BEX Program",
+                "expr:",
+                "  valueType:",
+                "    type: Text"));
+
+        assertNotEquals(BexNodeIdentity.stable(integerValueType.programNode()),
+                BexNodeIdentity.stable(textValueType.programNode()));
+        assertNotEquals(BexCompiledProgramKey.from(integerValueType), BexCompiledProgramKey.from(textValueType));
+    }
+
+    @Test
+    void itemTypeDifferencesParticipateInCacheKey() {
+        assertDifferentProgramIdentities(
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  itemType:",
+                        "    type: Integer",
+                        "  items:",
+                        "    - 1"),
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  itemType:",
+                        "    type: Text",
+                        "  items:",
+                        "    - 1"));
+    }
+
+    @Test
+    void keyTypeDifferencesParticipateInCacheKey() {
+        assertDifferentProgramIdentities(
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  keyType:",
+                        "    type: Text",
+                        "  a: 1"),
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  keyType:",
+                        "    type: Integer",
+                        "  a: 1"));
+    }
+
+    @Test
+    void blueDifferencesParticipateInCacheKey() {
+        assertDifferentProgramIdentities(
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  blue:",
+                        "    source: A",
+                        "  value: payload"),
+                String.join("\n",
+                        "type: Blue/BEX Program",
+                        "expr:",
+                        "  blue:",
+                        "    source: B",
+                        "  value: payload"));
+    }
+
+    @Test
+    void mergePolicyDifferencesParticipateInCacheKey() {
+        BexProgramSource first = BexProgramSource.inline(frozen(stepExpr(new blue.language.model.Node()
+                .mergePolicy("replace")
+                .properties(props("a", v(1))))));
+        BexProgramSource second = BexProgramSource.inline(frozen(stepExpr(new blue.language.model.Node()
+                .mergePolicy("append")
+                .properties(props("a", v(1))))));
+
+        assertNotEquals(BexNodeIdentity.stable(first.programNode()), BexNodeIdentity.stable(second.programNode()));
+        assertNotEquals(BexCompiledProgramKey.from(first), BexCompiledProgramKey.from(second));
+    }
+
+    private BexProgramSource source(String yaml) {
+        return BexProgramSource.inline(FrozenNode.fromResolvedNode(blue.yamlToNode(yaml)));
+    }
+
+    private void assertDifferentProgramIdentities(String firstYaml, String secondYaml) {
+        BexProgramSource first = source(firstYaml);
+        BexProgramSource second = source(secondYaml);
+
+        assertNotEquals(BexNodeIdentity.stable(first.programNode()), BexNodeIdentity.stable(second.programNode()));
+        assertNotEquals(BexCompiledProgramKey.from(first), BexCompiledProgramKey.from(second));
     }
 }

@@ -6,6 +6,7 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.BexStepResults;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.compile.BexCompiledProgram;
+import blue.bex.gas.BexGasSchedule;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
@@ -28,11 +29,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,20 +55,6 @@ class BexRichFixtureTest {
             "      eventKind: Tiny",
             "      payload: x");
 
-    private final Blue blue = new Blue(blueId -> {
-        if ("HotelOrderType".equals(blueId)) {
-            return Collections.singletonList(YAML_BLUE.yamlToNode(String.join("\n",
-                    "status:",
-                    "  type: Text")));
-        }
-        if ("RestaurantOrderType".equals(blueId)) {
-            return Collections.singletonList(YAML_BLUE.yamlToNode(String.join("\n",
-                    "restaurantStatus:",
-                    "  type: Text")));
-        }
-        return Collections.emptyList();
-    });
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
     private final Yaml yaml = new Yaml();
 
     @TestFactory
@@ -79,23 +69,26 @@ class BexRichFixtureTest {
 
     private void runFixture(Path path) throws Exception {
         Map<String, Object> fixture = readFixture(path);
+        validateFixtureShape(fixture, path);
+        Blue blue = blueForFixture(fixture);
         Map<String, Object> expectation = map(fixture.get("expectation"));
         String outcome = string(expectation.get("outcome"));
         assertNotNull(outcome, "Fixture outcome is required: " + path);
 
         if ("parse-error".equals(outcome)) {
-            RuntimeException ex = assertThrows(RuntimeException.class, () -> parseProgram(fixture));
+            RuntimeException ex = assertThrows(RuntimeException.class, () -> parseProgram(fixture, blue));
             assertErrorContains(ex, expectation);
             return;
         }
         if ("parse-error-or-output-conversion-error".equals(outcome)) {
-            assertParseOrOutputConversionError(fixture, expectation);
+            assertParseOrOutputConversionError(fixture, expectation, blue);
             return;
         }
 
-        Node program = parseProgram(fixture);
+        Node program = parseProgram(fixture, blue);
         BexProgramSource source = BexProgramSource.inline(FrozenNode.fromResolvedNode(program));
-        BexExecutionContext context = context(fixture);
+        BexExecutionContext context = context(fixture, blue);
+        BexEngine engine = engineForFixture(fixture, blue);
 
         if ("compile-error".equals(outcome)) {
             BexException ex = assertThrows(BexException.class, () -> engine.compile(source));
@@ -115,7 +108,7 @@ class BexRichFixtureTest {
             return;
         }
         if ("gas-property".equals(outcome)) {
-            assertGasProperty(compiled, context, expectation);
+            assertGasProperty(engine, compiled, context, expectation, blue);
             return;
         }
         if (!"success".equals(outcome)) {
@@ -126,17 +119,17 @@ class BexRichFixtureTest {
         assertSuccessExpectations(result, expectation);
     }
 
-    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation) {
+    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation, Blue blue) {
         Node program;
         try {
-            program = parseProgram(fixture);
+            program = parseProgram(fixture, blue);
         } catch (RuntimeException ex) {
             assertErrorContains(ex, expectation);
             return;
         }
         BexProgramSource source = BexProgramSource.inline(FrozenNode.fromResolvedNode(program));
         try {
-            BexExecutionResult result = engine.compileAndExecute(source, context(fixture));
+            BexExecutionResult result = engineForFixture(fixture, blue).compileAndExecute(source, context(fixture, blue));
             assertOutputConversionError(result.value(), expectation);
         } catch (BexException ex) {
             assertErrorContains(ex, expectation);
@@ -156,13 +149,13 @@ class BexRichFixtureTest {
         assertErrorContains(thrown, expectation);
     }
 
-    private void assertGasProperty(BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation) {
+    private void assertGasProperty(BexEngine engine, BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation, Blue blue) {
         String property = string(expectation.get("property"));
         if (!"gasUsedGreaterThanEquivalentTinyEvent".equals(property)) {
             fail("Unsupported gas property: " + property);
         }
         long large = engine.execute(compiled, context).gasUsed();
-        long tiny = engine.compileAndExecute(source(TINY_EVENT_PROGRAM), context).gasUsed();
+        long tiny = engine.compileAndExecute(source(TINY_EVENT_PROGRAM, blue), context).gasUsed();
         assertTrue(large > tiny, "Expected large output gas " + large + " to be greater than tiny output gas " + tiny);
     }
 
@@ -176,25 +169,100 @@ class BexRichFixtureTest {
         if (expectation.containsKey("events")) {
             assertEquals(normalize(expectation.get("events")), normalize(result.events().asValue().toSimple()));
         }
+        if (expectation.containsKey("gasUsed")) {
+            assertEquals(longValue(expectation.get("gasUsed")), result.gasUsed(), "gasUsed mismatch");
+        }
     }
 
-    private BexExecutionContext context(Map<String, Object> fixture) {
+    private BexExecutionContext context(Map<String, Object> fixture, Blue blue) {
         Map<String, Object> context = map(fixture.get("context"));
         String scope = string(context.get("documentScope"));
         if (scope == null) {
             scope = "/";
         }
-        Node root = parseNodeSource(string(context.get("rootDocumentSource")));
-        Node event = parseNodeSource(string(context.get("eventSource")));
-        Node currentContract = parseNodeSource(string(context.get("currentContractSource")));
+        Node root = parseNodeSource(string(context.get("rootDocumentSource")), blue);
+        Node event = parseNodeSource(string(context.get("eventSource")), blue);
+        Node currentContract = parseNodeSource(string(context.get("currentContractSource")), blue);
+        long gasLimit = context.containsKey("gasLimit") ? longValue(context.get("gasLimit")) : 1_000_000L;
 
-        return BexExecutionContext.builder()
+        BexExecutionContext.Builder builder = BexExecutionContext.builder()
                 .document(new FrozenBexDocumentView(FrozenNode.fromResolvedNode(root), FrozenNode.fromResolvedNode(root), scope))
                 .event(BexValues.nodeSnapshot(event))
                 .currentContract(BexValues.nodeSnapshot(currentContract))
                 .steps(steps(context.get("stepsBinding")))
-                .gasLimit(1_000_000)
+                .gasLimit(gasLimit);
+        for (Map.Entry<String, Object> entry : map(context.get("bindings")).entrySet()) {
+            builder.binding(entry.getKey(), BexValues.fromSimple(normalize(entry.getValue())));
+        }
+        return builder.build();
+    }
+
+    private BexEngine engineForFixture(Map<String, Object> fixture, Blue blue) {
+        return BexEngine.builder()
+                .blue(blue)
+                .gasSchedule(gasSchedule(fixture))
                 .build();
+    }
+
+    private BexGasSchedule gasSchedule(Map<String, Object> fixture) {
+        Map<String, Object> overrides = map(fixture.get("gasSchedule"));
+        if (overrides.isEmpty()) {
+            return BexGasSchedule.defaults();
+        }
+        BexGasSchedule.Builder builder = BexGasSchedule.builder();
+        for (Map.Entry<String, Object> entry : overrides.entrySet()) {
+            long value = longValue(entry.getValue());
+            switch (entry.getKey()) {
+                case "expressionBase":
+                    builder.expressionBase(value);
+                    break;
+                case "statementBase":
+                    builder.statementBase(value);
+                    break;
+                case "documentRead":
+                    builder.documentRead(value);
+                    break;
+                case "eventRead":
+                    builder.eventRead(value);
+                    break;
+                case "stepsRead":
+                    builder.stepsRead(value);
+                    break;
+                case "currentContractRead":
+                    builder.currentContractRead(value);
+                    break;
+                case "varRead":
+                    builder.varRead(value);
+                    break;
+                case "resultValueRead":
+                    builder.resultValueRead(value);
+                    break;
+                case "pointerGetBase":
+                    builder.pointerGetBase(value);
+                    break;
+                case "pointerSetBase":
+                    builder.pointerSetBase(value);
+                    break;
+                case "objectSetBase":
+                    builder.objectSetBase(value);
+                    break;
+                case "appendChangeBase":
+                    builder.appendChangeBase(value);
+                    break;
+                case "appendEventBase":
+                    builder.appendEventBase(value);
+                    break;
+                case "forEachItem":
+                    builder.forEachItem(value);
+                    break;
+                case "functionCall":
+                    builder.functionCall(value);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported gasSchedule field: " + entry.getKey());
+            }
+        }
+        return builder.build();
     }
 
     private BexStepResults steps(Object stepsObject) {
@@ -206,18 +274,34 @@ class BexRichFixtureTest {
         return builder.build();
     }
 
-    private Node parseProgram(Map<String, Object> fixture) {
+    private Blue blueForFixture(Map<String, Object> fixture) {
+        Map<String, Object> definitions = map(fixture.get("blueDefinitions"));
+        if (definitions.isEmpty()) {
+            return new Blue();
+        }
+        Map<String, List<Node>> parsed = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : definitions.entrySet()) {
+            parsed.put(entry.getKey(), Collections.singletonList(YAML_BLUE.yamlToNode(requiredString(entry.getValue(),
+                    "blueDefinitions." + entry.getKey()))));
+        }
+        return new Blue(blueId -> {
+            List<Node> nodes = parsed.get(blueId);
+            return nodes != null ? nodes : Collections.emptyList();
+        });
+    }
+
+    private Node parseProgram(Map<String, Object> fixture, Blue blue) {
         return blue.yamlToNode(requiredString(fixture.get("programSource"), "programSource"));
     }
 
-    private Node parseNodeSource(String source) {
+    private Node parseNodeSource(String source, Blue blue) {
         if (source == null || source.trim().isEmpty()) {
             return blue.yamlToNode("{}");
         }
         return blue.yamlToNode(source);
     }
 
-    private BexProgramSource source(String source) {
+    private BexProgramSource source(String source, Blue blue) {
         return BexProgramSource.inline(FrozenNode.fromResolvedNode(blue.yamlToNode(source)));
     }
 
@@ -238,7 +322,9 @@ class BexRichFixtureTest {
         final Path root = Paths.get(url.toURI());
         List<Path> paths = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(root)) {
-            stream.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".yaml"))
+            stream.filter(path -> Files.isRegularFile(path)
+                            && path.getFileName().toString().endsWith(".yaml")
+                            && !"manifest.yaml".equals(path.getFileName().toString()))
                     .forEach(paths::add);
         }
         Collections.sort(paths);
@@ -248,6 +334,106 @@ class BexRichFixtureTest {
     private String displayName(Path path) {
         Path fileName = path.getFileName();
         return fileName != null ? fileName.toString() : path.toString();
+    }
+
+    private void validateFixtureShape(Map<String, Object> fixture, Path path) {
+        validateAllowedKeys(fixture, set("fixtureId", "title", "targetStatus", "tags", "context",
+                "blueDefinitions", "gasSchedule", "programSource", "expectation"), "fixture " + path);
+        requiredString(fixture.get("fixtureId"), "fixtureId");
+        requiredString(fixture.get("title"), "title");
+        validateTags(fixture.get("tags"), path);
+        validateTargetStatus(fixture.get("targetStatus"), path);
+        if (!fixture.containsKey("programSource")) {
+            throw new IllegalArgumentException("Fixture missing programSource: " + path);
+        }
+        if (!fixture.containsKey("expectation")) {
+            throw new IllegalArgumentException("Fixture missing expectation: " + path);
+        }
+
+        Map<String, Object> context = map(fixture.get("context"));
+        validateAllowedKeys(context, set("documentScope", "rootDocumentSource", "eventSource",
+                "currentContractSource", "stepsBinding", "gasLimit", "bindings"), "context in " + path);
+        if (context.containsKey("bindings")) {
+            map(context.get("bindings"));
+        }
+
+        Map<String, Object> definitions = map(fixture.get("blueDefinitions"));
+        for (Map.Entry<String, Object> entry : definitions.entrySet()) {
+            requiredString(entry.getValue(), "blueDefinitions." + entry.getKey());
+        }
+
+        validateAllowedKeys(map(fixture.get("gasSchedule")), gasScheduleFields(), "gasSchedule in " + path);
+
+        Map<String, Object> expectation = map(fixture.get("expectation"));
+        String outcome = string(expectation.get("outcome"));
+        if (outcome == null) {
+            throw new IllegalArgumentException("Fixture expectation missing outcome: " + path);
+        }
+        Set<String> allowedExpectation;
+        if ("success".equals(outcome)) {
+            allowedExpectation = set("outcome", "resultSimple", "changeset", "events", "gasUsed");
+        } else if ("gas-property".equals(outcome)) {
+            allowedExpectation = set("outcome", "property");
+        } else if ("parse-error".equals(outcome)
+                || "parse-error-or-output-conversion-error".equals(outcome)
+                || "compile-error".equals(outcome)
+                || "runtime-error".equals(outcome)
+                || "output-conversion-error".equals(outcome)) {
+            allowedExpectation = set("outcome", "errorContains");
+        } else {
+            throw new IllegalArgumentException("Unsupported fixture outcome: " + outcome + " in " + path);
+        }
+        validateAllowedKeys(expectation, allowedExpectation, "expectation in " + path);
+    }
+
+    private void validateTags(Object tags, Path path) {
+        if (tags == null) {
+            return;
+        }
+        if (!(tags instanceof List)) {
+            throw new IllegalArgumentException("Fixture tags must be a list: " + path);
+        }
+        for (Object tag : (List<?>) tags) {
+            String text = string(tag);
+            if (text == null || text.trim().isEmpty()) {
+                throw new IllegalArgumentException("Fixture tags must contain only non-empty text values: " + path);
+            }
+        }
+    }
+
+    private void validateTargetStatus(Object targetStatus, Path path) {
+        if (targetStatus == null) {
+            return;
+        }
+        String status = requiredString(targetStatus, "targetStatus");
+        if (!targetStatuses().contains(status)) {
+            throw new IllegalArgumentException("Unsupported targetStatus " + status + " in " + path);
+        }
+    }
+
+    private void validateAllowedKeys(Map<String, Object> values, Set<String> allowed, String label) {
+        for (String key : values.keySet()) {
+            if (!allowed.contains(key)) {
+                throw new IllegalArgumentException(label + " contains unsupported field: " + key);
+            }
+        }
+    }
+
+    private Set<String> gasScheduleFields() {
+        return set("expressionBase", "statementBase", "documentRead", "eventRead", "stepsRead",
+                "currentContractRead", "varRead", "resultValueRead", "pointerGetBase",
+                "pointerSetBase", "objectSetBase", "appendChangeBase", "appendEventBase",
+                "forEachItem", "functionCall");
+    }
+
+    private Set<String> targetStatuses() {
+        return set("current-pass", "current-compile-error", "current-runtime-error",
+                "current-output-conversion-error", "current-parse-error",
+                "current-parse-error-or-output-conversion-error", "current-gas-property");
+    }
+
+    private Set<String> set(String... values) {
+        return new LinkedHashSet<>(Arrays.asList(values));
     }
 
     private void assertErrorContains(Throwable ex, Map<String, Object> expectation) {
@@ -285,6 +471,16 @@ class BexRichFixtureTest {
 
     private String string(Object value) {
         return value != null ? String.valueOf(value) : null;
+    }
+
+    private long longValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String) {
+            return Long.parseLong((String) value);
+        }
+        throw new IllegalArgumentException("Expected integer value but found: " + value);
     }
 
     @SuppressWarnings("unchecked")
