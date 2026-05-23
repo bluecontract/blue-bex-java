@@ -1,8 +1,10 @@
 package blue.bex.compile;
 
+import blue.bex.BexException;
 import blue.bex.pointer.BexPointer;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
+import blue.bex.value.BexValue;
 
 import java.util.List;
 
@@ -89,7 +91,7 @@ final class DynamicPointerOperand implements PointerOperand {
 
     @Override
     public String authored(CompiledFrame frame) {
-        return expr.eval(frame).asText();
+        return PointerOperands.pointerText(expr.eval(frame));
     }
 
     @Override
@@ -146,7 +148,7 @@ final class DynamicValuePointerOperand implements PointerOperand {
 
     @Override
     public String authored(CompiledFrame frame) {
-        return StaticValuePointerOperand.normalize(expr.eval(frame).asText());
+        return StaticValuePointerOperand.normalize(PointerOperands.pointerText(expr.eval(frame)));
     }
 
     @Override
@@ -157,5 +159,17 @@ final class DynamicValuePointerOperand implements PointerOperand {
     @Override
     public List<String> segments(CompiledFrame frame) {
         return frame.runtime().parseDynamicPointer(absolute(frame));
+    }
+}
+
+final class PointerOperands {
+    private PointerOperands() {
+    }
+
+    static String pointerText(BexValue value) {
+        if (value == null || value.isUndefined() || value.isNull()) {
+            throw new BexException("Pointer operand cannot be null or undefined");
+        }
+        return value.asText();
     }
 }

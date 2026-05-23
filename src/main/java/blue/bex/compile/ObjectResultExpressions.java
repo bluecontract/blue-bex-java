@@ -43,8 +43,9 @@ final class ObjectSetExpr extends Expr {
 
     @Override
     protected BexValue doEval(CompiledFrame frame) {
-        frame.runtime().gas().charge(frame.runtime().gas().schedule().objectSetBase);
-        return BexValues.overlay(object.eval(frame), key.get(frame), value.eval(frame));
+        BexValue val = value.eval(frame);
+        frame.runtime().gas().chargeValue(frame.runtime().gas().schedule().objectSetBase, val);
+        return BexValues.overlay(object.eval(frame), key.get(frame), val);
     }
 }
 
@@ -89,7 +90,7 @@ final class PointerSetExpr extends Expr {
         BexValue val = "remove".equals(operation) ? BexValues.undefined() : value.eval(frame);
         BexValue base = object.eval(frame);
         validatePointerSetBase(base, segments);
-        frame.runtime().gas().charge(frame.runtime().gas().schedule().pointerSetBase + segments.size() + frame.runtime().gas().estimatedSize(val) / 64);
+        frame.runtime().gas().chargePointerValue(frame.runtime().gas().schedule().pointerSetBase, segments.size(), val);
         return BexValues.pointerSet(base, segments, val, operation);
     }
 

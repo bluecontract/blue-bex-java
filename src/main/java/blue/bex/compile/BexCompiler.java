@@ -30,6 +30,7 @@ public final class BexCompiler {
     private final BexContainsCache containsCache = new BexContainsCache();
     private final BexMetrics metrics;
     private Map<String, FunctionSignature> functionSignatures = Collections.emptyMap();
+    private Map<String, BexValue> constants = Collections.emptyMap();
     private String currentFunction = "$root";
 
     public BexCompiler(BexMetrics metrics) {
@@ -40,9 +41,10 @@ public final class BexCompiler {
         FrozenNode step = source.programNode();
         FrozenNode definition = source.definitionNode().orElse(null);
 
-        Map<String, BexValue> constants = new LinkedHashMap<>();
-        loadConstants(constants, prop(definition, "constants"));
-        loadConstants(constants, prop(step, "constants"));
+        Map<String, BexValue> loadedConstants = new LinkedHashMap<>();
+        loadConstants(loadedConstants, prop(definition, "constants"));
+        loadConstants(loadedConstants, prop(step, "constants"));
+        constants = Collections.unmodifiableMap(new LinkedHashMap<>(loadedConstants));
 
         Map<String, FrozenNode> functionNodes = new LinkedHashMap<>();
         loadFunctions(functionNodes, prop(definition, "functions"));
@@ -274,7 +276,7 @@ public final class BexCompiler {
             compiled = new ForEachStatement(compileExpr(required(prop(body, "in"), "$forEach.in"), scope, bodyPointer + "/in"),
                     slot, compileStatements(prop(body, "do"), scope, bodyPointer + "/do"));
         } else if ("$appendChange".equals(op)) {
-            compiled = new AppendChangeStatement(textOrExpr(prop(body, "op"), scope, "replace", bodyPointer + "/op"),
+            compiled = new AppendChangeStatement(textOrExpr(required(prop(body, "op"), "$appendChange.op"), scope, null, bodyPointer + "/op"),
                     pointerOperand(required(prop(body, "path"), "$appendChange.path"), scope, bodyPointer + "/path"),
                     prop(body, "val") != null ? compileExpr(prop(body, "val"), scope, bodyPointer + "/val") : null);
         } else if ("$appendChanges".equals(op)) {
@@ -355,7 +357,13 @@ public final class BexCompiler {
         if ("$steps".equals(op)) return stepsExpr(body, scope, pointer);
         if ("$currentContract".equals(op)) return contextPointerExpr(body, scope, ContextKind.CURRENT_CONTRACT, pointer);
         if ("$var".equals(op)) return new VarExpr(scope.resolveSlot(requiredText(body, "$var")));
-        if ("$const".equals(op)) return new ConstExpr(requiredText(body, "$const"));
+        if ("$const".equals(op)) {
+            String name = requiredText(body, "$const");
+            if (!constants.containsKey(name)) {
+                throw new BexException("Unknown constant: " + name);
+            }
+            return new ConstExpr(name);
+        }
         if ("$get".equals(op)) return new GetExpr(compileExpr(required(prop(body, "object"), "$get.object"), scope, pointer + "/object"), textOrExpr(required(prop(body, "key"), "$get.key"), scope, null, pointer + "/key"));
         if ("$changeset".equals(op)) return new ChangesetExpr();
         if ("$events".equals(op)) return new EventsExpr();
@@ -369,6 +377,7 @@ public final class BexCompiler {
         if ("$object".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.OBJECT);
         if ("$list".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.LIST);
         if ("$concat".equals(op)) return new VariadicExpr(compileExprList(body, scope, pointer), VariadicOp.CONCAT);
+        if ("$pointerJoin".equals(op)) return new PointerJoinExpr(compileExprList(body, scope, pointer));
         if ("$join".equals(op)) return new JoinExpr(compileExpr(required(prop(body, "list"), "$join.list"), scope, pointer + "/list"), compileExpr(required(prop(body, "separator"), "$join.separator"), scope, pointer + "/separator"));
         if ("$split".equals(op)) return new SplitExpr(compileExpr(required(prop(body, "text"), "$split.text"), scope, pointer + "/text"), compileExpr(required(prop(body, "separator"), "$split.separator"), scope, pointer + "/separator"), prop(body, "limit") != null ? compileExpr(prop(body, "limit"), scope, pointer + "/limit") : null);
         if ("$startsWith".equals(op)) return new BinaryTextExpr(compileExprList(body, scope, pointer), BinaryTextOp.STARTS_WITH);
@@ -397,8 +406,8 @@ public final class BexCompiler {
         if ("$listConcat".equals(op)) return new VariadicExpr(compileExprList(body, scope, pointer), VariadicOp.LIST_CONCAT);
         if ("$merge".equals(op)) return new VariadicExpr(compileExprList(body, scope, pointer), VariadicOp.MERGE);
         if ("$objectSet".equals(op)) return new ObjectSetExpr(compileExpr(required(prop(body, "object"), "$objectSet.object"), scope, pointer + "/object"), textOrExpr(required(prop(body, "key"), "$objectSet.key"), scope, null, pointer + "/key"), compileExpr(required(prop(body, "val"), "$objectSet.val"), scope, pointer + "/val"));
-        if ("$pointerGet".equals(op)) return new PointerGetExpr(compileExpr(required(prop(body, "object"), "$pointerGet.object"), scope, pointer + "/object"), pointerOperand(required(prop(body, "path"), "$pointerGet.path"), scope, pointer + "/path"), prop(body, "default") != null ? compileExpr(prop(body, "default"), scope, pointer + "/default") : null);
-        if ("$pointerSet".equals(op)) return new PointerSetExpr(compileExpr(required(prop(body, "object"), "$pointerSet.object"), scope, pointer + "/object"), textOrExpr(prop(body, "op"), scope, "set", pointer + "/op"), pointerOperand(required(prop(body, "path"), "$pointerSet.path"), scope, pointer + "/path"), prop(body, "val") != null ? compileExpr(prop(body, "val"), scope, pointer + "/val") : null);
+        if ("$pointerGet".equals(op)) return new PointerGetExpr(compileExpr(required(prop(body, "object"), "$pointerGet.object"), scope, pointer + "/object"), valuePointerOperand(required(prop(body, "path"), "$pointerGet.path"), scope, pointer + "/path"), prop(body, "default") != null ? compileExpr(prop(body, "default"), scope, pointer + "/default") : null);
+        if ("$pointerSet".equals(op)) return new PointerSetExpr(compileExpr(required(prop(body, "object"), "$pointerSet.object"), scope, pointer + "/object"), textOrExpr(prop(body, "op"), scope, "set", pointer + "/op"), valuePointerOperand(required(prop(body, "path"), "$pointerSet.path"), scope, pointer + "/path"), prop(body, "val") != null ? compileExpr(prop(body, "val"), scope, pointer + "/val") : null);
         if ("$choose".equals(op)) return new ChooseExpr(compileExpr(required(prop(body, "cond"), "$choose.cond"), scope, pointer + "/cond"), compileExpr(required(prop(body, "then"), "$choose.then"), scope, pointer + "/then"), prop(body, "else") != null ? compileExpr(prop(body, "else"), scope, pointer + "/else") : new LiteralExpr(BexValues.undefined()));
         if ("$call".equals(op)) return compileCall(body, scope, pointer);
         throw new BexException("Unknown expression operator: " + op);
@@ -427,7 +436,7 @@ public final class BexCompiler {
     }
 
     private CompiledExpression contextPointerExpr(FrozenNode body, CompileScope scope, ContextKind kind, String pointer) {
-        return new ContextPointerExpr(pointerOperand(body, scope, pointer), kind);
+        return new ContextPointerExpr(valuePointerOperand(body, scope, pointer), kind);
     }
 
     private CompiledExpression bindingExpr(FrozenNode body, CompileScope scope, String pointer) {
@@ -455,10 +464,10 @@ public final class BexCompiler {
             int dot = selector.indexOf('.');
             String step = dot >= 0 ? selector.substring(0, dot) : selector;
             String path = dot >= 0 ? "/" + selector.substring(dot + 1).replace('.', '/') : "/";
-            return new StepsExpr(new StaticTextExpr(step), StaticPointerOperand.absolute(path));
+            return new StepsExpr(new StaticTextExpr(step), StaticValuePointerOperand.of(path));
         }
         return new StepsExpr(textOrExpr(required(prop(body, "step"), "$steps.step"), scope, null, pointer + "/step"),
-                pointerOperand(prop(body, "path") != null ? prop(body, "path") : scalarNode("/"), scope, pointer + "/path"));
+                valuePointerOperand(prop(body, "path") != null ? prop(body, "path") : scalarNode("/"), scope, pointer + "/path"));
     }
 
     private CallExpr compileCall(FrozenNode body, CompileScope scope, String pointer) {

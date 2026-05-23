@@ -1,5 +1,6 @@
 package blue.bex.compile;
 
+import blue.bex.BexException;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.value.BexValue;
@@ -18,6 +19,9 @@ final class CallExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         BexCompiledProgram.CompiledFunction compiled = frame.runtime().program().functions().get(function);
+        if (compiled == null) {
+            throw new BexException("Unknown function: " + function);
+        }
         BexValue[] values = new BexValue[argExpressions.length];
         for (int i = 0; i < argExpressions.length; i++) {
             values[i] = argExpressions[i].eval(frame);
