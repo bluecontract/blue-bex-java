@@ -43,6 +43,7 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.yaml:snakeyaml:1.31")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

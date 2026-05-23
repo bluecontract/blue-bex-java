@@ -6,17 +6,14 @@ import blue.bex.value.BexValues;
 import blue.language.utils.JsonPointer;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Indexed overlay implementing observable reverse-scan $resultValue semantics.
+ * Ordered overlay materializing accumulated patch effects for $resultValue reads.
  */
 public final class BexResultOverlay {
     private final BexDocumentView document;
     private final List<BexPatchEntry> entries = new ArrayList<>();
-    private final Map<String, BexPatchEntry> latestByPath = new LinkedHashMap<>();
     private final BexMetrics metrics;
 
     public BexResultOverlay(BexDocumentView document, BexMetrics metrics) {
@@ -26,7 +23,6 @@ public final class BexResultOverlay {
 
     public void append(BexPatchEntry entry) {
         entries.add(entry);
-        latestByPath.put(entry.absolutePath(), entry);
     }
 
     public BexValue valueAt(String absolutePointer, List<String> segments) {
@@ -34,35 +30,64 @@ public final class BexResultOverlay {
             metrics.incrementResultValueReads();
         }
         String pointer = JsonPointer.canonicalize(absolutePointer);
-        BexPatchEntry exact = latestByPath.get(pointer);
-        if (exact != null) {
-            if (metrics != null) {
-                metrics.incrementResultOverlayExactHits();
-            }
-            return "remove".equals(exact.op()) ? BexValues.undefined() : exact.val();
-        }
         List<String> selected = segments != null ? segments : JsonPointer.split(pointer);
-        for (int length = selected.size() - 1; length >= 0; length--) {
-            String ancestorPointer = JsonPointer.toPointer(selected.subList(0, length));
-            BexPatchEntry ancestor = latestByPath.get(ancestorPointer);
-            if (ancestor == null) {
-                continue;
-            }
-            if ("remove".equals(ancestor.op())) {
-                if (metrics != null) {
-                    metrics.incrementResultOverlayAncestorHits();
-                }
-                return BexValues.undefined();
-            }
-            BexValue value = ancestor.val().at(selected.subList(length, selected.size()));
-            if (metrics != null) {
-                metrics.incrementResultOverlayAncestorHits();
-            }
-            return value;
+        recordOverlayMetric(pointer, selected);
+        if (entries.isEmpty()) {
+            return document.canonicalAt(pointer);
         }
-        if (metrics != null) {
+        BexValue materialized = document.canonicalAt("/");
+        for (BexPatchEntry entry : entries) {
+            materialized = apply(materialized, entry);
+        }
+        return materialized.at(selected);
+    }
+
+    private BexValue apply(BexValue root, BexPatchEntry entry) {
+        if (entry.absoluteSegments().isEmpty()) {
+            return "remove".equals(entry.op()) ? BexValues.undefined() : entry.val();
+        }
+        return BexValues.pointerSet(root, entry.absoluteSegments(), entry.val(),
+                "remove".equals(entry.op()) ? "remove" : "set");
+    }
+
+    private void recordOverlayMetric(String pointer, List<String> selected) {
+        if (metrics == null) {
+            return;
+        }
+        boolean exact = false;
+        boolean ancestor = false;
+        boolean descendant = false;
+        for (BexPatchEntry entry : entries) {
+            if (entry.absolutePath().equals(pointer)) {
+                exact = true;
+            } else if (isPrefix(entry.absoluteSegments(), selected)) {
+                ancestor = true;
+            } else if (isPrefix(selected, entry.absoluteSegments())) {
+                descendant = true;
+            }
+        }
+        if (exact) {
+            metrics.incrementResultOverlayExactHits();
+            return;
+        }
+        if (ancestor) {
+            metrics.incrementResultOverlayAncestorHits();
+            return;
+        }
+        if (!descendant) {
             metrics.incrementResultOverlayDocumentFallbacks();
         }
-        return document.canonicalAt(pointer);
+    }
+
+    private boolean isPrefix(List<String> prefix, List<String> segments) {
+        if (prefix.size() >= segments.size()) {
+            return false;
+        }
+        for (int i = 0; i < prefix.size(); i++) {
+            if (!prefix.get(i).equals(segments.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 }

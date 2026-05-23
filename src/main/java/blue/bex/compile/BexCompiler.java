@@ -272,9 +272,15 @@ public final class BexCompiler {
                     compileStatements(prop(body, "then"), scope, bodyPointer + "/then"),
                     compileStatements(prop(body, "else"), scope, bodyPointer + "/else"));
         } else if ("$forEach".equals(op)) {
-            int slot = scope.declareOrGetSlot(requiredText(prop(body, "item"), "$forEach.item"));
+            String itemName = requiredText(prop(body, "item"), "$forEach.item");
+            String keyName = prop(body, "key") != null ? requiredText(prop(body, "key"), "$forEach.key") : null;
+            String indexName = prop(body, "index") != null ? requiredText(prop(body, "index"), "$forEach.index") : null;
+            validateDistinctForEachBindings(itemName, keyName, indexName);
+            int slot = scope.declareOrGetSlot(itemName);
+            int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
+            int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
             compiled = new ForEachStatement(compileExpr(required(prop(body, "in"), "$forEach.in"), scope, bodyPointer + "/in"),
-                    slot, compileStatements(prop(body, "do"), scope, bodyPointer + "/do"));
+                    slot, keySlot, indexSlot, compileStatements(prop(body, "do"), scope, bodyPointer + "/do"));
         } else if ("$appendChange".equals(op)) {
             compiled = new AppendChangeStatement(textOrExpr(required(prop(body, "op"), "$appendChange.op"), scope, null, bodyPointer + "/op"),
                     pointerOperand(required(prop(body, "path"), "$appendChange.path"), scope, bodyPointer + "/path"),
@@ -393,6 +399,7 @@ public final class BexCompiler {
         if ("$not".equals(op)) return new NotExpr(compileExpr(body, scope, pointer));
         if ("$truthy".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.TRUTHY);
         if ("$empty".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EMPTY);
+        if ("$exists".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EXISTS);
         if ("$coalesce".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$default".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$add".equals(op)) return new NumericExpr(compileExprList(body, scope, pointer), NumericOp.ADD);
@@ -531,7 +538,7 @@ public final class BexCompiler {
         if (node.getValue() != null && node.getProperties() == null && node.getItems() == null) {
             return new StaticTextExpr(String.valueOf(node.getValue()));
         }
-        return new DynamicTextExpr(compileExpr(node, scope, pointer));
+        return new DynamicTextExpr(compileExpr(node, scope, pointer), pointer);
     }
 
     private PointerOperand pointerOperand(FrozenNode node, CompileScope scope, String pointer) {
@@ -669,6 +676,18 @@ public final class BexCompiler {
 
     private CompiledStatement sourceStatement(String functionName, String pointer, String operator, CompiledStatement statement) {
         return new SourceStatement(BexSourcePath.of(functionName, pointer, operator), statement);
+    }
+
+    private void validateDistinctForEachBindings(String itemName, String keyName, String indexName) {
+        if (keyName != null && keyName.equals(itemName)) {
+            throw new BexException("$forEach.key must use a different binding name than $forEach.item");
+        }
+        if (indexName != null && indexName.equals(itemName)) {
+            throw new BexException("$forEach.index must use a different binding name than $forEach.item");
+        }
+        if (keyName != null && indexName != null && keyName.equals(indexName)) {
+            throw new BexException("$forEach.key must use a different binding name than $forEach.index");
+        }
     }
 
     private String escape(String segment) {

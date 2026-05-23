@@ -299,6 +299,11 @@ Static omitted/default paths may intentionally read a root/default location.
 Dynamic pointer expressions that evaluate to `null` or undefined fail instead
 of silently becoming the current document scope or root value.
 
+Dynamic text operands also reject `null` and undefined. This applies to
+operator fields such as `$get.key`, `$objectSet.key`, `$binding.name`,
+`$steps.step`, `$appendChange.op`, and `$pointerSet.op`. A static empty string
+is still allowed when it is explicitly authored.
+
 Use `$pointerJoin` when building document paths from dynamic path segments. Each
 item is treated as one JSON Pointer segment and escaped safely:
 
@@ -379,7 +384,24 @@ $join:
 | `$gt`, `$gte`, `$lt`, `$lte` | Numeric comparisons. |
 | `$and`, `$or`, `$not` | Boolean logic with short-circuiting. |
 | `$truthy`, `$empty` | Truthiness checks. |
+| `$exists` | Return false only for undefined values. |
 | `$coalesce` | First non-empty value. |
+
+`$exists` is useful for optional-field validation because it distinguishes a
+missing value from present falsy values. It returns `true` for `null`, `false`,
+`0`, empty text, and empty list/object values:
+
+```yaml
+$or:
+  - $not:
+      $exists:
+        $event: /message/request/note
+  - $is:
+      node:
+        $event: /message/request/note
+      pattern:
+        type: Text
+```
 
 ### Numeric
 
@@ -440,6 +462,29 @@ BEX-looking operators inside Blue type-definition fields such as `type`,
 | `$return` | Return the result value. |
 | `$fail` | Fail deterministically. |
 
+`$forEach` can bind list indexes and object keys when those are needed for
+patch paths:
+
+```yaml
+$forEach:
+  in:
+    $event: /message/request/orders
+  item: order
+  index: i
+  do:
+    - $appendChange:
+        op: replace
+        path:
+          $pointerJoin:
+            - orders
+            - $var: i
+            - status
+        val: received
+```
+
+For object iteration, use `key` and `item` to bind the object key and value
+separately. The older form with only `item` still binds `{ key, val }`.
+
 ## Results And Accumulators
 
 `BexExecutionResult` contains:
@@ -452,6 +497,13 @@ BEX-looking operators inside Blue type-definition fields such as `type`,
 
 BEX computes these values only. The host decides whether patches are applied,
 events are emitted, or accumulators are treated as ordinary data.
+
+`$resultValue` reads the document value after applying accumulated patches in
+order. Parent reads reflect descendant object patches, so reading
+`/hotelOrder` after replacing `/hotelOrder/status` returns the original
+`hotelOrder` object with the updated status. Current materialization supports
+object paths and list index replacement. Array insertion/removal semantics are
+not modeled as full JSON Patch array shifts.
 
 `$appendChanges` validates each patch entry the same way as `$appendChange`.
 Supported patch operations are `add`, `replace`, and `remove`. `add` and
@@ -480,7 +532,7 @@ The engine is compiled-first:
 - static pointers are parsed at compile time;
 - document and binding reads use cursor-backed values where possible;
 - `$objectSet` and `$pointerSet` use overlay values;
-- `$resultValue` uses an indexed overlay;
+- `$resultValue` materializes accumulated patch overlays for reads;
 - output conversion to `Node`, `FrozenNode`, or simple Java values is explicit.
 
 Every result includes `BexMetrics`:

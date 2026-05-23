@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-enum UnaryOp { UNWRAP, TEXT, INTEGER, NUMBER, BOOLEAN, OBJECT, LIST, TRUTHY, EMPTY, KEYS, ENTRIES, SIZE }
+enum UnaryOp { UNWRAP, TEXT, INTEGER, NUMBER, BOOLEAN, OBJECT, LIST, TRUTHY, EMPTY, EXISTS, KEYS, ENTRIES, SIZE }
 
 final class UnaryExpr extends Expr {
     private final CompiledExpression expression;
@@ -55,6 +55,8 @@ final class UnaryExpr extends Expr {
                 return BexValues.scalar(BexValues.truthy(value));
             case EMPTY:
                 return BexValues.scalar(BexValues.empty(value));
+            case EXISTS:
+                return BexValues.scalar(!value.isUndefined());
             case KEYS:
                 List<BexValue> keys = new ArrayList<>();
                 for (String key : value.keys()) keys.add(BexValues.scalar(key));

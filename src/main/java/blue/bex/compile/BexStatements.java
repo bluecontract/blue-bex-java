@@ -10,6 +10,7 @@ import blue.bex.runtime.Control;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,11 +105,15 @@ final class IfStatement extends Stmt {
 final class ForEachStatement extends Stmt {
     private final CompiledExpression input;
     private final int itemSlot;
+    private final int keySlot;
+    private final int indexSlot;
     private final List<CompiledStatement> body;
 
-    ForEachStatement(CompiledExpression input, int itemSlot, List<CompiledStatement> body) {
+    ForEachStatement(CompiledExpression input, int itemSlot, int keySlot, int indexSlot, List<CompiledStatement> body) {
         this.input = input;
         this.itemSlot = itemSlot;
+        this.keySlot = keySlot;
+        this.indexSlot = indexSlot;
         this.body = body;
     }
 
@@ -119,10 +124,18 @@ final class ForEachStatement extends Stmt {
             for (String key : value.keys()) {
                 frame.runtime().metrics().incrementLoopIterations();
                 frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
-                Map<String, BexValue> entry = new LinkedHashMap<>();
-                entry.put("key", BexValues.scalar(key));
-                entry.put("val", value.get(key));
-                frame.set(itemSlot, BexValues.map(entry));
+                if (keySlot >= 0) {
+                    frame.set(keySlot, BexValues.scalar(key));
+                    frame.set(itemSlot, value.get(key));
+                } else {
+                    Map<String, BexValue> entry = new LinkedHashMap<>();
+                    entry.put("key", BexValues.scalar(key));
+                    entry.put("val", value.get(key));
+                    frame.set(itemSlot, BexValues.map(entry));
+                }
+                if (indexSlot >= 0) {
+                    frame.set(indexSlot, BexValues.undefined());
+                }
                 for (CompiledStatement statement : body) {
                     if (statement.exec(frame) == Control.RETURN) return Control.RETURN;
                 }
@@ -132,6 +145,12 @@ final class ForEachStatement extends Stmt {
                 frame.runtime().metrics().incrementLoopIterations();
                 frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
                 frame.set(itemSlot, value.get(String.valueOf(i)));
+                if (indexSlot >= 0) {
+                    frame.set(indexSlot, BexValues.scalar(BigInteger.valueOf(i)));
+                }
+                if (keySlot >= 0) {
+                    frame.set(keySlot, BexValues.undefined());
+                }
                 for (CompiledStatement statement : body) {
                     if (statement.exec(frame) == Control.RETURN) return Control.RETURN;
                 }

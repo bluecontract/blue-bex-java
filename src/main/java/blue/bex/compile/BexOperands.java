@@ -33,14 +33,16 @@ final class StaticTextExpr implements TextOperand {
 
 final class DynamicTextExpr implements TextOperand {
     private final CompiledExpression expr;
+    private final String label;
 
-    DynamicTextExpr(CompiledExpression expr) {
+    DynamicTextExpr(CompiledExpression expr, String label) {
         this.expr = expr;
+        this.label = label;
     }
 
     @Override
     public String get(CompiledFrame frame) {
-        return expr.eval(frame).asText();
+        return TextOperands.text(expr.eval(frame), label);
     }
 }
 
@@ -169,6 +171,18 @@ final class PointerOperands {
     static String pointerText(BexValue value) {
         if (value == null || value.isUndefined() || value.isNull()) {
             throw new BexException("Pointer operand cannot be null or undefined");
+        }
+        return value.asText();
+    }
+}
+
+final class TextOperands {
+    private TextOperands() {
+    }
+
+    static String text(BexValue value, String label) {
+        if (value == null || value.isUndefined() || value.isNull()) {
+            throw new BexException(label + " cannot be null or undefined");
         }
         return value.asText();
     }
