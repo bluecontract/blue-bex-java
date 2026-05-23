@@ -56,6 +56,9 @@ public final class BexFrozenWriter {
             return factory.list(items, metrics);
         }
         if (value.isObject()) {
+            if (BexBlueNodeWriter.hasLanguageField(value)) {
+                return FrozenNode.fromResolvedNode(BexBlueNodeWriter.toNode(value));
+            }
             Map<String, FrozenNode> properties = new LinkedHashMap<>();
             for (String key : value.keys()) {
                 BexValue child = value.get(key);

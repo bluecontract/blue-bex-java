@@ -70,7 +70,7 @@ class BexEngineConformanceTest {
         cases.add(c("object undefined", op("$object", op("$document", "/none")), m()));
         cases.add(c("list undefined", op("$list", op("$document", "/none")), l()));
         cases.add(c("concat", op("$concat", list("a", op("$document", "/status"))), "aactive"));
-        cases.add(c("join", op("$join", obj("items", list("a", "b"), "separator", ":")), "a:b"));
+        cases.add(c("join", op("$join", obj("list", list("a", "b"), "separator", ":")), "a:b"));
         cases.add(c("split basic", op("$split", obj("text", "a:b:c", "separator", ":")), l("a", "b", "c")));
         cases.add(c("split empty segment", op("$split", obj("text", "a::c", "separator", ":")), l("a", "", "c")));
         cases.add(c("split trailing empty", op("$split", obj("text", "a:", "separator", ":")), l("a", "")));
@@ -229,7 +229,7 @@ class BexEngineConformanceTest {
                 "functions", obj("sum", sum, "missing", missing),
                 "do", list(
                         op("$let", obj("name", "first", "expr", op("$call", obj("function", "sum", "args", obj("a", 1, "b", 2, "c", 3))))),
-                        op("$let", obj("name", "second", "expr", op("$call", obj("function", "missing", "args", obj("a", "set"))))),
+                        op("$let", obj("name", "second", "expr", op("$call", obj("function", "missing", "args", obj("a", "set", "b", op("$document", "/missing")))))),
                         op("$return", obj("first", op("$var", "first"), "second", op("$var", "second")))
                 )
         );

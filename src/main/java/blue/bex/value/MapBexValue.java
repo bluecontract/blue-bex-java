@@ -50,16 +50,7 @@ final class MapBexValue extends AbstractBexValue {
 
     @Override
     public Node toNode() {
-        Node node = new Node();
-        LinkedHashMap<String, Node> properties = new LinkedHashMap<>();
-        for (String key : keys()) {
-            BexValue value = values.get(key);
-            if (value != null && !value.isUndefined()) {
-                properties.put(key, value.toNode());
-            }
-        }
-        node.properties(properties);
-        return node;
+        return BexNodeWriter.toNode(this);
     }
 
     @Override

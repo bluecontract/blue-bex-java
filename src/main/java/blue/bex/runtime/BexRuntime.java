@@ -9,8 +9,10 @@ import blue.bex.result.BexChangeset;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.bex.result.BexResultOverlay;
+import blue.bex.type.BexBlueTypeMatcher;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.Blue;
 import blue.language.utils.JsonPointer;
 
 import java.util.LinkedHashMap;
@@ -27,9 +29,11 @@ public final class BexRuntime {
     private final BexMetrics metrics;
     private final BexPointerCache pointerCache;
     private final BexExecutionAccumulator accumulator;
+    private final BexBlueTypeMatcher typeMatcher;
 
     public BexRuntime(BexCompiledProgram program,
                       BexExecutionContext context,
+                      Blue blue,
                       BexGasSchedule gasSchedule,
                       BexMetrics metrics,
                       BexPointerCache pointerCache) {
@@ -39,6 +43,7 @@ public final class BexRuntime {
         this.metrics = metrics;
         this.pointerCache = pointerCache;
         this.accumulator = new BexExecutionAccumulator(new BexResultOverlay(context.document(), metrics));
+        this.typeMatcher = new BexBlueTypeMatcher(blue);
     }
 
     public BexExecutionResult execute() {
@@ -53,6 +58,7 @@ public final class BexRuntime {
     public BexMetrics metrics() { return metrics; }
     public BexPointerCache pointerCache() { return pointerCache; }
     public BexExecutionAccumulator accumulator() { return accumulator; }
+    public BexBlueTypeMatcher typeMatcher() { return typeMatcher; }
 
     public BexValue readDocument(String absolutePointer, List<String> precompiledSegments, boolean resolved) {
         if (resolved) {

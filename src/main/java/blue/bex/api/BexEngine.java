@@ -10,6 +10,7 @@ import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.bex.runtime.BexRuntime;
+import blue.language.Blue;
 
 /**
  * Public entry point for compiling and executing selected BEX programs.
@@ -20,12 +21,14 @@ import blue.bex.runtime.BexRuntime;
  * emit events, or perform host actions.</p>
  */
 public final class BexEngine {
+    private final Blue blue;
     private final BexGasSchedule gasSchedule;
     private final BexCompiledProgramCache cache;
     private final BexMetricsSink metricsSink;
     private final BexPointerCache pointerCache = new BexPointerCache();
 
     private BexEngine(Builder builder) {
+        this.blue = builder.blue;
         this.gasSchedule = builder.gasSchedule;
         this.cache = builder.cache;
         this.metricsSink = builder.metricsSink;
@@ -43,6 +46,8 @@ public final class BexEngine {
     }
 
     private BexCompiledProgram compile(BexProgramSource source, BexMetrics metrics) {
+        long start = System.nanoTime();
+        try {
         BexCompiledProgramKey key = key(source);
         BexCompiledProgram cached = cache.get(key);
         if (cached != null) {
@@ -53,6 +58,9 @@ public final class BexEngine {
         BexCompiledProgram program = new BexCompiler(metrics).compile(source);
         cache.put(key, program);
         return program;
+        } finally {
+            metrics.addCompileNanos(System.nanoTime() - start);
+        }
     }
 
     public BexExecutionResult execute(BexCompiledProgram program, BexExecutionContext context) {
@@ -63,8 +71,15 @@ public final class BexEngine {
     }
 
     private BexExecutionResult execute(BexCompiledProgram program, BexExecutionContext context, BexMetrics metrics) {
-        BexRuntime runtime = new BexRuntime(program, context, gasSchedule, metrics, pointerCache);
-        return runtime.execute();
+        long start = System.nanoTime();
+        BexRuntime runtime = new BexRuntime(program, context, blue, gasSchedule, metrics, pointerCache);
+        BexExecutionResult result = runtime.execute();
+        metrics.addExecuteNanos(System.nanoTime() - start);
+        return new BexExecutionResult(result.value(),
+                result.changeset(),
+                result.events(),
+                result.gasUsed(),
+                metrics);
     }
 
     public BexExecutionResult compileAndExecute(BexProgramSource source, BexExecutionContext context) {
@@ -80,9 +95,15 @@ public final class BexEngine {
     }
 
     public static final class Builder {
+        private Blue blue = new Blue();
         private BexGasSchedule gasSchedule = BexGasSchedule.defaults();
         private BexCompiledProgramCache cache = new LruBexCompiledProgramCache();
         private BexMetricsSink metricsSink = BexMetricsSink.NOOP;
+
+        public Builder blue(Blue blue) {
+            this.blue = blue != null ? blue : new Blue();
+            return this;
+        }
 
         public Builder gasSchedule(BexGasSchedule gasSchedule) {
             this.gasSchedule = gasSchedule;

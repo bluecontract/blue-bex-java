@@ -57,7 +57,7 @@ public final class FrozenBexDocumentView implements BexDocumentView {
 
     private BexValue read(FrozenNode root, String pointer) {
         List<String> segments = JsonPointer.split(pointer);
-        FrozenNode selected = root.at(segments);
+        FrozenNode selected = root.at(JsonPointer.toPointer(segments));
         if (selected != null) {
             return BexValues.frozen(selected);
         }

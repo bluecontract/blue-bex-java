@@ -41,6 +41,8 @@ public final class BexMetrics {
     private long sizeEstimateCacheMisses;
     private long frozenWriterNodeFallbacks;
     private long frozenWriterChildNodeRoundTrips;
+    private long compileNanos;
+    private long executeNanos;
 
     public BexMetrics copy() {
         BexMetrics copy = new BexMetrics();
@@ -77,6 +79,8 @@ public final class BexMetrics {
         copy.sizeEstimateCacheMisses = sizeEstimateCacheMisses;
         copy.frozenWriterNodeFallbacks = frozenWriterNodeFallbacks;
         copy.frozenWriterChildNodeRoundTrips = frozenWriterChildNodeRoundTrips;
+        copy.compileNanos = compileNanos;
+        copy.executeNanos = executeNanos;
         return copy;
     }
 
@@ -113,6 +117,8 @@ public final class BexMetrics {
     public void incrementSizeEstimateCacheMisses() { sizeEstimateCacheMisses++; }
     public void incrementFrozenWriterNodeFallbacks() { frozenWriterNodeFallbacks++; }
     public void incrementFrozenWriterChildNodeRoundTrips() { frozenWriterChildNodeRoundTrips++; }
+    public void addCompileNanos(long nanos) { compileNanos += Math.max(0L, nanos); }
+    public void addExecuteNanos(long nanos) { executeNanos += Math.max(0L, nanos); }
 
     public long compiledExecutions() { return compiledExecutions; }
     public long compileCacheHits() { return compileCacheHits; }
@@ -147,4 +153,6 @@ public final class BexMetrics {
     public long sizeEstimateCacheMisses() { return sizeEstimateCacheMisses; }
     public long frozenWriterNodeFallbacks() { return frozenWriterNodeFallbacks; }
     public long frozenWriterChildNodeRoundTrips() { return frozenWriterChildNodeRoundTrips; }
+    public long compileNanos() { return compileNanos; }
+    public long executeNanos() { return executeNanos; }
 }
