@@ -163,7 +163,7 @@ class BexEngineConformanceTest {
                 op("$appendChange", obj("op", "replace", "path", "/status", "val", "ready")),
                 op("$appendChange", obj("op", "replace", "path", "/status", "val", "done")),
                 op("$appendEvent", obj("kind", "Calculated")),
-                op("$return", obj())
+                emptyStatement()
         ));
 
         BexExecutionResult result = runStep(step, defaultContext());
@@ -351,6 +351,15 @@ class BexEngineConformanceTest {
     }
 
     @Test
+    void expressionSourceCompilesFrozenExpressionWithoutProgramWrapper() {
+        BexExecutionResult result = BexEngine.builder().build()
+                .compileAndExecute(BexProgramSource.expression(frozen(op("$document", "/status"))), defaultContext());
+
+        assertEquals("active", simple(result.value()));
+        assertEquals(0, result.metrics().interpretedFallbacks());
+    }
+
+    @Test
     void cacheCompilesSelectedStepOnce() {
         LruBexCompiledProgramCache cache = new LruBexCompiledProgramCache();
         BexEngine engine = BexEngine.builder().cache(cache).build();
@@ -408,7 +417,7 @@ class BexEngineConformanceTest {
                 "do", list(
                         op("$appendEvent", op("$const", "large")),
                         op("$appendEvent", op("$const", "large")),
-                        op("$return", obj())
+                        emptyStatement()
                 )
         );
 
@@ -542,6 +551,10 @@ class BexEngineConformanceTest {
         return obj(name, body);
     }
 
+    private static Node emptyStatement() {
+        return obj("$empty", true);
+    }
+
     private static Node obj(Object... keysAndValues) {
         return new Node().properties(props(keysAndValues));
     }
@@ -590,7 +603,7 @@ class BexEngineConformanceTest {
     }
 
     private static Map<String, Object> docSimple() {
-        return m("count", bi(5), "list", l("a", "b"), "nested", m("flag", true, "name", "node"), "state", m("ready", false), "status", "active");
+        return m("count", bi(5), "list", l("a", "b"), "name", "Root", "nested", m("flag", true, "name", "node"), "state", m("ready", false), "status", "active");
     }
 
     private static Map<String, Object> m(Object... keysAndValues) {

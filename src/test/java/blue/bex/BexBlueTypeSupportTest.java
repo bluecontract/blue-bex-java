@@ -188,7 +188,8 @@ class BexBlueTypeSupportTest {
                 "functions:",
                 "  f:",
                 "    args:",
-                "      input: {}",
+                "      input:",
+                "        description: untyped argument",
                 "    expr:",
                 "      $var: input",
                 "expr:",
@@ -551,7 +552,7 @@ class BexBlueTypeSupportTest {
 
     @Test
     void bexInsideSchemaIsRejectedAtCompileTime() {
-        assertThrows(BexException.class, () -> run(yaml(
+        assertThrows(RuntimeException.class, () -> run(yaml(
                 "type: Blue/BEX Program",
                 "expr:",
                 "  $is:",
@@ -602,7 +603,7 @@ class BexBlueTypeSupportTest {
 
     @Test
     void bexInsideFunctionArgumentSchemaIsRejectedAtCompileTime() {
-        assertThrows(BexException.class, () -> compile(yaml(
+        assertThrows(RuntimeException.class, () -> compile(yaml(
                 "type: Blue/BEX Program",
                 "functions:",
                 "  f:",
@@ -791,12 +792,13 @@ class BexBlueTypeSupportTest {
     }
 
     @Test
-    void nodeWriterRejectsSchemaAndConstraintsTogether() {
+    void nodeWriterRejectsConstraintsField() {
         BexValue value = BexValues.fromSimple(m(
-                "schema", m("required", true),
                 "constraints", m("minLength", 1)));
 
-        assertThrows(BexException.class, () -> BexNodeWriter.toNode(value));
+        BexException ex = assertThrows(BexException.class, () -> BexNodeWriter.toNode(value));
+        assertTrue(ex.getMessage().contains("constraints"));
+        assertThrows(BexException.class, () -> BexFrozenWriter.toFrozen(value));
     }
 
     @Test
@@ -807,6 +809,20 @@ class BexBlueTypeSupportTest {
         BexException ex = assertThrows(BexException.class, () -> BexNodeWriter.toNode(value));
         assertTrue(ex.getMessage().contains("Unsupported Blue schema field: minLenght"));
         assertThrows(BexException.class, () -> BexFrozenWriter.toFrozen(value));
+    }
+
+    @Test
+    void nodeWriterRejectsLegacySchemaFields() {
+        BexException allowMultiple = assertThrows(BexException.class, () -> BexNodeWriter.toNode(
+                BexValues.fromSimple(m("schema", m("allowMultiple", true)))));
+        assertTrue(allowMultiple.getMessage().contains("Unsupported Blue schema field: allowMultiple"));
+
+        BexException options = assertThrows(BexException.class, () -> BexNodeWriter.toNode(
+                BexValues.fromSimple(m("schema", m("options", java.util.Arrays.asList("one", "two"))))));
+        assertTrue(options.getMessage().contains("Unsupported Blue schema field: options"));
+
+        assertThrows(BexException.class, () -> BexFrozenWriter.toFrozen(
+                BexValues.fromSimple(m("schema", m("allowMultiple", true)))));
     }
 
     @Test

@@ -52,6 +52,14 @@ class BexCompiledProgramCacheTest {
     }
 
     @Test
+    void sourceKindParticipatesInCacheKey() {
+        FrozenNode expression = frozen(op("$document", "/status"));
+
+        assertNotEquals(BexCompiledProgramKey.from(BexProgramSource.inline(expression)),
+                BexCompiledProgramKey.from(BexProgramSource.expression(expression)));
+    }
+
+    @Test
     void schemaDifferencesParticipateInCacheKeyAndCompiledBehavior() {
         BexProgramSource minLengthOne = source(String.join("\n",
                 "type: Blue/BEX Program",
@@ -155,19 +163,15 @@ class BexCompiledProgramCacheTest {
 
     @Test
     void blueDifferencesParticipateInCacheKey() {
-        assertDifferentProgramIdentities(
-                String.join("\n",
-                        "type: Blue/BEX Program",
-                        "expr:",
-                        "  blue:",
-                        "    source: A",
-                        "  value: payload"),
-                String.join("\n",
-                        "type: Blue/BEX Program",
-                        "expr:",
-                        "  blue:",
-                        "    source: B",
-                        "  value: payload"));
+        BexProgramSource first = BexProgramSource.inline(frozen(stepExpr(new blue.language.model.Node()
+                .blue(obj("source", "A"))
+                .value("payload"))));
+        BexProgramSource second = BexProgramSource.inline(frozen(stepExpr(new blue.language.model.Node()
+                .blue(obj("source", "B"))
+                .value("payload"))));
+
+        assertNotEquals(BexNodeIdentity.stable(first.programNode()), BexNodeIdentity.stable(second.programNode()));
+        assertNotEquals(BexCompiledProgramKey.from(first), BexCompiledProgramKey.from(second));
     }
 
     @Test

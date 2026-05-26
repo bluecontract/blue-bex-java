@@ -10,9 +10,8 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeSet;
 
 final class NodeBexValue extends AbstractBexValue {
     private final Node node;
@@ -30,7 +29,14 @@ final class NodeBexValue extends AbstractBexValue {
         return node.getName() == null
                 && node.getDescription() == null
                 && node.getType() == null
+                && node.getItemType() == null
+                && node.getKeyType() == null
+                && node.getValueType() == null
                 && node.getBlueId() == null
+                && node.getBlue() == null
+                && node.getSchema() == null
+                && node.getMergePolicy() == null
+                && node.getContracts() == null
                 && node.getValue() == null
                 && node.getItems() == null
                 && node.getProperties() == null;
@@ -43,7 +49,7 @@ final class NodeBexValue extends AbstractBexValue {
 
     @Override
     public boolean isObject() {
-        return node.getProperties() != null;
+        return node.getProperties() != null || hasObjectCompatibleLanguageFields();
     }
 
     @Override
@@ -80,6 +86,27 @@ final class NodeBexValue extends AbstractBexValue {
         }
         if ("type".equals(key)) {
             return node.getType() != null ? BexValues.nodeCursor(node.getType()) : BexValues.UNDEFINED;
+        }
+        if ("itemType".equals(key)) {
+            return node.getItemType() != null ? BexValues.nodeCursor(node.getItemType()) : BexValues.UNDEFINED;
+        }
+        if ("keyType".equals(key)) {
+            return node.getKeyType() != null ? BexValues.nodeCursor(node.getKeyType()) : BexValues.UNDEFINED;
+        }
+        if ("valueType".equals(key)) {
+            return node.getValueType() != null ? BexValues.nodeCursor(node.getValueType()) : BexValues.UNDEFINED;
+        }
+        if ("blue".equals(key)) {
+            return node.getBlue() != null ? BexValues.nodeCursor(node.getBlue()) : BexValues.UNDEFINED;
+        }
+        if ("contracts".equals(key)) {
+            return node.getContracts() != null ? BexValues.nodeCursor(node.getContracts()) : BexValues.UNDEFINED;
+        }
+        if ("schema".equals(key)) {
+            return node.getSchema() != null ? BexValues.nodeSnapshot(new Node().schema(node.getSchema())) : BexValues.UNDEFINED;
+        }
+        if ("mergePolicy".equals(key)) {
+            return node.getMergePolicy() != null ? BexValues.scalar(node.getMergePolicy()) : BexValues.UNDEFINED;
         }
         return BexValues.UNDEFINED;
     }
@@ -121,10 +148,17 @@ final class NodeBexValue extends AbstractBexValue {
 
     @Override
     public List<String> keys() {
-        if (node.getProperties() == null) {
+        if (node.getProperties() == null && !hasObjectCompatibleLanguageFields()) {
             return Collections.emptyList();
         }
-        ArrayList<String> keys = new ArrayList<>(node.getProperties().keySet());
+        LinkedHashSet<String> fields = new LinkedHashSet<>();
+        if (hasObjectCompatibleLanguageFields()) {
+            addLanguageKeys(fields);
+        }
+        if (node.getProperties() != null) {
+            fields.addAll(node.getProperties().keySet());
+        }
+        ArrayList<String> keys = new ArrayList<>(fields);
         Collections.sort(keys);
         return keys;
     }
@@ -135,9 +169,9 @@ final class NodeBexValue extends AbstractBexValue {
             return node.getItems().size();
         }
         if (node.getProperties() != null) {
-            return node.getProperties().size();
+            return keys().size();
         }
-        return isScalar() ? 1 : 0;
+        return hasObjectCompatibleLanguageFields() ? keys().size() : (isScalar() ? 1 : 0);
     }
 
     @Override
@@ -155,7 +189,7 @@ final class NodeBexValue extends AbstractBexValue {
             }
             return out;
         }
-        if (node.getProperties() != null) {
+        if (node.getProperties() != null || hasObjectCompatibleLanguageFields()) {
             LinkedHashMap<String, Object> out = new LinkedHashMap<>();
             for (String key : keys()) {
                 BexValue value = get(key);
@@ -166,5 +200,35 @@ final class NodeBexValue extends AbstractBexValue {
             return out;
         }
         return null;
+    }
+
+    private boolean hasObjectCompatibleLanguageFields() {
+        return node.getValue() == null
+                && node.getItems() == null
+                && (node.getName() != null
+                || node.getDescription() != null
+                || node.getType() != null
+                || node.getItemType() != null
+                || node.getKeyType() != null
+                || node.getValueType() != null
+                || node.getBlueId() != null
+                || node.getBlue() != null
+                || node.getContracts() != null
+                || node.getSchema() != null
+                || node.getMergePolicy() != null);
+    }
+
+    private void addLanguageKeys(LinkedHashSet<String> keys) {
+        if (node.getName() != null) keys.add("name");
+        if (node.getDescription() != null) keys.add("description");
+        if (node.getType() != null) keys.add("type");
+        if (node.getItemType() != null) keys.add("itemType");
+        if (node.getKeyType() != null) keys.add("keyType");
+        if (node.getValueType() != null) keys.add("valueType");
+        if (node.getBlueId() != null) keys.add("blueId");
+        if (node.getBlue() != null) keys.add("blue");
+        if (node.getContracts() != null) keys.add("contracts");
+        if (node.getSchema() != null) keys.add("schema");
+        if (node.getMergePolicy() != null) keys.add("mergePolicy");
     }
 }

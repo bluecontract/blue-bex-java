@@ -70,7 +70,7 @@ class BexAccumulatorPointerConsistencyTest {
         BexExecutionResult result = runStep(stepDo(list(
                 op("$appendChange", obj("op", "replace", "path", "status", "val", "done")),
                 op("$appendChanges", list(obj("op", "replace", "path", "status", "val", "batch"))),
-                op("$return", obj())
+                emptyStatement()
         )), context);
 
         assertEquals("/contracts/current/status", result.changeset().entries().get(0).absolutePath());
@@ -115,7 +115,7 @@ class BexAccumulatorPointerConsistencyTest {
                         "path", op("$pointerJoin", list("orders", op("$var", "id"), "status")),
                         "val", "confirmed"
                 )),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext());
 
         assertEquals("/orders/abc~1def~0ghi/status", result.changeset().entries().get(0).absolutePath());
@@ -144,11 +144,11 @@ class BexAccumulatorPointerConsistencyTest {
     void removePatchesDoNotRequireValuesAndSingleRemoveDoesNotEvaluateVal() {
         BexExecutionResult single = runStep(stepDo(list(
                 op("$appendChange", obj("op", "remove", "path", "/x", "val", op("$divide", list(1, 0)))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext());
         BexExecutionResult batch = runStep(stepDo(list(
                 op("$appendChanges", list(obj("op", "remove", "path", "/x"))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext());
 
         assertEquals("remove", single.changeset().entries().get(0).op());
@@ -170,7 +170,7 @@ class BexAccumulatorPointerConsistencyTest {
 
         BexExecutionResult result = runStep(stepDo(list(
                 op("$appendEvents", list(obj("kind", "A"), obj("kind", "B"))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext());
 
         assertEquals(l(m("kind", "A"), m("kind", "B")), simple(result.events().asValue()));
@@ -180,22 +180,22 @@ class BexAccumulatorPointerConsistencyTest {
     void appendOutputGasScalesWithValueSizeAndEntryCount() {
         long smallEventGas = runStep(stepDo(list(
                 op("$appendEvents", list(obj("kind", "A"))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext()).gasUsed();
         long largeEventGas = runStep(stepDo(list(
                 op("$appendEvents", list(largeObject(150))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext()).gasUsed();
         long onePatchGas = runStep(stepDo(list(
                 op("$appendChanges", list(obj("op", "replace", "path", "/a", "val", "x"))),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext()).gasUsed();
         long twoPatchGas = runStep(stepDo(list(
                 op("$appendChanges", list(
                         obj("op", "replace", "path", "/a", "val", "x"),
                         obj("op", "replace", "path", "/b", "val", "x")
                 )),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext()).gasUsed();
 
         assertTrue(largeEventGas > smallEventGas);

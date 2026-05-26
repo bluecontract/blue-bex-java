@@ -40,6 +40,24 @@ public final class BexCompiler {
     public BexCompiledProgram compile(blue.bex.api.BexProgramSource source) {
         FrozenNode step = source.programNode();
         FrozenNode definition = source.definitionNode().orElse(null);
+        if (source.isExpression()) {
+            if (definition != null) {
+                throw new BexException("Expression BEX source cannot use a definition");
+            }
+            if (source.entry().isPresent()) {
+                throw new BexException("Expression BEX source cannot use an entry");
+            }
+            constants = Collections.emptyMap();
+            functionSignatures = Collections.emptyMap();
+            currentFunction = "$root";
+            CompileScope scope = new CompileScope();
+            BexCompiledProgram.CompiledFunction root = new BexCompiledProgram.CompiledFunction("$root",
+                    Collections.<BexCompiledProgram.ArgSpec>emptyList(),
+                    Collections.<CompiledStatement>emptyList(),
+                    compileExpr(step, scope, "/expr"),
+                    scope.frameSize());
+            return new BexCompiledProgram(root, Collections.emptyMap(), constants, scope.frameSize(), BexNodeIdentity.safeBlueId(step));
+        }
 
         Map<String, BexValue> loadedConstants = new LinkedHashMap<>();
         loadConstants(loadedConstants, prop(definition, "constants"));
@@ -86,7 +104,7 @@ public final class BexCompiler {
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(), statements, null, rootFrameSize);
         }
 
-        return new BexCompiledProgram(root, compiledFunctions, constants, rootFrameSize, step.blueId());
+        return new BexCompiledProgram(root, compiledFunctions, constants, rootFrameSize, BexNodeIdentity.safeBlueId(step));
     }
 
     private BexCompiledProgram.CompiledFunction compileFunction(String name, FrozenNode functionNode, FunctionSignature signature) {
@@ -238,7 +256,7 @@ public final class BexCompiler {
     }
 
     private CompiledStatement compileStatement(FrozenNode statement, CompileScope scope, String pointer) {
-        if (statement == null || statement.isEmptyNode()) {
+        if (isEmptyStatement(statement, pointer)) {
             return sourceStatement(currentFunction, pointer, "$return", new ReturnStatement(null));
         }
         if (statement.getProperties() == null) {
@@ -308,6 +326,38 @@ public final class BexCompiler {
         return sourceStatement(currentFunction, bodyPointer, op, compiled);
     }
 
+    private boolean isEmptyStatement(FrozenNode statement, String pointer) {
+        if (statement == null || statement.isEmptyNode()) {
+            return true;
+        }
+        if (statement.getProperties() == null || !statement.getProperties().containsKey("$empty")) {
+            return false;
+        }
+        if (statement.getProperties().size() == 1
+                && !hasLanguageFields(statement)
+                && statement.getItems() == null
+                && (statement.getValue() == null || Boolean.TRUE.equals(statement.getValue()))
+                && statement.getPreviousBlueId() == null
+                && statement.getPosition() == null
+                && isEmptyMarkerValue(statement.getProperties().get("$empty"))) {
+            return true;
+        }
+        throw new BexException("Statement $empty placeholder must be exactly $empty: true at " + pointer);
+    }
+
+    private boolean isEmptyMarkerValue(FrozenNode node) {
+        return node != null && (node.isEmptyNode() || isTrueScalar(node));
+    }
+
+    private boolean isTrueScalar(FrozenNode node) {
+        return node != null
+                && Boolean.TRUE.equals(node.getValue())
+                && node.getProperties() == null
+                && node.getItems() == null
+                && node.getPreviousBlueId() == null
+                && node.getPosition() == null;
+    }
+
     private CompiledExpression compileExpr(FrozenNode node, CompileScope scope, String pointer) {
         if (node == null) {
             return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.nullValue()));
@@ -357,6 +407,9 @@ public final class BexCompiler {
 
     private CompiledExpression compileOperator(String op, FrozenNode body, CompileScope scope, String pointer) {
         if ("$literal".equals(op)) return new LiteralExpr(BexValues.frozen(body));
+        if ("$null".equals(op)) return new LiteralExpr(BexValues.nullValue());
+        if ("$emptyObject".equals(op)) return new LiteralExpr(BexValues.map(Collections.<String, BexValue>emptyMap()));
+        if ("$emptyList".equals(op)) return new LiteralExpr(BexValues.list(Collections.<BexValue>emptyList()));
         if ("$document".equals(op)) return documentExpr(body, scope, pointer);
         if ("$binding".equals(op)) return bindingExpr(body, scope, pointer);
         if ("$event".equals(op)) return contextPointerExpr(body, scope, ContextKind.EVENT, pointer);
@@ -398,7 +451,7 @@ public final class BexCompiler {
         if ("$or".equals(op)) return new LogicalExpr(compileExprList(body, scope, pointer), false);
         if ("$not".equals(op)) return new NotExpr(compileExpr(body, scope, pointer));
         if ("$truthy".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.TRUTHY);
-        if ("$empty".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EMPTY);
+        if ("$empty".equals(op) || "$isEmpty".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EMPTY);
         if ("$exists".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EXISTS);
         if ("$coalesce".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$default".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
@@ -577,8 +630,26 @@ public final class BexCompiler {
         if ("type".equals(key) && node.getType() != null) {
             return node.getType();
         }
+        if ("itemType".equals(key) && node.getItemType() != null) {
+            return node.getItemType();
+        }
+        if ("keyType".equals(key) && node.getKeyType() != null) {
+            return node.getKeyType();
+        }
+        if ("valueType".equals(key) && node.getValueType() != null) {
+            return node.getValueType();
+        }
         if ("value".equals(key) && node.getValue() != null) {
             return scalarNode(node.getValue());
+        }
+        if ("blueId".equals(key) && node.getReferenceBlueId() != null) {
+            return scalarNode(node.getReferenceBlueId());
+        }
+        if ("blue".equals(key) && node.getBlue() != null) {
+            return node.getBlue();
+        }
+        if ("contracts".equals(key) && node.getContracts() != null) {
+            return node.getContracts();
         }
         return null;
     }
@@ -645,6 +716,9 @@ public final class BexCompiler {
         if (node.getBlue() != null) {
             fields.put("blue", compileExpr(node.getBlue(), scope, pointer + "/blue"));
         }
+        if (node.getContracts() != null) {
+            fields.put("contracts", compileExpr(node.getContracts(), scope, pointer + "/contracts"));
+        }
         if (node.getSchema() != null) {
             fields.put("schema", new LiteralExpr(BexValues.nodeSnapshot(new blue.language.model.Node().schema(node.getSchema()))));
         }
@@ -662,6 +736,7 @@ public final class BexCompiler {
                 || node.getValueType() != null
                 || node.getReferenceBlueId() != null
                 || node.getBlue() != null
+                || node.getContracts() != null
                 || node.getSchema() != null
                 || node.getMergePolicy() != null;
     }
@@ -704,6 +779,9 @@ public final class BexCompiler {
         if (node.getPreviousBlueId() != null || node.getPosition() != null) {
             throw new BexException(label + " contains a Blue list-control key; use non-reserved names");
         }
+        if (node.getContracts() != null) {
+            throw new BexException(label + " contains reserved Blue key: contracts");
+        }
         if (node.getName() != null
                 || node.getDescription() != null
                 || node.getType() != null
@@ -740,6 +818,7 @@ public final class BexCompiler {
         rejectBexInStaticField(node.getKeyType(), pointer + "/keyType", "keyType");
         rejectBexInStaticField(node.getValueType(), pointer + "/valueType", "valueType");
         rejectBexInStaticField(node.getBlue(), pointer + "/blue", "blue");
+        rejectBexInStaticField(node.getContracts(), pointer + "/contracts", "contracts");
         if (node.getSchema() != null) {
             rejectBexInSchema(node.getSchema(), pointer + "/schema");
         }
@@ -765,7 +844,6 @@ public final class BexCompiler {
 
     private void rejectBexInSchema(Schema schema, String pointer) {
         rejectSchemaNode(schema.getRequired(), pointer);
-        rejectSchemaNode(schema.getAllowMultiple(), pointer);
         rejectSchemaNode(schema.getMinLength(), pointer);
         rejectSchemaNode(schema.getMaxLength(), pointer);
         rejectSchemaNode(schema.getMinimum(), pointer);
@@ -780,11 +858,6 @@ public final class BexCompiler {
         rejectSchemaNode(schema.getMaxFields(), pointer);
         if (schema.getEnum() != null) {
             for (Node node : schema.getEnum()) {
-                rejectSchemaNode(node, pointer);
-            }
-        }
-        if (schema.getOptions() != null) {
-            for (Node node : schema.getOptions()) {
                 rejectSchemaNode(node, pointer);
             }
         }

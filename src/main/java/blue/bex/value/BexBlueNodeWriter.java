@@ -49,7 +49,6 @@ public final class BexBlueNodeWriter {
         LinkedHashMap<String, Node> properties = new LinkedHashMap<>();
         boolean hasValuePayload = false;
         boolean hasItemsPayload = false;
-        boolean hasSchema = false;
         for (String key : value.keys()) {
             BexValue child = value.get(key);
             if (child == null || child.isUndefined()) {
@@ -82,12 +81,12 @@ public final class BexBlueNodeWriter {
                 node.blueId(child.asText());
             } else if ("blue".equals(key)) {
                 node.blue(toNode(child));
-            } else if ("schema".equals(key) || "constraints".equals(key)) {
-                if (hasSchema) {
-                    throw new BexException("A Blue node cannot contain both schema and constraints");
-                }
-                hasSchema = true;
+            } else if ("contracts".equals(key)) {
+                node.contracts(toObjectNode(child, "contracts"));
+            } else if ("schema".equals(key)) {
                 node.schema(toSchema(child));
+            } else if ("constraints".equals(key)) {
+                throw new BexException("Blue constraints field is invalid in Blue Language 1.0; use schema");
             } else if ("$previous".equals(key) || "$pos".equals(key)) {
                 throw new BexException("BEX output does not currently support Blue list-control field " + key);
             } else if ("properties".equals(key)) {
@@ -138,6 +137,7 @@ public final class BexBlueNodeWriter {
                 || "items".equals(key)
                 || "blueId".equals(key)
                 || "blue".equals(key)
+                || "contracts".equals(key)
                 || "schema".equals(key)
                 || "constraints".equals(key)
                 || "mergePolicy".equals(key)
@@ -167,6 +167,16 @@ public final class BexBlueNodeWriter {
         return BexValues.rawScalar(value);
     }
 
+    private static Node toObjectNode(BexValue value, String field) {
+        if (value.isNull()) {
+            return null;
+        }
+        if (!value.isObject()) {
+            throw new BexException("Blue " + field + " field must be an object");
+        }
+        return toNode(value);
+    }
+
     private static List<Node> toNodeList(BexValue value) {
         ArrayList<Node> items = new ArrayList<>();
         for (int i = 0; i < value.size(); i++) {
@@ -190,7 +200,6 @@ public final class BexBlueNodeWriter {
         validateSchemaKeys(value);
         Schema schema = new Schema();
         setSchemaNode(schema, value, "required");
-        setSchemaNode(schema, value, "allowMultiple");
         setSchemaNode(schema, value, "minLength");
         setSchemaNode(schema, value, "maxLength");
         setSchemaNode(schema, value, "minimum");
@@ -204,7 +213,6 @@ public final class BexBlueNodeWriter {
         setSchemaNode(schema, value, "minFields");
         setSchemaNode(schema, value, "maxFields");
         setSchemaList(schema, value, "enum");
-        setSchemaList(schema, value, "options");
         return schema;
     }
 
@@ -216,8 +224,6 @@ public final class BexBlueNodeWriter {
         Node node = toNode(value);
         if ("required".equals(key)) {
             schema.required(node);
-        } else if ("allowMultiple".equals(key)) {
-            schema.allowMultiple(node);
         } else if ("minLength".equals(key)) {
             schema.minLength(node);
         } else if ("maxLength".equals(key)) {
@@ -256,8 +262,6 @@ public final class BexBlueNodeWriter {
         List<Node> nodes = toNodeList(value);
         if ("enum".equals(key)) {
             schema.enumValues(nodes);
-        } else if ("options".equals(key)) {
-            schema.options(nodes);
         }
     }
 
@@ -272,7 +276,6 @@ public final class BexBlueNodeWriter {
     private static Set<String> schemaKeys() {
         return new LinkedHashSet<>(Arrays.asList(
                 "required",
-                "allowMultiple",
                 "minLength",
                 "maxLength",
                 "minimum",
@@ -285,7 +288,6 @@ public final class BexBlueNodeWriter {
                 "uniqueItems",
                 "minFields",
                 "maxFields",
-                "enum",
-                "options"));
+                "enum"));
     }
 }

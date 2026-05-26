@@ -14,22 +14,41 @@ import java.util.Optional;
  * and entry function.</p>
  */
 public final class BexProgramSource {
+    public enum Kind {
+        FULL_PROGRAM,
+        EXPRESSION
+    }
+
+    private final Kind kind;
     private final FrozenNode programNode;
     private final FrozenNode definitionNode;
     private final String entry;
 
-    private BexProgramSource(FrozenNode programNode, FrozenNode definitionNode, String entry) {
+    private BexProgramSource(Kind kind, FrozenNode programNode, FrozenNode definitionNode, String entry) {
+        this.kind = Objects.requireNonNull(kind, "kind");
         this.programNode = Objects.requireNonNull(programNode, "programNode");
         this.definitionNode = definitionNode;
         this.entry = entry;
     }
 
     public static BexProgramSource inline(FrozenNode programNode) {
-        return new BexProgramSource(programNode, null, null);
+        return new BexProgramSource(Kind.FULL_PROGRAM, programNode, null, null);
+    }
+
+    public static BexProgramSource expression(FrozenNode expressionNode) {
+        return new BexProgramSource(Kind.EXPRESSION, expressionNode, null, null);
     }
 
     public static BexProgramSource withDefinition(FrozenNode programNode, FrozenNode definitionNode, String entry) {
-        return new BexProgramSource(programNode, definitionNode, entry);
+        return new BexProgramSource(Kind.FULL_PROGRAM, programNode, definitionNode, entry);
+    }
+
+    public Kind kind() {
+        return kind;
+    }
+
+    public boolean isExpression() {
+        return kind == Kind.EXPRESSION;
     }
 
     public FrozenNode programNode() {

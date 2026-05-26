@@ -191,20 +191,22 @@ Do not combine `blueId` with sibling fields to describe a typed instance. Use
 
 BEX programs are Blue documents, so BEX syntax must use valid Blue authoring
 forms. For user-defined name containers such as `functions`, `constants`,
-`args`, and `$call.args`, do not use Blue language keys as names. This includes
-`value`, `items`, `blueId`, `type`, `schema`, `name`, `description`,
+`args`, and `$call.args`, do not use Blue language keys or invalid reserved keys
+as names. This includes `value`, `items`, `blueId`, `type`, `schema`, `name`,
+`description`,
 `itemType`, `keyType`, `valueType`, `mergePolicy`, `constraints`, `contracts`,
 `properties`, `$previous`, and `$pos`.
 
 For operator bodies, payload/reference/control keys such as `value`, `items`,
-`blueId`, `properties`, `$previous`, and `$pos` cannot be used as ordinary
+`blueId`, `contracts`, `properties`, `$previous`, and `$pos` cannot be used as ordinary
 multi-field operands. Use BEX operand names such as `node`, `list`, `input`,
 `pattern`, `object`, `key`, `path`, `val`, `cond`, `then`, and `else`.
 
 Metadata keys such as `name`, `description`, `type`, `schema`, `itemType`,
-`keyType`, and `valueType` are legal Blue language fields, but they are not
-ordinary object properties. An operator may use one of them only when the BEX
-compiler explicitly supports that field.
+`keyType`, `valueType`, and `contracts` are legal Blue language fields, but they are not
+ordinary object properties. `constraints` is invalid in Blue Language 1.0. An
+operator may use one of the legal metadata fields only when the BEX compiler
+explicitly supports that field.
 
 Function argument patterns and `$is.pattern` are static Blue patterns. BEX does
 not evaluate expressions inside those patterns, and it does not emulate Blue
@@ -383,7 +385,7 @@ $join:
 | `$eq`, `$ne` | Equality and inequality. |
 | `$gt`, `$gte`, `$lt`, `$lte` | Numeric comparisons. |
 | `$and`, `$or`, `$not` | Boolean logic with short-circuiting. |
-| `$truthy`, `$empty` | Truthiness checks. |
+| `$truthy`, `$empty`, `$isEmpty` | Truthiness checks. `$isEmpty` is an alias that avoids Blue list-placeholder syntax in list operands. |
 | `$exists` | Return false only for undefined values. |
 | `$coalesce` | First non-empty value. |
 
@@ -441,6 +443,7 @@ $or:
 | `$choose` | Conditional expression. |
 | `$call` | Call a local function. |
 | `$literal` | Return payload without compiling nested operators. |
+| `$null`, `$emptyObject`, `$emptyList` | Emit explicit null, empty object, or empty list values after Blue source normalization. |
 
 `$literal` prevents normal expression compilation, but BEX still rejects
 BEX-looking operators inside Blue type-definition fields such as `type`,

@@ -37,7 +37,7 @@ final class BexNodeFingerprint {
         updateField(digest, "name", node.getName());
         updateField(digest, "description", node.getDescription());
         updateField(digest, "referenceBlueId", node.getReferenceBlueId());
-        updateField(digest, "blueId", node.blueId());
+        updateField(digest, "blueId", BexNodeIdentity.safeBlueId(node));
         if (node.isInlineValue()) {
             updateField(digest, "inlineValue", "true");
         }
@@ -65,6 +65,9 @@ final class BexNodeFingerprint {
         }
         if (node.getBlue() != null) {
             updateNodeField(digest, "blue", node.getBlue());
+        }
+        if (node.getContracts() != null) {
+            updateNodeField(digest, "contracts", node.getContracts());
         }
         if (node.getSchema() != null) {
             updateSchema(digest, node.getSchema());
@@ -99,7 +102,6 @@ final class BexNodeFingerprint {
     private static void updateSchema(MessageDigest digest, Schema schema) {
         update(digest, "schema{");
         updateSchemaNodeField(digest, "required", schema.getRequired());
-        updateSchemaNodeField(digest, "allowMultiple", schema.getAllowMultiple());
         updateSchemaNodeField(digest, "minLength", schema.getMinLength());
         updateSchemaNodeField(digest, "maxLength", schema.getMaxLength());
         updateSchemaNodeField(digest, "minimum", schema.getMinimum());
@@ -113,7 +115,6 @@ final class BexNodeFingerprint {
         updateSchemaNodeField(digest, "minFields", schema.getMinFields());
         updateSchemaNodeField(digest, "maxFields", schema.getMaxFields());
         updateSchemaNodeListField(digest, "enum", schema.getEnum());
-        updateSchemaNodeListField(digest, "options", schema.getOptions());
         update(digest, "}");
     }
 

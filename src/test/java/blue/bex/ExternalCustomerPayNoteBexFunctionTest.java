@@ -38,6 +38,7 @@ class ExternalCustomerPayNoteBexFunctionTest {
 
         Node programNode = requiredNode(programDocument, "/contracts/processPackageCustomerPayNoteSnapshotResolved/steps/0");
         Node definitionNode = requiredNode(programDocument, "/contracts/packageFulfillmentBexDefinition");
+        Node documentNode = programDocument.clone().contracts(null);
         Node matchedEvent = requiredNode(eventEnvelope, "/message/request/0");
 
         assertEquals("processCustomerPayNoteSnapshotResolved", valueAt(programNode, "/entry"));
@@ -50,7 +51,7 @@ class ExternalCustomerPayNoteBexFunctionTest {
                         FrozenNode.fromResolvedNode(definitionNode),
                         "processCustomerPayNoteSnapshotResolved"),
                 BexExecutionContext.builder()
-                        .document(new FrozenBexDocumentView(FrozenNode.fromResolvedNode(programDocument)))
+                        .document(new FrozenBexDocumentView(FrozenNode.fromResolvedNode(documentNode)))
                         .event(BexValues.nodeCursorTrustedImmutable(matchedEvent))
                         .currentContract(BexValues.frozen(FrozenNode.fromResolvedNode(definitionNode)))
                         .gasLimit(100_000_000L)
@@ -133,7 +134,9 @@ class ExternalCustomerPayNoteBexFunctionTest {
             if (current == null) {
                 return null;
             }
-            if (current.getProperties() != null) {
+            if ("contracts".equals(segment) && current.getContracts() != null) {
+                current = current.getContracts();
+            } else if (current.getProperties() != null) {
                 current = current.getProperties().get(segment);
             } else if (current.getItems() != null) {
                 current = item(current, segment);

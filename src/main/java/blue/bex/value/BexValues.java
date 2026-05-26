@@ -97,7 +97,14 @@ public final class BexValues {
     }
 
     public static String frozenBlueId(BexValue value) {
-        return value instanceof FrozenNodeBexValue ? ((FrozenNodeBexValue) value).node().blueId() : null;
+        if (!(value instanceof FrozenNodeBexValue)) {
+            return null;
+        }
+        try {
+            return ((FrozenNodeBexValue) value).node().blueId();
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     public static BexValue map(Map<String, BexValue> values) {

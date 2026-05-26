@@ -25,8 +25,7 @@ public final class BexBlueTypeMatcher {
         }
         try {
             Node valueNode = BexNodeWriter.toNode(value);
-            Node patternNode = pattern.toNode();
-            return blue.nodeMatchesType(valueNode, patternNode);
+            return blue.nodeMatchesType(FrozenNode.fromResolvedNode(valueNode), pattern);
         } catch (RuntimeException ex) {
             return false;
         }

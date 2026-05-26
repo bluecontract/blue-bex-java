@@ -87,11 +87,27 @@ class BexStatementTest {
                         obj("op", "replace", "path", "/status", "val", "first"),
                         obj("op", "replace", "path", "/status", "val", "second")
                 )),
-                op("$return", obj())
+                emptyStatement()
         )), defaultContext());
 
         assertEquals("first", simple(result.changeset().entries().get(0).val()));
         assertEquals("second", simple(result.changeset().entries().get(1).val()));
+    }
+
+    @Test
+    void emptyPlaceholderStatementReturnsDefaultResult() {
+        BexExecutionResult result = runStep(stepDo(list(
+                op("$appendEvent", obj("kind", "Calculated")),
+                emptyStatement()
+        )), defaultContext());
+
+        assertEquals(l(m("kind", "Calculated")), simple(result.events().asValue()));
+        assertEquals(m("changeset", l(), "events", l(m("kind", "Calculated"))), simple(result.value()));
+    }
+
+    @Test
+    void invalidEmptyPlaceholderStatementFails() {
+        assertThrows(RuntimeException.class, () -> runStep(stepDo(list(obj("$empty", false))), defaultContext()));
     }
 }
 

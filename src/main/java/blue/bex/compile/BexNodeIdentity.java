@@ -13,7 +13,7 @@ public final class BexNodeIdentity {
         if (node == null) {
             return "none";
         }
-        String blueId = node.blueId();
+        String blueId = safeBlueId(node);
         if (blueId != null && !blueId.isEmpty()) {
             return "blueId:" + blueId;
         }
@@ -22,5 +22,16 @@ public final class BexNodeIdentity {
             return "referenceBlueId:" + referenceBlueId;
         }
         return "fingerprint:" + BexNodeFingerprint.compute(node);
+    }
+
+    public static String safeBlueId(FrozenNode node) {
+        if (node == null) {
+            return null;
+        }
+        try {
+            return node.blueId();
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 }

@@ -31,7 +31,7 @@ public final class BexContainsCache {
         if (node == null) {
             return false;
         }
-        String blueId = node.blueId();
+        String blueId = BexNodeIdentity.safeBlueId(node);
         Boolean cached = blueId != null ? blueIdCache.get(blueId) : identityCache.get(node);
         if (cached != null) {
             if (metrics != null) {
@@ -60,7 +60,8 @@ public final class BexContainsCache {
                 || scan(node.getItemType())
                 || scan(node.getKeyType())
                 || scan(node.getValueType())
-                || scan(node.getBlue())) {
+                || scan(node.getBlue())
+                || scan(node.getContracts())) {
             return true;
         }
         if (node.getProperties() != null) {
