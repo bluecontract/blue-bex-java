@@ -2,6 +2,7 @@ package blue.bex.compile;
 
 import blue.bex.BexException;
 import blue.bex.BexSourcePath;
+import blue.bex.api.BexIntrinsicRegistry;
 import blue.bex.runtime.CompileScope;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledStatement;
@@ -29,12 +30,19 @@ public final class BexCompiler {
 
     private final BexContainsCache containsCache = new BexContainsCache();
     private final BexMetrics metrics;
+    private final BexIntrinsicRegistry intrinsics;
+    private final Set<String> requiredIntrinsicBlueIds = new LinkedHashSet<>();
     private Map<String, FunctionSignature> functionSignatures = Collections.emptyMap();
     private Map<String, BexValue> constants = Collections.emptyMap();
     private String currentFunction = "$root";
 
     public BexCompiler(BexMetrics metrics) {
+        this(metrics, BexIntrinsicRegistry.empty());
+    }
+
+    public BexCompiler(BexMetrics metrics, BexIntrinsicRegistry intrinsics) {
         this.metrics = metrics;
+        this.intrinsics = intrinsics != null ? intrinsics : BexIntrinsicRegistry.empty();
     }
 
     public BexCompiledProgram compile(blue.bex.api.BexProgramSource source) {
@@ -56,7 +64,8 @@ public final class BexCompiler {
                     Collections.<CompiledStatement>emptyList(),
                     compileExpr(step, scope, "/expr"),
                     scope.frameSize());
-            return new BexCompiledProgram(root, Collections.emptyMap(), constants, scope.frameSize(), BexNodeIdentity.safeBlueId(step));
+            return new BexCompiledProgram(root, Collections.emptyMap(), constants, scope.frameSize(),
+                    BexNodeIdentity.safeBlueId(step), requiredIntrinsicBlueIds);
         }
 
         Map<String, BexValue> loadedConstants = new LinkedHashMap<>();
@@ -94,8 +103,11 @@ public final class BexCompiler {
                     null, 0);
         } else if (stepExpr != null) {
             currentFunction = "$root";
+            CompileScope scope = new CompileScope();
+            CompiledExpression expression = compileExpr(stepExpr, scope, "/expr");
+            rootFrameSize = scope.frameSize();
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(),
-                    Collections.<CompiledStatement>emptyList(), compileExpr(stepExpr, new CompileScope(), "/expr"), 0);
+                    Collections.<CompiledStatement>emptyList(), expression, rootFrameSize);
         } else {
             CompileScope scope = new CompileScope();
             currentFunction = "$root";
@@ -104,7 +116,8 @@ public final class BexCompiler {
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(), statements, null, rootFrameSize);
         }
 
-        return new BexCompiledProgram(root, compiledFunctions, constants, rootFrameSize, BexNodeIdentity.safeBlueId(step));
+        return new BexCompiledProgram(root, compiledFunctions, constants, rootFrameSize,
+                BexNodeIdentity.safeBlueId(step), requiredIntrinsicBlueIds);
     }
 
     private BexCompiledProgram.CompiledFunction compileFunction(String name, FrozenNode functionNode, FunctionSignature signature) {
@@ -278,9 +291,13 @@ public final class BexCompiler {
         String bodyPointer = pointer + "/" + escape(op);
         CompiledStatement compiled;
         if ("$let".equals(op)) {
-            String name = requiredText(prop(body, "name"), "$let.name");
-            int slot = scope.declareOrGetSlot(name);
-            compiled = new LetStatement(slot, compileExpr(required(prop(body, "expr"), "$let.expr"), scope, bodyPointer + "/expr"));
+            if (prop(body, "vars") != null) {
+                compiled = compileMultiLet(body, scope, bodyPointer);
+            } else {
+                String name = requiredText(prop(body, "name"), "$let.name");
+                int slot = scope.declareOrGetSlot(name);
+                compiled = new LetStatement(slot, compileExpr(required(prop(body, "expr"), "$let.expr"), scope, bodyPointer + "/expr"));
+            }
         } else if ("$set".equals(op)) {
             String name = requiredText(prop(body, "name"), "$set.name");
             int slot = scope.resolveSlot(name);
@@ -317,13 +334,88 @@ public final class BexCompiler {
             } else {
                 compiled = new ReturnStatement(compileExpr(body, scope, bodyPointer));
             }
+        } else if ("$returnIf".equals(op)) {
+            if (hasExplicitProperty(body, "value")) {
+                throw new BexException("$returnIf uses expr for its return payload; value is not supported");
+            }
+            compiled = new ReturnIfStatement(
+                    compileExpr(required(prop(body, "cond"), "$returnIf.cond"), scope, bodyPointer + "/cond"),
+                    prop(body, "expr") != null ? compileExpr(prop(body, "expr"), scope, bodyPointer + "/expr") : null);
         } else if ("$fail".equals(op)) {
             FrozenNode message = body != null && body.getProperties() != null ? prop(body, "message") : body;
             compiled = new FailStatement(compileExpr(message, scope, bodyPointer + "/message"));
+        } else if ("$failIf".equals(op)) {
+            compiled = new FailIfStatement(
+                    compileExpr(required(prop(body, "cond"), "$failIf.cond"), scope, bodyPointer + "/cond"),
+                    compileExpr(required(prop(body, "message"), "$failIf.message"), scope, bodyPointer + "/message"));
         } else {
             throw new BexException("Unknown statement operator: " + op);
         }
         return sourceStatement(currentFunction, bodyPointer, op, compiled);
+    }
+
+    private CompiledStatement compileMultiLet(FrozenNode body, CompileScope scope, String pointer) {
+        FrozenNode varsNode = required(prop(body, "vars"), "$let.vars");
+        validatePlainObjectContainer(varsNode, "$let.vars");
+        if (varsNode.getProperties() == null) {
+            if (varsNode.isEmptyNode()) {
+                return new MultiLetStatement(new int[0], new CompiledExpression[0], false);
+            }
+            throw new BexException("$let.vars must be an object");
+        }
+        List<String> names = new ArrayList<>(varsNode.getProperties().keySet());
+        boolean sequential = prop(body, "order") != null;
+        if (sequential) {
+            names = orderedLetNames(prop(body, "order"), varsNode, pointer + "/order");
+        } else {
+            Collections.sort(names);
+        }
+
+        int[] slots = new int[names.size()];
+        List<CompiledExpression> expressions = new ArrayList<>();
+        if (sequential) {
+            for (int i = 0; i < names.size(); i++) {
+                String name = names.get(i);
+                expressions.add(compileExpr(varsNode.getProperties().get(name), scope,
+                        pointer + "/vars/" + escape(name)));
+                slots[i] = scope.declareOrGetSlot(name);
+            }
+        } else {
+            for (String name : names) {
+                expressions.add(compileExpr(varsNode.getProperties().get(name), scope,
+                        pointer + "/vars/" + escape(name)));
+            }
+            for (int i = 0; i < names.size(); i++) {
+                slots[i] = scope.declareOrGetSlot(names.get(i));
+            }
+        }
+        return new MultiLetStatement(slots, expressions.toArray(new CompiledExpression[0]), sequential);
+    }
+
+    private List<String> orderedLetNames(FrozenNode orderNode, FrozenNode varsNode, String pointer) {
+        if (orderNode == null || orderNode.getItems() == null) {
+            throw new BexException("$let.order must be a list");
+        }
+        List<String> names = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (int i = 0; i < orderNode.getItems().size(); i++) {
+            String name = requiredText(orderNode.getItems().get(i), "$let.order item");
+            if (!seen.add(name)) {
+                throw new BexException("$let.order contains duplicate variable: " + name);
+            }
+            if (varsNode.getProperties() == null || !varsNode.getProperties().containsKey(name)) {
+                throw new BexException("$let.order references unknown variable: " + name);
+            }
+            names.add(name);
+        }
+        if (varsNode.getProperties() != null && seen.size() != varsNode.getProperties().size()) {
+            for (String name : varsNode.getProperties().keySet()) {
+                if (!seen.contains(name)) {
+                    throw new BexException("$let.order missing variable: " + name);
+                }
+            }
+        }
+        return names;
     }
 
     private boolean isEmptyStatement(FrozenNode statement, String pointer) {
@@ -415,13 +507,13 @@ public final class BexCompiler {
         if ("$event".equals(op)) return contextPointerExpr(body, scope, ContextKind.EVENT, pointer);
         if ("$steps".equals(op)) return stepsExpr(body, scope, pointer);
         if ("$currentContract".equals(op)) return contextPointerExpr(body, scope, ContextKind.CURRENT_CONTRACT, pointer);
-        if ("$var".equals(op)) return new VarExpr(scope.resolveSlot(requiredText(body, "$var")));
+        if ("$var".equals(op)) return varExpr(body, scope, pointer);
         if ("$const".equals(op)) {
-            String name = requiredText(body, "$const");
+            String name = constName(body);
             if (!constants.containsKey(name)) {
                 throw new BexException("Unknown constant: " + name);
             }
-            return new ConstExpr(name);
+            return new ConstExpr(name, pathOperandOrNull(body, scope, pointer));
         }
         if ("$get".equals(op)) return new GetExpr(compileExpr(required(prop(body, "object"), "$get.object"), scope, pointer + "/object"), textOrExpr(required(prop(body, "key"), "$get.key"), scope, null, pointer + "/key"));
         if ("$changeset".equals(op)) return new ChangesetExpr();
@@ -453,6 +545,8 @@ public final class BexCompiler {
         if ("$truthy".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.TRUTHY);
         if ("$empty".equals(op) || "$isEmpty".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EMPTY);
         if ("$exists".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EXISTS);
+        if ("$kind".equals(op)) return new KindExpr(compileExpr(body, scope, pointer));
+        if ("$isKind".equals(op)) return new IsKindExpr(compileExpr(required(prop(body, "val"), "$isKind.val"), scope, pointer + "/val"), kindSet(required(prop(body, "kind"), "$isKind.kind")));
         if ("$coalesce".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$default".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$add".equals(op)) return new NumericExpr(compileExprList(body, scope, pointer), NumericOp.ADD);
@@ -468,9 +562,180 @@ public final class BexCompiler {
         if ("$objectSet".equals(op)) return new ObjectSetExpr(compileExpr(required(prop(body, "object"), "$objectSet.object"), scope, pointer + "/object"), textOrExpr(required(prop(body, "key"), "$objectSet.key"), scope, null, pointer + "/key"), compileExpr(required(prop(body, "val"), "$objectSet.val"), scope, pointer + "/val"));
         if ("$pointerGet".equals(op)) return new PointerGetExpr(compileExpr(required(prop(body, "object"), "$pointerGet.object"), scope, pointer + "/object"), valuePointerOperand(required(prop(body, "path"), "$pointerGet.path"), scope, pointer + "/path"), prop(body, "default") != null ? compileExpr(prop(body, "default"), scope, pointer + "/default") : null);
         if ("$pointerSet".equals(op)) return new PointerSetExpr(compileExpr(required(prop(body, "object"), "$pointerSet.object"), scope, pointer + "/object"), textOrExpr(prop(body, "op"), scope, "set", pointer + "/op"), valuePointerOperand(required(prop(body, "path"), "$pointerSet.path"), scope, pointer + "/path"), prop(body, "val") != null ? compileExpr(prop(body, "val"), scope, pointer + "/val") : null);
+        if ("$map".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.MAP, "expr");
+        if ("$filter".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.FILTER, "where");
+        if ("$flatMap".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.FLAT_MAP, "expr");
+        if ("$reduce".equals(op)) return reduceExpr(body, scope, pointer);
+        if ("$some".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.SOME, "where");
+        if ("$find".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.FIND, "where");
+        if ("$findEntry".equals(op)) return collectionExpr(body, scope, pointer, CollectionOp.FIND_ENTRY, "where");
+        if ("$includes".equals(op)) return new IncludesExpr(compileExpr(required(prop(body, "list"), "$includes.list"), scope, pointer + "/list"),
+                compileExpr(required(prop(body, "val"), "$includes.val"), scope, pointer + "/val"));
+        if ("$hasKey".equals(op)) return new HasKeyExpr(compileExpr(required(prop(body, "object"), "$hasKey.object"), scope, pointer + "/object"),
+                textOrExpr(required(prop(body, "key"), "$hasKey.key"), scope, null, pointer + "/key"));
+        if ("$objectFromEntries".equals(op)) return new ObjectFromEntriesExpr(compileExpr(body, scope, pointer));
+        if ("$intrinsic".equals(op)) return intrinsicExpr(body, scope, pointer);
         if ("$choose".equals(op)) return new ChooseExpr(compileExpr(required(prop(body, "cond"), "$choose.cond"), scope, pointer + "/cond"), compileExpr(required(prop(body, "then"), "$choose.then"), scope, pointer + "/then"), prop(body, "else") != null ? compileExpr(prop(body, "else"), scope, pointer + "/else") : new LiteralExpr(BexValues.undefined()));
         if ("$call".equals(op)) return compileCall(body, scope, pointer);
         throw new BexException("Unknown expression operator: " + op);
+    }
+
+    private CompiledExpression intrinsicExpr(FrozenNode body, CompileScope scope, String pointer) {
+        if (body == null || body.getValue() != null || body.getItems() != null) {
+            throw new BexException("$intrinsic expects an object body");
+        }
+        FrozenNode typeNode = required(prop(body, "type"), "$intrinsic.type");
+        rejectBexAnywhereInStaticPattern(typeNode, pointer + "/type");
+        String blueId = intrinsicTypeBlueId(typeNode);
+        BexValue typeValue = BexValues.frozen(typeNode);
+        if (blueId == null || blueId.isEmpty()) {
+            throw new BexException("$intrinsic.type must resolve to a BlueId");
+        }
+        if (!intrinsics.supports(blueId)) {
+            throw new BexException("Unsupported intrinsic BlueId: " + blueId);
+        }
+        requiredIntrinsicBlueIds.add(blueId);
+
+        Map<String, CompiledExpression> fields = new LinkedHashMap<>();
+        if (body.getProperties() != null) {
+            for (Map.Entry<String, FrozenNode> entry : body.getProperties().entrySet()) {
+                if ("type".equals(entry.getKey())) {
+                    continue;
+                }
+                fields.put(entry.getKey(), compileExpr(entry.getValue(), scope, pointer + "/" + escape(entry.getKey())));
+            }
+        }
+        return new IntrinsicExpr(blueId, typeValue, fields);
+    }
+
+    private String intrinsicTypeBlueId(FrozenNode typeNode) {
+        String blueId = BexNodeIdentity.safeBlueId(typeNode);
+        if (blueId != null && !blueId.isEmpty()) {
+            return blueId;
+        }
+        if (typeNode.getReferenceBlueId() != null && !typeNode.getReferenceBlueId().isEmpty()) {
+            return typeNode.getReferenceBlueId();
+        }
+        FrozenNode blueIdProperty = prop(typeNode, "blueId");
+        String text = text(blueIdProperty);
+        if (text != null && !text.isEmpty()) {
+            return text;
+        }
+        return text(typeNode);
+    }
+
+    private CompiledExpression varExpr(FrozenNode body, CompileScope scope, String pointer) {
+        if (body != null && body.getProperties() != null) {
+            String name = requiredText(prop(body, "name"), "$var.name");
+            return new VarExpr(scope.resolveSlot(name), pathOperandOrNull(body, scope, pointer));
+        }
+        return new VarExpr(scope.resolveSlot(requiredText(body, "$var")));
+    }
+
+    private String constName(FrozenNode body) {
+        if (body != null && body.getProperties() != null) {
+            return requiredText(prop(body, "name"), "$const.name");
+        }
+        return requiredText(body, "$const");
+    }
+
+    private PointerOperand pathOperandOrNull(FrozenNode body, CompileScope scope, String pointer) {
+        if (body == null || body.getProperties() == null || prop(body, "path") == null) {
+            return null;
+        }
+        return valuePointerOperand(prop(body, "path"), scope, pointer + "/path");
+    }
+
+    private Set<String> kindSet(FrozenNode node) {
+        Set<String> kinds = new LinkedHashSet<>();
+        if (node.getItems() != null) {
+            for (FrozenNode item : node.getItems()) {
+                kinds.add(validateKind(requiredText(item, "$isKind.kind item")));
+            }
+        } else {
+            kinds.add(validateKind(requiredText(node, "$isKind.kind")));
+        }
+        return Collections.unmodifiableSet(kinds);
+    }
+
+    private String validateKind(String kind) {
+        if ("undefined".equals(kind)
+                || "null".equals(kind)
+                || "text".equals(kind)
+                || "integer".equals(kind)
+                || "double".equals(kind)
+                || "boolean".equals(kind)
+                || "object".equals(kind)
+                || "list".equals(kind)) {
+            return kind;
+        }
+        throw new BexException("Unknown BEX kind: " + kind);
+    }
+
+    private CompiledExpression collectionExpr(FrozenNode body, CompileScope scope, String pointer,
+                                              CollectionOp op, String bodyField) {
+        String operator = collectionOperatorName(op);
+        CompiledExpression input = compileExpr(required(prop(body, "in"), operator + ".in"), scope, pointer + "/in");
+        String itemName = requiredText(prop(body, "item"), operator + ".item");
+        String keyName = prop(body, "key") != null ? requiredText(prop(body, "key"), operator + ".key") : null;
+        String indexName = prop(body, "index") != null ? requiredText(prop(body, "index"), operator + ".index") : null;
+        validateDistinctCollectionBindings(operator, itemName, keyName, indexName);
+        int itemSlot = scope.declareOrGetSlot(itemName);
+        int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
+        int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
+        CompiledExpression expr = compileExpr(required(prop(body, bodyField), operator + "." + bodyField),
+                scope, pointer + "/" + bodyField);
+        return new CollectionQueryExpr(input, itemSlot, keySlot, indexSlot, expr, op);
+    }
+
+    private CompiledExpression reduceExpr(FrozenNode body, CompileScope scope, String pointer) {
+        CompiledExpression input = compileExpr(required(prop(body, "in"), "$reduce.in"), scope, pointer + "/in");
+        String accName = requiredText(prop(body, "acc"), "$reduce.acc");
+        String itemName = requiredText(prop(body, "item"), "$reduce.item");
+        String keyName = prop(body, "key") != null ? requiredText(prop(body, "key"), "$reduce.key") : null;
+        String indexName = prop(body, "index") != null ? requiredText(prop(body, "index"), "$reduce.index") : null;
+        validateDistinctCollectionBindings("$reduce", itemName, keyName, indexName);
+        if (accName.equals(itemName) || accName.equals(keyName) || accName.equals(indexName)) {
+            throw new BexException("$reduce.acc must use a different binding name");
+        }
+        CompiledExpression init = compileExpr(required(prop(body, "init"), "$reduce.init"), scope, pointer + "/init");
+        int accSlot = scope.declareOrGetSlot(accName);
+        int itemSlot = scope.declareOrGetSlot(itemName);
+        int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
+        int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
+        CompiledExpression expr = compileExpr(required(prop(body, "expr"), "$reduce.expr"), scope, pointer + "/expr");
+        return new ReduceExpr(input, accSlot, init, itemSlot, keySlot, indexSlot, expr);
+    }
+
+    private String collectionOperatorName(CollectionOp op) {
+        switch (op) {
+            case MAP:
+                return "$map";
+            case FILTER:
+                return "$filter";
+            case FLAT_MAP:
+                return "$flatMap";
+            case SOME:
+                return "$some";
+            case FIND:
+                return "$find";
+            case FIND_ENTRY:
+                return "$findEntry";
+            default:
+                return "collection operator";
+        }
+    }
+
+    private void validateDistinctCollectionBindings(String operator, String itemName, String keyName, String indexName) {
+        if (keyName != null && keyName.equals(itemName)) {
+            throw new BexException(operator + ".key must use a different binding name than " + operator + ".item");
+        }
+        if (indexName != null && indexName.equals(itemName)) {
+            throw new BexException(operator + ".index must use a different binding name than " + operator + ".item");
+        }
+        if (keyName != null && indexName != null && keyName.equals(indexName)) {
+            throw new BexException(operator + ".key must use a different binding name than " + operator + ".index");
+        }
     }
 
     private CompiledExpression isExpr(FrozenNode body, CompileScope scope, String pointer) {
@@ -652,6 +917,10 @@ public final class BexCompiler {
             return node.getContracts();
         }
         return null;
+    }
+
+    private boolean hasExplicitProperty(FrozenNode node, String key) {
+        return node != null && node.getProperties() != null && node.getProperties().containsKey(key);
     }
 
     private FrozenNode meaningful(FrozenNode node) {

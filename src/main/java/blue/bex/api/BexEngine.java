@@ -1,5 +1,6 @@
 package blue.bex.api;
 
+import blue.bex.BexException;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.BexCompiledProgramCache;
 import blue.bex.compile.BexCompiledProgramKey;
@@ -25,6 +26,7 @@ public final class BexEngine {
     private final BexGasSchedule gasSchedule;
     private final BexCompiledProgramCache cache;
     private final BexMetricsSink metricsSink;
+    private final BexIntrinsicRegistry intrinsics;
     private final BexPointerCache pointerCache = new BexPointerCache();
 
     private BexEngine(Builder builder) {
@@ -32,6 +34,7 @@ public final class BexEngine {
         this.gasSchedule = builder.gasSchedule;
         this.cache = builder.cache;
         this.metricsSink = builder.metricsSink;
+        this.intrinsics = builder.intrinsics;
     }
 
     public static Builder builder() {
@@ -52,10 +55,12 @@ public final class BexEngine {
         BexCompiledProgram cached = cache.get(key);
         if (cached != null) {
             metrics.incrementCompileCacheHits();
+            validateIntrinsicSupport(cached);
             return cached;
         }
         metrics.incrementCompileCacheMisses();
-        BexCompiledProgram program = new BexCompiler(metrics).compile(source);
+        BexCompiledProgram program = new BexCompiler(metrics, intrinsics).compile(source);
+        validateIntrinsicSupport(program);
         cache.put(key, program);
         return program;
         } finally {
@@ -72,7 +77,8 @@ public final class BexEngine {
 
     private BexExecutionResult execute(BexCompiledProgram program, BexExecutionContext context, BexMetrics metrics) {
         long start = System.nanoTime();
-        BexRuntime runtime = new BexRuntime(program, context, blue, gasSchedule, metrics, pointerCache);
+        validateIntrinsicSupport(program);
+        BexRuntime runtime = new BexRuntime(program, context, blue, gasSchedule, metrics, pointerCache, intrinsics);
         BexExecutionResult result = runtime.execute();
         metrics.addExecuteNanos(System.nanoTime() - start);
         return new BexExecutionResult(result.value(),
@@ -94,11 +100,20 @@ public final class BexEngine {
         return BexCompiledProgramKey.from(source);
     }
 
+    private void validateIntrinsicSupport(BexCompiledProgram program) {
+        for (String blueId : program.requiredIntrinsicBlueIds()) {
+            if (!intrinsics.supports(blueId)) {
+                throw new BexException("Unsupported intrinsic BlueId: " + blueId);
+            }
+        }
+    }
+
     public static final class Builder {
         private Blue blue = new Blue();
         private BexGasSchedule gasSchedule = BexGasSchedule.defaults();
         private BexCompiledProgramCache cache = new LruBexCompiledProgramCache();
         private BexMetricsSink metricsSink = BexMetricsSink.NOOP;
+        private BexIntrinsicRegistry intrinsics = BexIntrinsicRegistry.empty();
 
         public Builder blue(Blue blue) {
             this.blue = blue != null ? blue : new Blue();
@@ -117,6 +132,21 @@ public final class BexEngine {
 
         public Builder metrics(BexMetricsSink metrics) {
             this.metricsSink = metrics != null ? metrics : BexMetricsSink.NOOP;
+            return this;
+        }
+
+        public Builder intrinsics(BexIntrinsicRegistry intrinsics) {
+            this.intrinsics = intrinsics != null ? intrinsics : BexIntrinsicRegistry.empty();
+            return this;
+        }
+
+        public Builder intrinsic(String blueId, BexIntrinsicProcessor processor) {
+            this.intrinsics = this.intrinsics.with(blueId, processor);
+            return this;
+        }
+
+        public Builder intrinsic(Class<?> typeClass, BexIntrinsicProcessor processor) {
+            this.intrinsics = this.intrinsics.with(typeClass, processor);
             return this;
         }
 

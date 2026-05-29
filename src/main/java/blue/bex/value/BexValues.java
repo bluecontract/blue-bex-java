@@ -157,6 +157,41 @@ public final class BexValues {
         return BexEquality.equal(left, right);
     }
 
+    public static String kind(BexValue value) {
+        if (value == null || value.isUndefined()) {
+            return "undefined";
+        }
+        if (value.isNull()) {
+            return "null";
+        }
+        if (value.isList()) {
+            return "list";
+        }
+        if (value.isObject()) {
+            return "object";
+        }
+        if (!value.isScalar()) {
+            return "undefined";
+        }
+        Object raw = rawScalar(value);
+        if (raw instanceof Boolean) {
+            return "boolean";
+        }
+        if (raw instanceof BigInteger
+                || raw instanceof Integer
+                || raw instanceof Long
+                || raw instanceof Short
+                || raw instanceof Byte) {
+            return "integer";
+        }
+        if (raw instanceof BigDecimal
+                || raw instanceof Float
+                || raw instanceof Double) {
+            return "double";
+        }
+        return "text";
+    }
+
     static Object scalarSimple(Object value) {
         return value;
     }

@@ -13,8 +13,10 @@ import blue.language.snapshot.FrozenNode;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Lazy-compiled BEX program.
@@ -25,17 +27,30 @@ public final class BexCompiledProgram {
     private final Map<String, BexValue> constants;
     private final int rootFrameSize;
     private final String programBlueId;
+    private final Set<String> requiredIntrinsicBlueIds;
 
     public BexCompiledProgram(CompiledFunction entry,
                               Map<String, CompiledFunction> functions,
                               Map<String, BexValue> constants,
                               int rootFrameSize,
                               String programBlueId) {
+        this(entry, functions, constants, rootFrameSize, programBlueId, Collections.<String>emptySet());
+    }
+
+    public BexCompiledProgram(CompiledFunction entry,
+                              Map<String, CompiledFunction> functions,
+                              Map<String, BexValue> constants,
+                              int rootFrameSize,
+                              String programBlueId,
+                              Set<String> requiredIntrinsicBlueIds) {
         this.entry = entry;
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.constants = Collections.unmodifiableMap(new LinkedHashMap<>(constants));
         this.rootFrameSize = rootFrameSize;
         this.programBlueId = programBlueId;
+        this.requiredIntrinsicBlueIds = Collections.unmodifiableSet(new LinkedHashSet<>(requiredIntrinsicBlueIds != null
+                ? requiredIntrinsicBlueIds
+                : Collections.<String>emptySet()));
     }
 
     public BexValue execute(BexRuntime runtime) {
@@ -47,6 +62,7 @@ public final class BexCompiledProgram {
     public Map<String, BexValue> constants() { return constants; }
     public int rootFrameSize() { return rootFrameSize; }
     public String programBlueId() { return programBlueId; }
+    public Set<String> requiredIntrinsicBlueIds() { return requiredIntrinsicBlueIds; }
 
     public BexValue constant(String name) {
         BexValue value = constants.get(name);

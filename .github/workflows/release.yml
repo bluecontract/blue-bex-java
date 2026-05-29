@@ -15,10 +15,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Check if branch is master
+      - name: Check if branch is main
         run: |
-          if [[ "${GITHUB_REF##*/}" != "master" ]]; then
-            echo "This workflow can only be triggered for the master branch."
+          if [[ "${GITHUB_REF##*/}" != "main" ]]; then
+            echo "This workflow can only be triggered for the main branch."
             exit 1
           fi
 

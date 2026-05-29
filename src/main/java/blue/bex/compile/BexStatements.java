@@ -75,6 +75,36 @@ class LetStatement extends Stmt {
     }
 }
 
+final class MultiLetStatement extends Stmt {
+    private final int[] slots;
+    private final CompiledExpression[] expressions;
+    private final boolean sequential;
+
+    MultiLetStatement(int[] slots, CompiledExpression[] expressions, boolean sequential) {
+        this.slots = slots;
+        this.expressions = expressions;
+        this.sequential = sequential;
+    }
+
+    @Override
+    protected Control doExec(CompiledFrame frame) {
+        if (sequential) {
+            for (int i = 0; i < slots.length; i++) {
+                frame.set(slots[i], expressions[i].eval(frame));
+            }
+        } else {
+            BexValue[] values = new BexValue[expressions.length];
+            for (int i = 0; i < expressions.length; i++) {
+                values[i] = expressions[i].eval(frame);
+            }
+            for (int i = 0; i < slots.length; i++) {
+                frame.set(slots[i], values[i]);
+            }
+        }
+        return Control.CONTINUE;
+    }
+}
+
 final class SetStatement extends LetStatement {
     SetStatement(int slot, CompiledExpression expr) {
         super(slot, expr);
@@ -287,6 +317,25 @@ final class ReturnStatement extends Stmt {
     }
 }
 
+final class ReturnIfStatement extends Stmt {
+    private final CompiledExpression cond;
+    private final CompiledExpression value;
+
+    ReturnIfStatement(CompiledExpression cond, CompiledExpression value) {
+        this.cond = cond;
+        this.value = value;
+    }
+
+    @Override
+    protected Control doExec(CompiledFrame frame) {
+        if (!BexValues.truthy(cond.eval(frame))) {
+            return Control.CONTINUE;
+        }
+        frame.returnValue(value != null ? value.eval(frame) : frame.runtime().defaultResultValue());
+        return Control.RETURN;
+    }
+}
+
 final class FailStatement extends Stmt {
     private final CompiledExpression message;
 
@@ -297,5 +346,23 @@ final class FailStatement extends Stmt {
     @Override
     protected Control doExec(CompiledFrame frame) {
         throw new BexException(message.eval(frame).asText());
+    }
+}
+
+final class FailIfStatement extends Stmt {
+    private final CompiledExpression cond;
+    private final CompiledExpression message;
+
+    FailIfStatement(CompiledExpression cond, CompiledExpression message) {
+        this.cond = cond;
+        this.message = message;
+    }
+
+    @Override
+    protected Control doExec(CompiledFrame frame) {
+        if (BexValues.truthy(cond.eval(frame))) {
+            throw new BexException(message.eval(frame).asText());
+        }
+        return Control.CONTINUE;
     }
 }

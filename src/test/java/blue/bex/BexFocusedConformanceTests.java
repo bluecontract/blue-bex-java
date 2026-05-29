@@ -111,6 +111,229 @@ class BexStatementTest {
     }
 }
 
+class BexErgonomicsCoreTest {
+    @Test
+    void guardsAreLazyAndReturnFromRoot() {
+        BexExecutionResult result = runStep(stepDo(list(
+                op("$returnIf", obj("cond", false, "expr", op("$integer", "not-an-integer"))),
+                op("$failIf", obj("cond", false, "message", op("$integer", "not-an-integer"))),
+                op("$returnIf", obj("cond", true, "expr", "done")),
+                op("$fail", "unreachable")
+        )), defaultContext());
+
+        assertEquals("done", simple(result.value()));
+        assertThrows(BexException.class, () -> runStep(stepDo(list(
+                op("$failIf", obj("cond", true, "message", "boom"))
+        )), defaultContext()));
+    }
+
+    @Test
+    void kindAndIsKindUseBexRuntimeKinds() {
+        BexExecutionResult result = runExpr(obj(
+                "missing", op("$kind", op("$document", "/missing")),
+                "nil", op("$kind", op("$null", true)),
+                "text", op("$kind", "hello"),
+                "integer", op("$kind", 7),
+                "double", op("$kind", op("$number", "1.5")),
+                "boolean", op("$kind", true),
+                "object", op("$kind", obj("a", 1)),
+                "list", op("$kind", list(1)),
+                "numeric", op("$isKind", obj("val", 7, "kind", list("integer", "double"))),
+                "notText", op("$isKind", obj("val", 7, "kind", "text"))
+        ));
+
+        assertEquals(m(
+                "boolean", "boolean",
+                "double", "double",
+                "integer", "integer",
+                "list", "list",
+                "missing", "undefined",
+                "nil", "null",
+                "notText", false,
+                "numeric", true,
+                "object", "object",
+                "text", "text"
+        ), simple(result.value()));
+    }
+
+    @Test
+    void pathAwareVarAndConstReadByJsonPointerWithoutNameShorthand() {
+        BexExecutionResult result = runStep(obj(
+                "type", "Blue/BEX Program",
+                "constants", obj("Policy/minimum", obj("amount", 100)),
+                "do", list(
+                        op("$let", obj("name", "request/summary", "expr", "legacy-name")),
+                        op("$let", obj("name", "request", "expr", obj("summary", "new-path"))),
+                        op("$return", obj(
+                                "legacy", op("$var", "request/summary"),
+                                "path", op("$var", obj("name", "request", "path", "/summary")),
+                                "const", op("$const", obj("name", "Policy/minimum", "path", "/amount"))
+                        ))
+                )
+        ), defaultContext());
+
+        assertEquals(m("const", bi(100), "legacy", "legacy-name", "path", "new-path"), simple(result.value()));
+    }
+
+    @Test
+    void multiLetUnorderedIsParallelAndOrderedIsSequential() {
+        BexExecutionResult parallel = runStep(stepDo(list(
+                op("$let", obj("name", "a", "expr", "old")),
+                op("$let", obj("vars", obj(
+                        "a", "new",
+                        "b", op("$var", "a")
+                ))),
+                op("$return", obj("a", op("$var", "a"), "b", op("$var", "b")))
+        )), defaultContext());
+        assertEquals(m("a", "new", "b", "old"), simple(parallel.value()));
+
+        BexExecutionResult sequential = runStep(stepDo(list(
+                op("$let", obj("name", "a", "expr", "old")),
+                op("$let", obj("order", list("a", "b"), "vars", obj(
+                        "a", "new",
+                        "b", op("$var", "a")
+                ))),
+                op("$return", obj("a", op("$var", "a"), "b", op("$var", "b")))
+        )), defaultContext());
+        assertEquals(m("a", "new", "b", "new"), simple(sequential.value()));
+
+        assertThrows(BexException.class, () -> runStep(stepDo(list(
+                op("$let", obj("vars", obj("a", 1, "b", op("$var", "a"))))
+        )), defaultContext()));
+    }
+
+    @Test
+    void collectionQueriesCoverProjectionSelectionFanoutAndAggregation() {
+        BexExecutionResult result = runExpr(obj(
+                "mapped", op("$map", obj(
+                        "in", list(1, 2, 3),
+                        "item", "x",
+                        "expr", op("$multiply", list(op("$var", "x"), 2))
+                )),
+                "filtered", op("$filter", obj(
+                        "in", list(1, 2, 3, 4),
+                        "item", "x",
+                        "where", op("$gt", list(op("$var", "x"), 2))
+                )),
+                "flat", op("$flatMap", obj(
+                        "in", list(1, 2),
+                        "item", "x",
+                        "expr", list(op("$var", "x"), op("$add", list(op("$var", "x"), 10)))
+                )),
+                "sum", op("$reduce", obj(
+                        "in", list(1, 2, 3),
+                        "acc", "total",
+                        "init", 0,
+                        "item", "x",
+                        "expr", op("$add", list(op("$var", "total"), op("$var", "x")))
+                )),
+                "some", op("$some", obj(
+                        "in", list(1, 2, 3),
+                        "item", "x",
+                        "where", op("$eq", list(op("$var", "x"), 2))
+                )),
+                "found", op("$find", obj(
+                        "in", list("a", "bb", "ccc"),
+                        "item", "x",
+                        "where", op("$eq", list(op("$var", "x"), "bb"))
+                )),
+                "entry", op("$findEntry", obj(
+                        "in", obj("b", 2, "a", 1),
+                        "item", "v",
+                        "key", "k",
+                        "index", "i",
+                        "where", op("$gt", list(op("$var", "v"), 1))
+                )),
+                "objectFiltered", op("$filter", obj(
+                        "in", obj("b", 2, "a", 1, "c", 3),
+                        "item", "v",
+                        "key", "k",
+                        "where", op("$ne", list(op("$var", "k"), "b"))
+                )),
+                "includes", op("$includes", obj("list", list("add", "replace", "remove"), "val", "replace")),
+                "hasKey", op("$hasKey", obj("object", obj("a", 1), "key", "a")),
+                "builtObject", op("$objectFromEntries", op("$map", obj(
+                        "in", op("$entries", obj("b", 2, "a", 1)),
+                        "item", "entry",
+                        "expr", obj(
+                                "key", op("$var", obj("name", "entry", "path", "/key")),
+                                "val", op("$multiply", list(op("$var", obj("name", "entry", "path", "/val")), 10))
+                        )
+                )))
+        ));
+
+        assertEquals(m(
+                "builtObject", m("a", bi(10), "b", bi(20)),
+                "entry", m("index", bi(1), "key", "b", "val", bi(2)),
+                "filtered", l(bi(3), bi(4)),
+                "flat", l(bi(1), bi(11), bi(2), bi(12)),
+                "found", "bb",
+                "hasKey", true,
+                "includes", true,
+                "mapped", l(bi(2), bi(4), bi(6)),
+                "objectFiltered", m("a", bi(1), "c", bi(3)),
+                "some", true,
+                "sum", bi(6)
+        ), simple(result.value()));
+    }
+
+    @Test
+    void objectFromEntriesRejectsBadKeysAndUndefinedValueOmitsKey() {
+        assertEquals(m("a", bi(1)), simple(runExpr(op("$objectFromEntries", list(
+                obj("key", "b", "val", 2),
+                obj("key", "a", "val", 1),
+                obj("key", "b", "val", op("$document", "/missing"))
+        ))).value()));
+
+        assertThrows(BexException.class, () -> runExpr(op("$objectFromEntries", list(
+                obj("key", op("$null", true), "val", 1)
+        ))));
+    }
+
+    @Test
+    void shortCircuitingAvoidsLaterFailuresAndGas() {
+        BexExecutionResult shortCircuit = runExpr(op("$some", obj(
+                "in", list(1, 2, 3),
+                "item", "x",
+                "where", op("$eq", list(op("$var", "x"), 1))
+        )));
+        BexExecutionResult fullScan = runExpr(op("$some", obj(
+                "in", list(1, 2, 3),
+                "item", "x",
+                "where", op("$eq", list(op("$var", "x"), 3))
+        )));
+        assertEquals(true, simple(shortCircuit.value()));
+        assertTrue(shortCircuit.gasUsed() < fullScan.gasUsed());
+
+        assertEquals("a", simple(runExpr(op("$find", obj(
+                "in", list("a", "b"),
+                "item", "x",
+                "where", op("$or", list(
+                        op("$eq", list(op("$var", "x"), "a")),
+                        op("$integer", "not-an-integer")
+                ))
+        ))).value()));
+    }
+
+    @Test
+    void collectionQueryBindingsDoNotLeakAndReturnIfValueIsRejected() {
+        BexExecutionResult result = runStep(stepDo(list(
+                op("$let", obj("name", "x", "expr", "outer")),
+                op("$let", obj("name", "ignored", "expr", op("$map", obj(
+                        "in", list("inner"),
+                        "item", "x",
+                        "expr", op("$var", "x")
+                )))),
+                op("$return", op("$var", "x"))
+        )), defaultContext());
+
+        assertEquals("outer", simple(result.value()));
+        assertThrows(BexException.class, () -> runStep(stepDo(list(
+                op("$returnIf", obj("cond", true, "value", "wrong-key"))
+        )), defaultContext()));
+    }
+}
+
 class BexFunctionFrameTest {
     @Test
     void nestedFunctionCallShadowsCallerSlotWithoutLeakage() {

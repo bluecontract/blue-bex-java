@@ -135,28 +135,42 @@ final class BindingExpr extends Expr {
 
 final class VarExpr extends Expr {
     private final int slot;
+    private final PointerOperand pointer;
 
     VarExpr(int slot) {
+        this(slot, null);
+    }
+
+    VarExpr(int slot, PointerOperand pointer) {
         this.slot = slot;
+        this.pointer = pointer;
     }
 
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         frame.runtime().gas().charge(frame.runtime().gas().schedule().varRead);
-        return frame.get(slot);
+        BexValue value = frame.get(slot);
+        return pointer != null ? value.at(pointer.segments(frame)) : value;
     }
 }
 
 final class ConstExpr extends Expr {
     private final String name;
+    private final PointerOperand pointer;
 
     ConstExpr(String name) {
+        this(name, null);
+    }
+
+    ConstExpr(String name, PointerOperand pointer) {
         this.name = name;
+        this.pointer = pointer;
     }
 
     @Override
     protected BexValue doEval(CompiledFrame frame) {
-        return frame.runtime().program().constant(name);
+        BexValue value = frame.runtime().program().constant(name);
+        return pointer != null ? value.at(pointer.segments(frame)) : value;
     }
 }
 
@@ -209,5 +223,29 @@ final class ListExpr extends Expr {
             out.add(item.eval(frame));
         }
         return BexValues.list(out);
+    }
+}
+
+final class IntrinsicExpr extends Expr {
+    private final String blueId;
+    private final BexValue type;
+    private final Map<String, CompiledExpression> fields;
+
+    IntrinsicExpr(String blueId, BexValue type, Map<String, CompiledExpression> fields) {
+        this.blueId = blueId;
+        this.type = type;
+        this.fields = fields;
+    }
+
+    @Override
+    protected BexValue doEval(CompiledFrame frame) {
+        Map<String, BexValue> values = new LinkedHashMap<>();
+        for (Map.Entry<String, CompiledExpression> entry : fields.entrySet()) {
+            BexValue value = entry.getValue().eval(frame);
+            if (!value.isUndefined()) {
+                values.put(entry.getKey(), value);
+            }
+        }
+        return frame.runtime().invokeIntrinsic(blueId, type, values);
     }
 }

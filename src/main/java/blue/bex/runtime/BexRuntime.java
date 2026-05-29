@@ -1,6 +1,7 @@
 package blue.bex.runtime;
 
 import blue.bex.api.BexExecutionContext;
+import blue.bex.api.BexIntrinsicRegistry;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasMeter;
 import blue.bex.gas.BexGasSchedule;
@@ -30,6 +31,7 @@ public final class BexRuntime {
     private final BexPointerCache pointerCache;
     private final BexExecutionAccumulator accumulator;
     private final BexBlueTypeMatcher typeMatcher;
+    private final BexIntrinsicRegistry intrinsics;
 
     public BexRuntime(BexCompiledProgram program,
                       BexExecutionContext context,
@@ -37,6 +39,16 @@ public final class BexRuntime {
                       BexGasSchedule gasSchedule,
                       BexMetrics metrics,
                       BexPointerCache pointerCache) {
+        this(program, context, blue, gasSchedule, metrics, pointerCache, BexIntrinsicRegistry.empty());
+    }
+
+    public BexRuntime(BexCompiledProgram program,
+                      BexExecutionContext context,
+                      Blue blue,
+                      BexGasSchedule gasSchedule,
+                      BexMetrics metrics,
+                      BexPointerCache pointerCache,
+                      BexIntrinsicRegistry intrinsics) {
         this.program = program;
         this.context = context;
         this.gas = new BexGasMeter(gasSchedule, context.gasLimit(), metrics);
@@ -44,6 +56,7 @@ public final class BexRuntime {
         this.pointerCache = pointerCache;
         this.accumulator = new BexExecutionAccumulator(new BexResultOverlay(context.document(), metrics));
         this.typeMatcher = new BexBlueTypeMatcher(blue);
+        this.intrinsics = intrinsics != null ? intrinsics : BexIntrinsicRegistry.empty();
     }
 
     public BexExecutionResult execute() {
@@ -59,6 +72,7 @@ public final class BexRuntime {
     public BexPointerCache pointerCache() { return pointerCache; }
     public BexExecutionAccumulator accumulator() { return accumulator; }
     public BexBlueTypeMatcher typeMatcher() { return typeMatcher; }
+    public BexIntrinsicRegistry intrinsics() { return intrinsics; }
 
     public BexValue readDocument(String absolutePointer, List<String> precompiledSegments, boolean resolved) {
         if (resolved) {
@@ -108,6 +122,10 @@ public final class BexRuntime {
         result.put("changeset", changeset.asValue());
         result.put("events", accumulator.events().asValue());
         return BexValues.map(result);
+    }
+
+    public BexValue invokeIntrinsic(String blueId, BexValue type, Map<String, BexValue> fields) {
+        return intrinsics.invoke(blueId, type, fields, gas::charge, gas::used);
     }
 
     public String resolvePointer(String authoredPointer) {

@@ -55,6 +55,19 @@ Read operators charge their read cost in addition to `expressionBase`:
 
 Canonical and resolved document reads currently cost the same.
 
+Path-aware `$var` and `$const` object forms do not add a separate read charge
+for static paths. If the `path` operand is dynamic, the path expression consumes
+its normal expression gas before the value-local pointer read.
+
+`$kind` and `$isKind` charge their normal expression tree costs only:
+
+```text
+$kind = expressionBase + gas for value expression
+$isKind = expressionBase + gas for val expression
+```
+
+`$isKind.kind` is static authored data and does not consume expression gas.
+
 ## Pointer And Object Updates
 
 `$pointerGet` charges:
@@ -139,8 +152,74 @@ selected branch.
 `$forEach` charges `statementBase`, the input expression, `forEachItem` for each
 iterated item, then the body statements for each iteration.
 
-`$and`, `$or`, and `$coalesce` short-circuit. Unevaluated operands consume no
-gas.
+`$returnIf` charges `statementBase`, then the condition expression. Its `expr`
+operand is evaluated only when the condition is truthy.
+
+`$failIf` charges `statementBase`, then the condition expression. Its `message`
+operand is evaluated only when the condition is truthy.
+
+`$let.vars` charges `statementBase`. In unordered form, all binding expressions
+are evaluated before any slot is assigned. In ordered form, each binding
+expression is evaluated and assigned in the explicit order.
+
+Collection query bindings are restored after `$map`, `$filter`, `$flatMap`,
+`$some`, `$find`, `$findEntry`, and `$reduce` finish. Capturing and restoring
+slots is deterministic bookkeeping and does not add gas beyond the expression
+and item charges below.
+
+`$and`, `$or`, `$coalesce`, `$some`, `$find`, `$findEntry`, and `$includes`
+short-circuit. Unevaluated operands or collection items consume no gas.
+
+Collection expressions `$map`, `$filter`, `$flatMap`, `$reduce`, `$some`,
+`$find`, and `$findEntry` charge:
+
+```text
+expressionBase
++ gas for input expression
++ forEachItem for each evaluated item
++ gas for the query/body expression for each evaluated item
+```
+
+`$reduce` also charges the initializer expression once after the input
+expression.
+
+`$objectFromEntries` charges:
+
+```text
+expressionBase
++ gas for entries expression
++ forEachItem for each input entry
+```
+
+`$includes` charges:
+
+```text
+expressionBase
++ gas for list expression
++ gas for val expression
++ forEachItem for each compared list item
+```
+
+`$hasKey` charges:
+
+```text
+expressionBase
++ gas for object expression
++ gas for key expression only when key is dynamic
+```
+
+`$intrinsic` charges:
+
+```text
+expressionBase
++ gas for each evaluated payload field expression
++ gas charged explicitly by the registered intrinsic processor
+```
+
+`$intrinsic.type` is static authored Blue data and does not consume expression
+gas. Unsupported intrinsic BlueIds fail during compilation before execution
+starts. Payload fields that evaluate to `undefined` are omitted after their
+normal expression gas has been charged.
 
 Function calls charge the caller expression or statement normally, then the
 called function invocation charges `functionCall`. Argument expressions are
