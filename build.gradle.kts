@@ -38,7 +38,7 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-    val blueLanguageVersion = if (System.getenv("CI") == null) "2.0.0-SNAPSHOT" else "2.0.0"
+    val blueLanguageVersion = if (System.getenv("CI") == null) "3.0.0-SNAPSHOT" else "3.0.0"
     api("blue.language:blue-language-java:$blueLanguageVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
