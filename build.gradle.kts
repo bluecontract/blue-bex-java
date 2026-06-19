@@ -6,7 +6,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
-    id("org.jreleaser") version "1.13.1"
+    id("org.jreleaser") version "1.24.0"
 }
 
 group = "blue.bex"
