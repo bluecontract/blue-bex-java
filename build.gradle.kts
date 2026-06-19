@@ -32,9 +32,7 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-    if (JavaVersion.current().isJava9Compatible) {
-        options.release.set(8)
-    }
+    options.release.set(8)
 }
 
 dependencies {
