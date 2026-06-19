@@ -45,6 +45,11 @@ dependencies {
 }
 
 tasks.test {
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(8))
+        }
+    )
     useJUnitPlatform()
     reports {
         junitXml.required.set(false)
