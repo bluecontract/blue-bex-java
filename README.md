@@ -810,33 +810,6 @@ policy, transform, and patch-emission workflows: 30 Kyverno validate-style
 cases, 20 Kyverno mutate/generate-style cases, 20 JMESPath/JSONata-style
 query/transform cases, and 10 JSON Patch emission edge cases.
 
-## Release Setup
-
-The project version is stored in `.cz.toml`. Local builds append `-SNAPSHOT`;
-CI builds publish the plain version, for example `1.0.0`.
-
-Stable releases are triggered manually from `main` with the `Release` workflow:
-
-```bash
-./gradlew clean build
-./gradlew publish
-./gradlew jreleaserFullRelease
-```
-
-Release candidates are published from the long-lived `next` branch. Pushes to
-`next` that affect `.cz.toml`, Gradle files, the Gradle wrapper, or `src/**`
-run the `Release RC` workflow, which prepares the next `X.Y.Z-rc.N` version,
-publishes it, and pushes the release commit and tag back to `next`.
-
-The release workflows expect these repository secrets:
-
-- `WORKFLOW_PAT`
-- `MAVENCENTRAL_USERNAME` - the Central Portal user-token username
-- `MAVENCENTRAL_PASSWORD` - the Central Portal user-token password/passcode
-- `GPG_PUBLIC_KEY`
-- `GPG_SECRET_KEY`
-- `GPG_PASSPHRASE`
-
 ## Tests
 
 ```bash
