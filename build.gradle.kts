@@ -6,7 +6,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
-    id("org.jreleaser") version "1.13.1"
+    id("org.jreleaser") version "1.24.0"
 }
 
 group = "blue.bex"
@@ -32,9 +32,7 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
-    if (JavaVersion.current().isJava9Compatible) {
-        options.release.set(8)
-    }
+    options.release.set(8)
 }
 
 dependencies {
@@ -47,6 +45,11 @@ dependencies {
 }
 
 tasks.test {
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(8))
+        }
+    )
     useJUnitPlatform()
     reports {
         junitXml.required.set(false)
