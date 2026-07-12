@@ -269,6 +269,21 @@ BexExecutionContext.builder()
         .build();
 ```
 
+For a host value that is expensive to construct and may not be read, use a
+lazy binding. Its supplier runs only when BEX first reads that name, at most
+once per execution context; BEX then receives the supplied concrete value.
+
+```java
+BexExecutionContext.builder()
+        .document(view)
+        .lazyBinding("expensiveSnapshot", this::createSnapshotValue)
+        .build();
+```
+
+`event`, `steps`, and `currentContract` are standard eager bindings. Calling
+`context.bindings()` intentionally materializes all lazy bindings in insertion
+order and returns an unmodifiable map of concrete values.
+
 Use `$binding` for arbitrary host bindings:
 
 ```yaml

@@ -6,6 +6,8 @@ import blue.bex.value.BexValues;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Immutable execution context for one BEX run.
@@ -17,11 +19,12 @@ import java.util.Map;
  */
 public final class BexExecutionContext {
     private final BexDocumentView document;
-    private final Map<String, BexValue> bindings;
+    private final Map<String, BindingSlot> bindingSlots;
     private final BexValue event;
     private final BexValue currentContract;
     private final BexStepResults steps;
     private final long gasLimit;
+    private volatile Map<String, BexValue> materializedBindings;
 
     private BexExecutionContext(Builder builder) {
         this.document = builder.document;
@@ -30,11 +33,14 @@ public final class BexExecutionContext {
         if (document == null) {
             throw new IllegalArgumentException("document is required");
         }
-        LinkedHashMap<String, BexValue> copy = new LinkedHashMap<>(builder.bindings);
-        if (builder.steps != null && !copy.containsKey("steps")) {
-            copy.put("steps", builder.steps.asValue());
+        LinkedHashMap<String, BindingSlot> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, BindingDefinition> entry : builder.bindings.entrySet()) {
+            copy.put(entry.getKey(), entry.getValue().createSlot());
         }
-        this.bindings = Collections.unmodifiableMap(copy);
+        if (builder.steps != null && !copy.containsKey("steps")) {
+            copy.put("steps", new EagerBindingSlot(builder.steps.asValue()));
+        }
+        this.bindingSlots = Collections.unmodifiableMap(copy);
         this.event = bindingFrom(copy, "event");
         this.currentContract = bindingFrom(copy, "currentContract");
     }
@@ -60,12 +66,32 @@ public final class BexExecutionContext {
     }
 
     public BexValue binding(String name) {
-        BexValue value = bindings.get(name);
-        return value != null ? value : BexValues.undefined();
+        return bindingFrom(bindingSlots, name);
     }
 
+    /**
+     * Returns all host bindings as concrete BEX values.
+     *
+     * <p>Calling this method materializes every lazy binding in declaration
+     * order. The returned map is unmodifiable and contains no lazy wrappers.
+     * If a supplier fails, materialization stops at that binding and the
+     * failure is retained by its slot for later reads.</p>
+     *
+     * @return concrete host bindings in declaration order
+     */
     public Map<String, BexValue> bindings() {
-        return bindings;
+        Map<String, BexValue> cached = materializedBindings;
+        if (cached != null) {
+            return cached;
+        }
+
+        LinkedHashMap<String, BexValue> values = new LinkedHashMap<>();
+        for (Map.Entry<String, BindingSlot> entry : bindingSlots.entrySet()) {
+            values.put(entry.getKey(), entry.getValue().resolve());
+        }
+        Map<String, BexValue> materialized = Collections.unmodifiableMap(values);
+        materializedBindings = materialized;
+        return materialized;
     }
 
     public String currentScopePath() {
@@ -80,7 +106,7 @@ public final class BexExecutionContext {
         private BexDocumentView document;
         private BexStepResults steps;
         private long gasLimit = 100_000L;
-        private final LinkedHashMap<String, BexValue> bindings = new LinkedHashMap<>();
+        private final LinkedHashMap<String, BindingDefinition> bindings = new LinkedHashMap<>();
 
         public Builder document(BexDocumentView document) {
             this.document = document;
@@ -104,10 +130,33 @@ public final class BexExecutionContext {
         }
 
         public Builder binding(String name, BexValue value) {
-            if (name == null || name.trim().isEmpty()) {
-                throw new IllegalArgumentException("binding name is required");
+            validateBindingName(name);
+            bindings.put(name, new EagerBindingDefinition(value));
+            return this;
+        }
+
+        /**
+         * Adds a host binding that is resolved when it is first read.
+         *
+         * <p>The supplier is invoked at most once for each built execution
+         * context. A {@code null} result is exposed as
+         * {@link BexValues#undefined()}. The standard {@code event},
+         * {@code currentContract}, and {@code steps} bindings remain eager and
+         * cannot be supplied lazily.</p>
+         *
+         * @param name binding name
+         * @param supplier concrete value supplier
+         * @return this builder
+         * @throws IllegalArgumentException if the name is invalid or names a
+         *                                  standard eager binding
+         * @throws NullPointerException if {@code supplier} is {@code null}
+         */
+        public Builder lazyBinding(String name, Supplier<? extends BexValue> supplier) {
+            validateBindingName(name);
+            if (isStandardBindingName(name)) {
+                throw new IllegalArgumentException("standard binding must remain eager: " + name);
             }
-            bindings.put(name, value != null ? value : BexValues.undefined());
+            bindings.put(name, new LazyBindingDefinition(Objects.requireNonNull(supplier, "supplier")));
             return this;
         }
 
@@ -141,8 +190,192 @@ public final class BexExecutionContext {
         }
     }
 
-    private static BexValue bindingFrom(Map<String, BexValue> bindings, String name) {
-        BexValue value = bindings.get(name);
-        return value != null ? value : BexValues.undefined();
+    private static void validateBindingName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("binding name is required");
+        }
+    }
+
+    private static boolean isStandardBindingName(String name) {
+        return "event".equals(name)
+                || "currentContract".equals(name)
+                || "steps".equals(name);
+    }
+
+    private static BexValue bindingFrom(Map<String, BindingSlot> bindingSlots, String name) {
+        BindingSlot slot = bindingSlots.get(name);
+        return slot != null ? slot.resolve() : BexValues.undefined();
+    }
+
+    private interface BindingDefinition {
+        BindingSlot createSlot();
+    }
+
+    private interface BindingSlot {
+        BexValue resolve();
+    }
+
+    private static final class EagerBindingDefinition implements BindingDefinition {
+        private final BexValue value;
+
+        private EagerBindingDefinition(BexValue value) {
+            this.value = value != null ? value : BexValues.undefined();
+        }
+
+        @Override
+        public BindingSlot createSlot() {
+            return new EagerBindingSlot(value);
+        }
+    }
+
+    private static final class LazyBindingDefinition implements BindingDefinition {
+        private final Supplier<? extends BexValue> supplier;
+
+        private LazyBindingDefinition(Supplier<? extends BexValue> supplier) {
+            this.supplier = supplier;
+        }
+
+        @Override
+        public BindingSlot createSlot() {
+            return new LazyBindingSlot(supplier);
+        }
+    }
+
+    private static final class EagerBindingSlot implements BindingSlot {
+        private final BexValue value;
+
+        private EagerBindingSlot(BexValue value) {
+            this.value = value != null ? value : BexValues.undefined();
+        }
+
+        @Override
+        public BexValue resolve() {
+            return value;
+        }
+    }
+
+    private static final class LazyBindingSlot implements BindingSlot {
+        private final Supplier<? extends BexValue> supplier;
+        private volatile ResolutionState state = ResolutionState.UNRESOLVED;
+        private Thread resolvingThread;
+        private BexValue value;
+        private Throwable failure;
+
+        private LazyBindingSlot(Supplier<? extends BexValue> supplier) {
+            this.supplier = supplier;
+        }
+
+        @Override
+        public BexValue resolve() {
+            ResolutionState observed = state;
+            if (observed == ResolutionState.RESOLVED) {
+                return value;
+            }
+            if (observed == ResolutionState.FAILED) {
+                return rethrow(failure);
+            }
+
+            boolean interrupted = false;
+            try {
+                boolean resolveHere = false;
+                synchronized (this) {
+                    while (!resolveHere) {
+                        observed = state;
+                        if (observed == ResolutionState.RESOLVED) {
+                            return value;
+                        }
+                        if (observed == ResolutionState.FAILED) {
+                            return rethrow(failure);
+                        }
+                        if (observed == ResolutionState.UNRESOLVED) {
+                            resolvingThread = Thread.currentThread();
+                            state = ResolutionState.RESOLVING;
+                            resolveHere = true;
+                            continue;
+                        }
+                        if (resolvingThread == Thread.currentThread()) {
+                            return failRecursiveResolution();
+                        }
+                        try {
+                            wait();
+                        } catch (InterruptedException ex) {
+                            interrupted = true;
+                        }
+                    }
+                }
+
+                BexValue supplied;
+                try {
+                    supplied = supplier.get();
+                } catch (Throwable ex) {
+                    return rethrow(completeFailure(ex));
+                }
+                return completeSuccess(supplied);
+            } finally {
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        private BexValue completeSuccess(BexValue supplied) {
+            synchronized (this) {
+                if (state == ResolutionState.RESOLVING
+                        && resolvingThread == Thread.currentThread()) {
+                    value = supplied != null ? supplied : BexValues.undefined();
+                    state = ResolutionState.RESOLVED;
+                    resolvingThread = null;
+                    notifyAll();
+                    return value;
+                }
+                if (state == ResolutionState.FAILED) {
+                    return rethrow(failure);
+                }
+                return rethrow(new IllegalStateException("Invalid lazy binding resolution state"));
+            }
+        }
+
+        private Throwable completeFailure(Throwable thrown) {
+            synchronized (this) {
+                if (state == ResolutionState.RESOLVING
+                        && resolvingThread == Thread.currentThread()) {
+                    failure = thrown;
+                    state = ResolutionState.FAILED;
+                    resolvingThread = null;
+                    notifyAll();
+                    return thrown;
+                }
+                if (state == ResolutionState.FAILED) {
+                    return failure;
+                }
+                return new IllegalStateException("Invalid lazy binding resolution state", thrown);
+            }
+        }
+
+        private BexValue failRecursiveResolution() {
+            IllegalStateException recursionFailure = new IllegalStateException("Recursive lazy binding resolution");
+            failure = recursionFailure;
+            state = ResolutionState.FAILED;
+            resolvingThread = null;
+            notifyAll();
+            return rethrow(recursionFailure);
+        }
+
+        private static BexValue rethrow(Throwable thrown) {
+            LazyBindingSlot.<RuntimeException>throwUnchecked(thrown);
+            throw new AssertionError("unreachable");
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <T extends Throwable> void throwUnchecked(Throwable thrown) throws T {
+            throw (T) thrown;
+        }
+    }
+
+    private enum ResolutionState {
+        UNRESOLVED,
+        RESOLVING,
+        RESOLVED,
+        FAILED
     }
 }
