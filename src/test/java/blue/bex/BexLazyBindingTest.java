@@ -159,9 +159,222 @@ class BexLazyBindingTest {
         IllegalStateException first = assertThrows(IllegalStateException.class, () -> context.binding("recursive"));
         IllegalStateException second = assertThrows(IllegalStateException.class, () -> context.binding("recursive"));
 
-        assertEquals("Recursive lazy binding resolution", first.getMessage());
+        assertEquals("Lazy binding cycle: recursive -> recursive", first.getMessage());
         assertSame(first, second);
         assertEquals(1, calls.get());
+    }
+
+    @Test
+    void cycleFailureCannotBeReplacedBySupplierFallbackValue() {
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<BexExecutionContext> contextReference = new AtomicReference<>();
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("recursive", () -> {
+                    calls.incrementAndGet();
+                    try {
+                        contextReference.get().binding("recursive");
+                    } catch (IllegalStateException ignored) {
+                        // The slot has already memoized the cycle failure.
+                    }
+                    return BexValues.scalar("fallback");
+                })
+                .build();
+        contextReference.set(context);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> context.binding("recursive"));
+
+        assertEquals("Lazy binding cycle: recursive -> recursive", failure.getMessage());
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("recursive")));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void sameThreadIndirectCycleFailsAndMemoizesOneFailureForEverySlot() {
+        AtomicInteger aCalls = new AtomicInteger();
+        AtomicInteger bCalls = new AtomicInteger();
+        AtomicReference<BexExecutionContext> contextReference = new AtomicReference<>();
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("a", () -> {
+                    aCalls.incrementAndGet();
+                    return contextReference.get().binding("b");
+                })
+                .lazyBinding("b", () -> {
+                    bCalls.incrementAndGet();
+                    return contextReference.get().binding("a");
+                })
+                .build();
+        contextReference.set(context);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> context.binding("a"));
+
+        assertEquals("Lazy binding cycle: b -> a -> b", failure.getMessage());
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("a")));
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("b")));
+        assertEquals(1, aCalls.get());
+        assertEquals(1, bCalls.get());
+    }
+
+    @Test
+    void twoThreadCrossSlotCycleFailsWithoutRetryingEitherSupplier() throws Exception {
+        AtomicInteger aCalls = new AtomicInteger();
+        AtomicInteger bCalls = new AtomicInteger();
+        CountDownLatch suppliersStarted = new CountDownLatch(2);
+        CountDownLatch readOtherBinding = new CountDownLatch(1);
+        AtomicReference<BexExecutionContext> contextReference = new AtomicReference<>();
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("a", () -> {
+                    aCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(readOtherBinding);
+                    return contextReference.get().binding("b");
+                })
+                .lazyBinding("b", () -> {
+                    bCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(readOtherBinding);
+                    return contextReference.get().binding("a");
+                })
+                .build();
+        contextReference.set(context);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BexValue> a = executor.submit(() -> context.binding("a"));
+            Future<BexValue> b = executor.submit(() -> context.binding("b"));
+            assertTrue(suppliersStarted.await(5, TimeUnit.SECONDS));
+
+            readOtherBinding.countDown();
+
+            Throwable failure = failureFrom(a);
+            assertSame(failure, failureFrom(b));
+            assertTrue(failure instanceof IllegalStateException);
+            assertTrue(failure.getMessage().startsWith("Lazy binding cycle: "));
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("a")));
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("b")));
+            assertEquals(1, aCalls.get());
+            assertEquals(1, bCalls.get());
+        } finally {
+            readOtherBinding.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void threeThreadCrossSlotCycleFailsWithoutRetryingAnySupplier() throws Exception {
+        AtomicInteger aCalls = new AtomicInteger();
+        AtomicInteger bCalls = new AtomicInteger();
+        AtomicInteger cCalls = new AtomicInteger();
+        CountDownLatch suppliersStarted = new CountDownLatch(3);
+        CountDownLatch readOtherBinding = new CountDownLatch(1);
+        AtomicReference<BexExecutionContext> contextReference = new AtomicReference<>();
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("a", () -> {
+                    aCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(readOtherBinding);
+                    return contextReference.get().binding("b");
+                })
+                .lazyBinding("b", () -> {
+                    bCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(readOtherBinding);
+                    return contextReference.get().binding("c");
+                })
+                .lazyBinding("c", () -> {
+                    cCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(readOtherBinding);
+                    return contextReference.get().binding("a");
+                })
+                .build();
+        contextReference.set(context);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        try {
+            Future<BexValue> a = executor.submit(() -> context.binding("a"));
+            Future<BexValue> b = executor.submit(() -> context.binding("b"));
+            Future<BexValue> c = executor.submit(() -> context.binding("c"));
+            assertTrue(suppliersStarted.await(5, TimeUnit.SECONDS));
+
+            readOtherBinding.countDown();
+
+            Throwable failure = failureFrom(a);
+            assertSame(failure, failureFrom(b));
+            assertSame(failure, failureFrom(c));
+            assertTrue(failure instanceof IllegalStateException);
+            assertTrue(failure.getMessage().startsWith("Lazy binding cycle: "));
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("a")));
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("b")));
+            assertSame(failure, assertThrows(IllegalStateException.class, () -> context.binding("c")));
+            assertEquals(1, aCalls.get());
+            assertEquals(1, bCalls.get());
+            assertEquals(1, cCalls.get());
+        } finally {
+            readOtherBinding.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void acyclicCrossBindingDependencyResolvesNormally() {
+        AtomicInteger aCalls = new AtomicInteger();
+        AtomicInteger bCalls = new AtomicInteger();
+        AtomicReference<BexExecutionContext> contextReference = new AtomicReference<>();
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("a", () -> {
+                    aCalls.incrementAndGet();
+                    return contextReference.get().binding("b");
+                })
+                .lazyBinding("b", () -> {
+                    bCalls.incrementAndGet();
+                    return BexValues.scalar("value");
+                })
+                .build();
+        contextReference.set(context);
+
+        assertEquals("value", simple(context.binding("a")));
+        assertEquals("value", simple(context.binding("b")));
+        assertEquals(1, aCalls.get());
+        assertEquals(1, bCalls.get());
+    }
+
+    @Test
+    void independentLazyBindingsResolveSuppliersConcurrently() throws Exception {
+        AtomicInteger aCalls = new AtomicInteger();
+        AtomicInteger bCalls = new AtomicInteger();
+        CountDownLatch suppliersStarted = new CountDownLatch(2);
+        CountDownLatch releaseSuppliers = new CountDownLatch(1);
+        BexExecutionContext context = contextBuilder()
+                .lazyBinding("a", () -> {
+                    aCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(releaseSuppliers);
+                    return BexValues.scalar("a");
+                })
+                .lazyBinding("b", () -> {
+                    bCalls.incrementAndGet();
+                    suppliersStarted.countDown();
+                    await(releaseSuppliers);
+                    return BexValues.scalar("b");
+                })
+                .build();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BexValue> a = executor.submit(() -> context.binding("a"));
+            Future<BexValue> b = executor.submit(() -> context.binding("b"));
+            assertTrue(suppliersStarted.await(5, TimeUnit.SECONDS));
+            assertEquals(1, aCalls.get());
+            assertEquals(1, bCalls.get());
+
+            releaseSuppliers.countDown();
+
+            assertEquals("a", simple(a.get(5, TimeUnit.SECONDS)));
+            assertEquals("b", simple(b.get(5, TimeUnit.SECONDS)));
+        } finally {
+            releaseSuppliers.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
     }
 
     @Test
