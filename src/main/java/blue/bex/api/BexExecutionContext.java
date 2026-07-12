@@ -3,7 +3,10 @@ package blue.bex.api;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +27,7 @@ public final class BexExecutionContext {
     private final BexValue currentContract;
     private final BexStepResults steps;
     private final long gasLimit;
+    private final ResolutionCoordinator resolutionCoordinator;
     private volatile Map<String, BexValue> materializedBindings;
 
     private BexExecutionContext(Builder builder) {
@@ -33,9 +37,10 @@ public final class BexExecutionContext {
         if (document == null) {
             throw new IllegalArgumentException("document is required");
         }
+        this.resolutionCoordinator = new ResolutionCoordinator();
         LinkedHashMap<String, BindingSlot> copy = new LinkedHashMap<>();
         for (Map.Entry<String, BindingDefinition> entry : builder.bindings.entrySet()) {
-            copy.put(entry.getKey(), entry.getValue().createSlot());
+            copy.put(entry.getKey(), entry.getValue().createSlot(entry.getKey(), resolutionCoordinator));
         }
         if (builder.steps != null && !copy.containsKey("steps")) {
             copy.put("steps", new EagerBindingSlot(builder.steps.asValue()));
@@ -142,7 +147,8 @@ public final class BexExecutionContext {
          * context. A {@code null} result is exposed as
          * {@link BexValues#undefined()}. The standard {@code event},
          * {@code currentContract}, and {@code steps} bindings remain eager and
-         * cannot be supplied lazily.</p>
+         * cannot be supplied lazily. Cyclic lazy-binding reads fail
+         * deterministically and memoize the failure.</p>
          *
          * @param name binding name
          * @param supplier concrete value supplier
@@ -208,7 +214,7 @@ public final class BexExecutionContext {
     }
 
     private interface BindingDefinition {
-        BindingSlot createSlot();
+        BindingSlot createSlot(String name, ResolutionCoordinator resolutionCoordinator);
     }
 
     private interface BindingSlot {
@@ -223,7 +229,7 @@ public final class BexExecutionContext {
         }
 
         @Override
-        public BindingSlot createSlot() {
+        public BindingSlot createSlot(String name, ResolutionCoordinator resolutionCoordinator) {
             return new EagerBindingSlot(value);
         }
     }
@@ -236,8 +242,8 @@ public final class BexExecutionContext {
         }
 
         @Override
-        public BindingSlot createSlot() {
-            return new LazyBindingSlot(supplier);
+        public BindingSlot createSlot(String name, ResolutionCoordinator resolutionCoordinator) {
+            return new LazyBindingSlot(name, supplier, resolutionCoordinator);
         }
     }
 
@@ -255,14 +261,20 @@ public final class BexExecutionContext {
     }
 
     private static final class LazyBindingSlot implements BindingSlot {
+        private final String name;
         private final Supplier<? extends BexValue> supplier;
+        private final ResolutionCoordinator resolutionCoordinator;
         private volatile ResolutionState state = ResolutionState.UNRESOLVED;
         private Thread resolvingThread;
         private BexValue value;
         private Throwable failure;
 
-        private LazyBindingSlot(Supplier<? extends BexValue> supplier) {
+        private LazyBindingSlot(String name,
+                                Supplier<? extends BexValue> supplier,
+                                ResolutionCoordinator resolutionCoordinator) {
+            this.name = name;
             this.supplier = supplier;
+            this.resolutionCoordinator = resolutionCoordinator;
         }
 
         @Override
@@ -273,6 +285,11 @@ public final class BexExecutionContext {
             }
             if (observed == ResolutionState.FAILED) {
                 return rethrow(failure);
+            }
+
+            ResolutionDependency dependency = resolutionCoordinator.registerDependency(this);
+            if (dependency != null && dependency.cycleFailure != null) {
+                return dependency.failResolutionCycle();
             }
 
             boolean interrupted = false;
@@ -294,7 +311,8 @@ public final class BexExecutionContext {
                             continue;
                         }
                         if (resolvingThread == Thread.currentThread()) {
-                            return failRecursiveResolution();
+                            return failResolutionCycle(new IllegalStateException(
+                                    "Lazy binding cycle: " + name + " -> " + name));
                         }
                         try {
                             wait();
@@ -306,12 +324,18 @@ public final class BexExecutionContext {
 
                 BexValue supplied;
                 try {
+                    resolutionCoordinator.enterSupplier(this);
                     supplied = supplier.get();
                 } catch (Throwable ex) {
                     return rethrow(completeFailure(ex));
+                } finally {
+                    resolutionCoordinator.exitSupplier(this);
                 }
                 return completeSuccess(supplied);
             } finally {
+                if (dependency != null) {
+                    dependency.close();
+                }
                 if (interrupted) {
                     Thread.currentThread().interrupt();
                 }
@@ -352,13 +376,25 @@ public final class BexExecutionContext {
             }
         }
 
-        private BexValue failRecursiveResolution() {
-            IllegalStateException recursionFailure = new IllegalStateException("Recursive lazy binding resolution");
-            failure = recursionFailure;
-            state = ResolutionState.FAILED;
-            resolvingThread = null;
-            notifyAll();
-            return rethrow(recursionFailure);
+        private BexValue failResolutionCycle(IllegalStateException cycleFailure) {
+            synchronized (this) {
+                if (state == ResolutionState.RESOLVING
+                        && resolvingThread == Thread.currentThread()) {
+                    failure = cycleFailure;
+                    state = ResolutionState.FAILED;
+                    resolvingThread = null;
+                    notifyAll();
+                    return rethrow(cycleFailure);
+                }
+                if (state == ResolutionState.FAILED) {
+                    return rethrow(failure);
+                }
+                return rethrow(new IllegalStateException("Invalid lazy binding resolution state", cycleFailure));
+            }
+        }
+
+        private boolean needsResolution() {
+            return state == ResolutionState.UNRESOLVED || state == ResolutionState.RESOLVING;
         }
 
         private static BexValue rethrow(Throwable thrown) {
@@ -377,5 +413,114 @@ public final class BexExecutionContext {
         RESOLVING,
         RESOLVED,
         FAILED
+    }
+
+    private static final class ResolutionCoordinator {
+        private final Object lock = new Object();
+        private final ThreadLocal<Deque<LazyBindingSlot>> resolvingSlots = new ThreadLocal<Deque<LazyBindingSlot>>() {
+            @Override
+            protected Deque<LazyBindingSlot> initialValue() {
+                return new ArrayDeque<>();
+            }
+        };
+        private final Map<LazyBindingSlot, LazyBindingSlot> activeDependencies = new IdentityHashMap<>();
+
+        private ResolutionDependency registerDependency(LazyBindingSlot target) {
+            Deque<LazyBindingSlot> stack = resolvingSlots.get();
+            LazyBindingSlot source = stack.peek();
+            if (source == null) {
+                resolvingSlots.remove();
+                return null;
+            }
+            if (!target.needsResolution()) {
+                return null;
+            }
+
+            synchronized (lock) {
+                if (!target.needsResolution()) {
+                    return null;
+                }
+                LazyBindingSlot cursor = target;
+                while (cursor != null) {
+                    if (cursor == source) {
+                        return ResolutionDependency.cycle(source, cycleFailure(source, target, activeDependencies));
+                    }
+                    cursor = activeDependencies.get(cursor);
+                }
+                activeDependencies.put(source, target);
+                return ResolutionDependency.active(this, source, target);
+            }
+        }
+
+        private void enterSupplier(LazyBindingSlot slot) {
+            resolvingSlots.get().push(slot);
+        }
+
+        private void exitSupplier(LazyBindingSlot slot) {
+            Deque<LazyBindingSlot> stack = resolvingSlots.get();
+            if (stack.isEmpty() || stack.pop() != slot) {
+                stack.clear();
+                resolvingSlots.remove();
+                throw new IllegalStateException("Invalid lazy binding resolution stack");
+            }
+            if (stack.isEmpty()) {
+                resolvingSlots.remove();
+            }
+        }
+
+        private void removeDependency(LazyBindingSlot source, LazyBindingSlot target) {
+            synchronized (lock) {
+                if (activeDependencies.get(source) == target) {
+                    activeDependencies.remove(source);
+                }
+            }
+        }
+
+        private static IllegalStateException cycleFailure(LazyBindingSlot source,
+                                                          LazyBindingSlot target,
+                                                          Map<LazyBindingSlot, LazyBindingSlot> dependencies) {
+            StringBuilder message = new StringBuilder("Lazy binding cycle: ").append(source.name);
+            LazyBindingSlot slot = target;
+            while (slot != null) {
+                message.append(" -> ").append(slot.name);
+                slot = dependencies.get(slot);
+            }
+            return new IllegalStateException(message.toString());
+        }
+    }
+
+    private static final class ResolutionDependency {
+        private final ResolutionCoordinator resolutionCoordinator;
+        private final LazyBindingSlot source;
+        private final LazyBindingSlot target;
+        private final IllegalStateException cycleFailure;
+
+        private ResolutionDependency(ResolutionCoordinator resolutionCoordinator,
+                                     LazyBindingSlot source,
+                                     LazyBindingSlot target,
+                                     IllegalStateException cycleFailure) {
+            this.resolutionCoordinator = resolutionCoordinator;
+            this.source = source;
+            this.target = target;
+            this.cycleFailure = cycleFailure;
+        }
+
+        private static ResolutionDependency active(ResolutionCoordinator resolutionCoordinator,
+                                                    LazyBindingSlot source,
+                                                    LazyBindingSlot target) {
+            return new ResolutionDependency(resolutionCoordinator, source, target, null);
+        }
+
+        private static ResolutionDependency cycle(LazyBindingSlot source, IllegalStateException cycleFailure) {
+            return new ResolutionDependency(null, source, null, cycleFailure);
+        }
+
+        private BexValue failResolutionCycle() {
+            return source.failResolutionCycle(cycleFailure);
+        }
+
+        private void close() {
+            resolutionCoordinator.removeDependency(source, target);
+        }
     }
 }

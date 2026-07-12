@@ -282,7 +282,8 @@ BexExecutionContext.builder()
 
 `event`, `steps`, and `currentContract` are standard eager bindings. Calling
 `context.bindings()` intentionally materializes all lazy bindings in insertion
-order and returns an unmodifiable map of concrete values.
+order and returns an unmodifiable map of concrete values. Cyclic lazy-binding
+reads fail deterministically and memoize their failure.
 
 Use `$binding` for arbitrary host bindings:
 
