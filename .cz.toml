@@ -1,4 +1,5 @@
 [tool.commitizen]
+# The release workflow updates this version when it creates an RC tag.
 name = "cz_conventional_commits"
 tag_format = "v$version"
 version_scheme = "semver"
