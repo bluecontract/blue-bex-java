@@ -3,7 +3,7 @@ version: 1
 specVersion: "1.0-draft"
 fixtureRoot: bex/1.0/fixtures
 fixtureFileExtension: .yaml
-fixturePackageIdentity: "sha256:c0e9323a02d5d7102e727e8bc82f2c1f6e9f40132ba5380ef93240068e9d1946"
+fixturePackageIdentity: "sha256:3c8fe32e33f4813eb71bcfb09c7d7d7bcfad9fcedb4413729002285c33996236"
 directories:
   current: required
   parse-errors: required
@@ -18,8 +18,8 @@ identityAlgorithm:
 counts:
   current: 53
   parseErrors: 3
-  gas: 103
-  totalFixtures: 159
+  gas: 104
+  totalFixtures: 160
 fixtures:
   - id: BEX-CURRENT-001
     path: current/01-is-node-primitive-true.yaml
@@ -333,6 +333,8 @@ fixtures:
     path: gas/gas-128-map-two-items.yaml
   - id: BEX-GAS-129
     path: gas/gas-129-some-short-circuit.yaml
+  - id: BEX-GAS-130
+    path: gas/gas-130-document-schema-append-change.yaml
   - id: BEX-PARSE-001
     path: parse-errors/01-invalid-is-value-shape.yaml
   - id: BEX-PARSE-002

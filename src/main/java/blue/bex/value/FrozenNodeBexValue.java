@@ -92,9 +92,7 @@ final class FrozenNodeBexValue extends AbstractBexValue {
             return node.getContracts() != null ? BexValues.frozen(node.getContracts()) : BexValues.UNDEFINED;
         }
         if ("schema".equals(key)) {
-            return node.getSchema() != null
-                    ? BexValues.nodeSnapshot(new Node().schema(node.getSchema()))
-                    : BexValues.UNDEFINED;
+            return BexValues.schemaSnapshot(node.getSchema());
         }
         if ("mergePolicy".equals(key)) {
             return node.getMergePolicy() != null ? BexValues.scalar(node.getMergePolicy()) : BexValues.UNDEFINED;

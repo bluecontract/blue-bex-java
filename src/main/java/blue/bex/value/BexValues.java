@@ -2,8 +2,11 @@ package blue.bex.value;
 
 import blue.bex.BexException;
 import blue.language.model.Node;
+import blue.language.model.Schema;
 import blue.language.snapshot.FrozenNode;
 import blue.language.utils.JsonPointer;
+import blue.language.utils.NodeToMapListOrValue;
+import blue.language.utils.SchemaToMapListOrValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -94,6 +97,16 @@ public final class BexValues {
 
     public static BexValue frozen(FrozenNode node) {
         return node != null ? new FrozenNodeBexValue(node) : UNDEFINED;
+    }
+
+    static BexValue schemaSnapshot(Schema schema) {
+        if (schema == null) {
+            return UNDEFINED;
+        }
+        // Schema is the value of a node's "schema" key, not another schema-bearing node.
+        return fromSimple(SchemaToMapListOrValue.get(
+                schema.clone(),
+                NodeToMapListOrValue::get));
     }
 
     public static String frozenBlueId(BexValue value) {

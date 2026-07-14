@@ -1,0 +1,28 @@
+fixtureId: BEX-GAS-130
+title: Document-read schema-bearing value has finite deterministic append size
+tags: [gas, document, schema]
+context:
+  documentScope: /
+  rootDocumentSource: |
+    template:
+      schema:
+        required: true
+      payload: x
+programSource: |
+  type: Blue/BEX Program
+  do:
+    - $appendChange:
+        op: add
+        path: /copy
+        val:
+          $document: /template
+expectation:
+  outcome: success
+  changeset:
+    - op: add
+      path: /copy
+      val:
+        schema:
+          required: true
+        payload: x
+  gasUsed: 40

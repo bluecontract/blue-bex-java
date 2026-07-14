@@ -103,7 +103,7 @@ final class NodeBexValue extends AbstractBexValue {
             return node.getContracts() != null ? BexValues.nodeCursor(node.getContracts()) : BexValues.UNDEFINED;
         }
         if ("schema".equals(key)) {
-            return node.getSchema() != null ? BexValues.nodeSnapshot(new Node().schema(node.getSchema())) : BexValues.UNDEFINED;
+            return BexValues.schemaSnapshot(node.getSchema());
         }
         if ("mergePolicy".equals(key)) {
             return node.getMergePolicy() != null ? BexValues.scalar(node.getMergePolicy()) : BexValues.UNDEFINED;
