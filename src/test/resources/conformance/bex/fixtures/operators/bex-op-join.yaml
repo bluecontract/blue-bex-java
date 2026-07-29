@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-join
+vectors:
+- BEX-E-08
+category: operator
+description: Direct executable coverage for `$join`.
+program:
+  expr:
+    $join:
+      list:
+      - a
+      - b
+      - c
+      separator: '-'
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: a-b-c
+  assertions: []

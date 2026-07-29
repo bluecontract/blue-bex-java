@@ -1,0 +1,33 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-03
+vectors:
+- BEX-S-03
+category: s
+description: Duplicate patch paths are preserved in append order.
+program:
+  do:
+  - $appendChange:
+      op: replace
+      path: /x
+      val: 1
+  - $appendChange:
+      op: replace
+      path: /x
+      val: 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  changes:
+  - op: replace
+    path: /x
+    val: 1
+  - op: replace
+    path: /x
+    val: 2

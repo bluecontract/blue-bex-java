@@ -1,5 +1,8 @@
 package blue.bex.runtime;
 
+import blue.bex.output.BexAdmittedValue;
+import blue.bex.output.BexOutputAdmission;
+import blue.bex.output.BexOutputKind;
 import blue.bex.result.BexChangeset;
 import blue.bex.result.BexEvents;
 import blue.bex.result.BexPatchEntry;
@@ -15,18 +18,44 @@ import java.util.List;
 public final class BexExecutionAccumulator {
     private final List<BexPatchEntry> changes = new ArrayList<>();
     private final List<BexValue> events = new ArrayList<>();
-    private final BexResultOverlay overlay;
+    private final List<BexAdmittedValue> admittedEvents = new ArrayList<>();
+    private BexResultOverlay overlay;
+    private final BexOutputAdmission outputAdmission;
 
     public BexExecutionAccumulator(BexResultOverlay overlay) {
+        this(overlay, null);
+    }
+
+    public BexExecutionAccumulator(BexResultOverlay overlay,
+                                   BexOutputAdmission outputAdmission) {
         this.overlay = overlay;
+        this.outputAdmission = outputAdmission;
     }
 
     public void appendChange(BexPatchEntry entry) {
-        changes.add(entry);
-        overlay.append(entry);
+        BexPatchEntry admittedEntry = entry;
+        if (outputAdmission != null && !"remove".equals(entry.op())) {
+            BexAdmittedValue admitted =
+                    outputAdmission.admit(entry.val(), BexOutputKind.PATCH_VALUE);
+            admittedEntry = new BexPatchEntry(
+                    entry.op(),
+                    entry.authoredPath(),
+                    entry.absolutePath(),
+                    admitted.value(),
+                    admitted);
+        }
+        changes.add(admittedEntry);
+        overlay.append(admittedEntry);
     }
 
     public void appendEvent(BexValue event) {
+        if (outputAdmission != null) {
+            BexAdmittedValue admitted =
+                    outputAdmission.admit(event, BexOutputKind.EVENT);
+            admittedEvents.add(admitted);
+            events.add(admitted.value());
+            return;
+        }
         events.add(event);
     }
 
@@ -35,10 +64,17 @@ public final class BexExecutionAccumulator {
     }
 
     public BexEvents events() {
-        return new BexEvents(events);
+        return new BexEvents(events, admittedEvents);
     }
 
     public BexResultOverlay overlay() {
         return overlay;
+    }
+
+    void discard(BexResultOverlay resetOverlay) {
+        changes.clear();
+        events.clear();
+        admittedEvents.clear();
+        overlay = resetOverlay;
     }
 }

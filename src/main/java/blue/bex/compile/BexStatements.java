@@ -2,6 +2,7 @@ package blue.bex.compile;
 
 import blue.bex.BexException;
 import blue.bex.BexSourcePath;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.result.BexPatchEntry;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
@@ -18,8 +19,8 @@ import java.util.Map;
 abstract class Stmt implements CompiledStatement {
     @Override
     public final Control exec(CompiledFrame frame) {
+        BexGasWork.charge(frame, BexGasCounter.STATEMENT_EXECUTED);
         frame.runtime().metrics().incrementStatementExecutions();
-        frame.runtime().gas().charge(frame.runtime().gas().schedule().statementBase);
         try {
             return doExec(frame);
         } catch (BexException ex) {
@@ -152,13 +153,15 @@ final class ForEachStatement extends Stmt {
         BexValue value = input.eval(frame);
         if (value.isObject()) {
             for (String key : value.keys()) {
+                BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
                 frame.runtime().metrics().incrementLoopIterations();
-                frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
                 if (keySlot >= 0) {
                     frame.set(keySlot, BexValues.scalar(key));
                     frame.set(itemSlot, value.get(key));
                 } else {
                     Map<String, BexValue> entry = new LinkedHashMap<>();
+                    BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED, 2L);
                     entry.put("key", BexValues.scalar(key));
                     entry.put("val", value.get(key));
                     frame.set(itemSlot, BexValues.map(entry));
@@ -172,8 +175,9 @@ final class ForEachStatement extends Stmt {
             }
         } else if (value.isList()) {
             for (int i = 0; i < value.size(); i++) {
+                BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
                 frame.runtime().metrics().incrementLoopIterations();
-                frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
                 frame.set(itemSlot, value.get(String.valueOf(i)));
                 if (indexSlot >= 0) {
                     frame.set(indexSlot, BexValues.scalar(BigInteger.valueOf(i)));
@@ -197,7 +201,7 @@ final class BexStatementEffects {
     }
 
     static void appendChange(CompiledFrame frame, BexPatchEntry entry) {
-        frame.runtime().gas().chargeValue(frame.runtime().gas().schedule().appendChangeBase, entry.val());
+        BexGasWork.charge(frame, BexGasCounter.PATCH_APPENDED);
         frame.accumulator().appendChange(entry);
     }
 
@@ -205,7 +209,7 @@ final class BexStatementEffects {
         if (value.isUndefined()) {
             throw new BexException("Undefined cannot be emitted as an event");
         }
-        frame.runtime().gas().chargeValue(frame.runtime().gas().schedule().appendEventBase, value);
+        BexGasWork.charge(frame, BexGasCounter.EVENT_APPENDED);
         frame.accumulator().appendEvent(value);
     }
 }
@@ -225,6 +229,7 @@ final class AppendChangeStatement extends Stmt {
     protected Control doExec(CompiledFrame frame) {
         String operation = op.get(frame);
         boolean requiresVal = BexPatchEntryParser.requiresValue(operation);
+        String authoredPath = pointer.authored(frame);
         BexValue value = BexValues.undefined();
         if (requiresVal) {
             if (val == null) {
@@ -233,7 +238,7 @@ final class AppendChangeStatement extends Stmt {
             value = val.eval(frame);
         }
         BexStatementEffects.appendChange(frame,
-                BexPatchEntryParser.fromFields(frame, operation, pointer.authored(frame), val != null, value));
+                BexPatchEntryParser.fromFields(frame, operation, authoredPath, val != null, value));
         return Control.CONTINUE;
     }
 }
@@ -250,6 +255,8 @@ final class AppendChangesStatement extends Stmt {
         BexValue list = expr.eval(frame);
         if (!list.isList()) throw new BexException("$appendChanges requires a list");
         for (int i = 0; i < list.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
             BexStatementEffects.appendChange(frame,
                     BexPatchEntryParser.fromValue(frame, list.get(String.valueOf(i))));
         }
@@ -283,6 +290,8 @@ final class AppendEventsStatement extends Stmt {
         BexValue list = expr.eval(frame);
         if (!list.isList()) throw new BexException("$appendEvents requires a list");
         for (int i = 0; i < list.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
             BexStatementEffects.appendEvent(frame, list.get(String.valueOf(i)));
         }
         return Control.CONTINUE;

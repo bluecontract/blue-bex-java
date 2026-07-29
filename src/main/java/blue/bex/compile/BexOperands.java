@@ -13,9 +13,43 @@ interface TextOperand {
 }
 
 interface PointerOperand {
-    String authored(CompiledFrame frame);
-    String absolute(CompiledFrame frame);
-    List<String> segments(CompiledFrame frame);
+    ResolvedPointer resolve(CompiledFrame frame);
+
+    default String authored(CompiledFrame frame) {
+        return resolve(frame).authored();
+    }
+
+    default String absolute(CompiledFrame frame) {
+        return resolve(frame).absolute();
+    }
+
+    default List<String> segments(CompiledFrame frame) {
+        return resolve(frame).segments();
+    }
+}
+
+final class ResolvedPointer {
+    private final String authored;
+    private final String absolute;
+    private final List<String> segments;
+
+    ResolvedPointer(String authored, String absolute, List<String> segments) {
+        this.authored = authored;
+        this.absolute = absolute;
+        this.segments = segments;
+    }
+
+    String authored() {
+        return authored;
+    }
+
+    String absolute() {
+        return absolute;
+    }
+
+    List<String> segments() {
+        return segments;
+    }
 }
 
 final class StaticTextExpr implements TextOperand {
@@ -66,21 +100,13 @@ final class StaticPointerOperand implements PointerOperand {
     }
 
     @Override
-    public String authored(CompiledFrame frame) {
-        return authored;
-    }
-
-    @Override
-    public String absolute(CompiledFrame frame) {
-        return absolute ? pointer.text() : frame.runtime().resolvePointer(authored);
-    }
-
-    @Override
-    public List<String> segments(CompiledFrame frame) {
+    public ResolvedPointer resolve(CompiledFrame frame) {
         if (absolute) {
-            return pointer.segments();
+            return new ResolvedPointer(authored, pointer.text(), pointer.segments());
         }
-        return frame.runtime().parseDynamicPointer(absolute(frame));
+        String resolved = frame.runtime().resolvePointer(authored);
+        return new ResolvedPointer(authored, resolved,
+                frame.runtime().parseDynamicPointer(resolved));
     }
 }
 
@@ -92,18 +118,11 @@ final class DynamicPointerOperand implements PointerOperand {
     }
 
     @Override
-    public String authored(CompiledFrame frame) {
-        return PointerOperands.pointerText(expr.eval(frame));
-    }
-
-    @Override
-    public String absolute(CompiledFrame frame) {
-        return frame.runtime().resolvePointer(authored(frame));
-    }
-
-    @Override
-    public List<String> segments(CompiledFrame frame) {
-        return frame.runtime().parseDynamicPointer(absolute(frame));
+    public ResolvedPointer resolve(CompiledFrame frame) {
+        String authored = PointerOperands.pointerText(expr.eval(frame));
+        String absolute = frame.runtime().resolvePointer(authored);
+        return new ResolvedPointer(authored, absolute,
+                frame.runtime().parseDynamicPointer(absolute));
     }
 }
 
@@ -119,18 +138,8 @@ final class StaticValuePointerOperand implements PointerOperand {
     }
 
     @Override
-    public String authored(CompiledFrame frame) {
-        return pointer.text();
-    }
-
-    @Override
-    public String absolute(CompiledFrame frame) {
-        return pointer.text();
-    }
-
-    @Override
-    public List<String> segments(CompiledFrame frame) {
-        return pointer.segments();
+    public ResolvedPointer resolve(CompiledFrame frame) {
+        return new ResolvedPointer(pointer.text(), pointer.text(), pointer.segments());
     }
 
     static String normalize(String authored) {
@@ -149,18 +158,12 @@ final class DynamicValuePointerOperand implements PointerOperand {
     }
 
     @Override
-    public String authored(CompiledFrame frame) {
-        return StaticValuePointerOperand.normalize(PointerOperands.pointerText(expr.eval(frame)));
-    }
-
-    @Override
-    public String absolute(CompiledFrame frame) {
-        return frame.runtime().canonicalPointer(authored(frame));
-    }
-
-    @Override
-    public List<String> segments(CompiledFrame frame) {
-        return frame.runtime().parseDynamicPointer(absolute(frame));
+    public ResolvedPointer resolve(CompiledFrame frame) {
+        String authored = StaticValuePointerOperand.normalize(
+                PointerOperands.pointerText(expr.eval(frame)));
+        String absolute = frame.runtime().canonicalPointer(authored);
+        return new ResolvedPointer(authored, absolute,
+                frame.runtime().parseDynamicPointer(absolute));
     }
 }
 

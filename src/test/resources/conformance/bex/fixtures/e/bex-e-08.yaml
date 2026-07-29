@@ -1,0 +1,30 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-08
+vectors:
+- BEX-E-08
+category: e
+description: Numeric conversions, exact division, Text rendering, and finite Double conversion are deterministic.
+program:
+  expr:
+    integer:
+      $integer: '9007199254740992'
+    text:
+      $text: true
+    divide:
+      $divide:
+      - 6
+      - 3
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    integer: 9007199254740992
+    text: 'true'
+    divide: 2

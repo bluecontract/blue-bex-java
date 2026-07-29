@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-01
+vectors:
+- BEX-C-01
+category: c
+description: Exactly one `$` key denotes an expression operator; multiple keys denote an object expression.
+program:
+  expr:
+    $x: 1
+    data: 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    $x: 1
+    data: 2

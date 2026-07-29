@@ -1,0 +1,16 @@
+name: Compute 2.0
+type:
+  blueId: 2Ag2NfcWpCfPqBAR7bFAEL9L3roX3UWGUkDq7nN3D4gV
+description: Portable deterministic Handler runtime implementing Blue BEX Specification 2.0. It receives identity-preserving document, event, processingEvent, currentContract, steps, and bindings; returns a Contract Execution Result and one exact named child ledger.
+program:
+  description: Required BEX 2.0 program or exact reference to it.
+  schema:
+    required: true
+entry:
+  type:
+    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+  description: Optional root function name.
+gasLimit:
+  type:
+    blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+  description: Optional runtime sub-limit that may only reduce the parent budget.

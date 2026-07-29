@@ -1,0 +1,28 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-05
+vectors:
+- BEX-H-05
+category: h
+description: Blue Double input is source-token independent and output rounding is deterministic.
+program:
+  expr:
+    $number:
+      $document: /d
+context:
+  rootDocument:
+    d: 1.0
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: result
+    op: sameAcrossVariants
+  variants:
+  - name: source-1.0
+    rawRootDocumentJson: '{"d":1.0}'
+  - name: source-1e0
+    rawRootDocumentJson: '{"d":1e0}'

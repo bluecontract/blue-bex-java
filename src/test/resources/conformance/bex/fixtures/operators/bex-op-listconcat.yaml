@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-listconcat
+vectors:
+- BEX-E-11
+category: operator
+description: Direct executable coverage for `$listConcat`.
+program:
+  expr:
+    $listConcat:
+    - - 1
+      - 2
+    - - 3
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - 1
+  - 2
+  - 3
+  assertions: []

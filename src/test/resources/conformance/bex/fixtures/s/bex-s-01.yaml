@@ -1,0 +1,38 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-01
+vectors:
+- BEX-S-01
+category: s
+description: '`$if` executes only one branch; `$forEach` binds item/key/index deterministically.'
+program:
+  do:
+  - $if:
+      cond: true
+      then:
+      - $forEach:
+          in:
+          - 10
+          - 20
+          item: x
+          index: i
+          do:
+          - $appendEvent:
+              i:
+                $var: i
+              x:
+                $var: x
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  events:
+  - i: 0
+    x: 10
+  - i: 1
+    x: 20

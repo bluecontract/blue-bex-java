@@ -10,13 +10,14 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 
 final class OverlayMapBexValue extends AbstractBexValue {
     private final BexValue base;
     private final Map<String, BexValue> overrides;
+    private volatile List<String> canonicalKeys;
 
     OverlayMapBexValue(BexValue base, String key, BexValue value) {
         this(base, Collections.singletonMap(key, value));
@@ -47,15 +48,33 @@ final class OverlayMapBexValue extends AbstractBexValue {
 
     @Override
     public List<String> keys() {
-        TreeSet<String> keys = new TreeSet<>(base.keys());
-        for (Map.Entry<String, BexValue> entry : overrides.entrySet()) {
-            if (entry.getValue() == null || entry.getValue().isUndefined()) {
-                keys.remove(entry.getKey());
-            } else {
-                keys.add(entry.getKey());
+        List<String> established = canonicalKeys;
+        if (established != null) {
+            return established;
+        }
+        synchronized (this) {
+            established = canonicalKeys;
+            if (established == null) {
+                LinkedHashSet<String> retained =
+                        new LinkedHashSet<>(base.keys());
+                for (Map.Entry<String, BexValue> entry
+                        : overrides.entrySet()) {
+                    if (entry.getValue() == null
+                            || entry.getValue()
+                            .isUndefined()) {
+                        retained.remove(entry.getKey());
+                    } else {
+                        retained.add(entry.getKey());
+                    }
+                }
+                established =
+                        Collections.unmodifiableList(
+                                BexUnicodeOrder.sortedCopy(
+                                        retained));
+                canonicalKeys = established;
             }
         }
-        return new ArrayList<>(keys);
+        return established;
     }
 
     @Override

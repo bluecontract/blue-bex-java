@@ -1,0 +1,59 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-02
+vectors:
+- BEX-E-02
+category: e
+description: '`$event`, `$processingEvent`, `$currentContract`, `$steps`, `$binding`, `$var`, and `$const` use value-local pointers.'
+program:
+  constants:
+    c:
+      x: 7
+  do:
+  - $let:
+      name: v
+      expr:
+        x: 6
+  - $return:
+      event:
+        $event: /x
+      processing:
+        $processingEvent: /x
+      contract:
+        $currentContract: /x
+      step:
+        $steps: s.x
+      binding:
+        $binding: b/x
+      var:
+        $var:
+          name: v
+          path: /x
+      const:
+        $const:
+          name: c
+          path: /x
+context:
+  rootDocument: {}
+  event:
+    x: 1
+  processingEvent:
+    x: 2
+  currentContract:
+    x: 3
+  steps:
+    s:
+      x: 4
+  bindings:
+    b:
+      x: 5
+  documentScope: /
+expected:
+  result:
+    event: 1
+    processing: 2
+    contract: 3
+    step: 4
+    binding: 5
+    var: 6
+    const: 7
+  assertions: []

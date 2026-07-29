@@ -248,12 +248,18 @@ class BexUseCaseConformanceTest {
 
     @Test
     void resultValueListIndexRemoveIsNonShiftingOverlayBehavior() {
+        Node orders = op("$resultValue", "/orders");
         BexExecutionResult result = run(stepDo(list(
                 op("$appendChange", obj("op", "remove", "path", "/orders/1")),
-                op("$return", obj("orders", op("$resultValue", "/orders")))
+                op("$return", obj(
+                        "first", op("$listGet", obj("list", orders, "index", 0)),
+                        "removedExists", op("$exists", op("$listGet", obj("list", orders, "index", 1))),
+                        "size", op("$size", orders),
+                        "third", op("$listGet", obj("list", orders, "index", 2))))
         )), documentContext(obj("orders", list("a", "b", "c"))));
 
-        assertEquals(m("orders", l("a", null, "c")), simple(result.value()));
+        assertEquals(m("first", "a", "removedExists", false, "size", bi(3), "third", "c"),
+                simple(result.value()));
     }
 
     @Test

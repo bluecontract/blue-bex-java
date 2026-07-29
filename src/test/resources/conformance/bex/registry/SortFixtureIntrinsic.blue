@@ -1,0 +1,5 @@
+name: BEX Sort Fixture Intrinsic 2.0
+description: Conformance-only deterministic intrinsic that sorts a supplied list using the canonical merge-sort schedule and reports named sortComparison counters.
+values:
+  type:
+    blueId: 8DSFoWG9MqRSUhStqoPLrwVQiYByRh18NWbDEarN8MKF

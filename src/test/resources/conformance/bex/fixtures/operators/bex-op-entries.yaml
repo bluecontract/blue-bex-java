@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-entries
+vectors:
+- BEX-E-09
+category: operator
+description: Direct executable coverage for `$entries`.
+program:
+  expr:
+    $entries:
+      b: 2
+      a: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - key: a
+    val: 1
+  - key: b
+    val: 2
+  assertions: []

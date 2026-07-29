@@ -16,6 +16,15 @@ final class BexEquality {
         if (left.isUndefined() || right.isUndefined()) {
             return left.isUndefined() && right.isUndefined();
         }
+        /*
+         * Equal established identities prove exact-value equality without
+         * demanding either representation. This must precede semantic kind
+         * inspection because either side may still be a collapsed reference.
+         */
+        if (left.isExact() && right.isExact()
+                && left.exactBlueId().equals(right.exactBlueId())) {
+            return true;
+        }
         if (left.isNull() || right.isNull()) {
             return left.isNull() && right.isNull();
         }

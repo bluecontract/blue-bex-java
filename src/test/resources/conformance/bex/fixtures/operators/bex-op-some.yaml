@@ -1,0 +1,29 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-some
+vectors:
+- BEX-E-11
+category: operator
+description: Direct executable coverage for `$some`.
+program:
+  expr:
+    $some:
+      in:
+      - 1
+      - 2
+      - 3
+      item: x
+      where:
+        $gt:
+        - $var: x
+        - 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: true
+  assertions: []

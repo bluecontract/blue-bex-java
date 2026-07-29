@@ -36,11 +36,7 @@ public final class BexMetrics {
     private long pointerCacheHits;
     private long pointerCacheMisses;
     private long functionArgMapAllocations;
-    private long sizeEstimateCalls;
-    private long sizeEstimateCacheHits;
-    private long sizeEstimateCacheMisses;
     private long frozenWriterNodeFallbacks;
-    private long frozenWriterChildNodeRoundTrips;
     private long compileNanos;
     private long executeNanos;
 
@@ -74,11 +70,7 @@ public final class BexMetrics {
         copy.pointerCacheHits = pointerCacheHits;
         copy.pointerCacheMisses = pointerCacheMisses;
         copy.functionArgMapAllocations = functionArgMapAllocations;
-        copy.sizeEstimateCalls = sizeEstimateCalls;
-        copy.sizeEstimateCacheHits = sizeEstimateCacheHits;
-        copy.sizeEstimateCacheMisses = sizeEstimateCacheMisses;
         copy.frozenWriterNodeFallbacks = frozenWriterNodeFallbacks;
-        copy.frozenWriterChildNodeRoundTrips = frozenWriterChildNodeRoundTrips;
         copy.compileNanos = compileNanos;
         copy.executeNanos = executeNanos;
         return copy;
@@ -112,11 +104,7 @@ public final class BexMetrics {
     public void incrementPointerCacheHits() { pointerCacheHits++; }
     public void incrementPointerCacheMisses() { pointerCacheMisses++; }
     public void incrementFunctionArgMapAllocations() { functionArgMapAllocations++; }
-    public void incrementSizeEstimateCalls() { sizeEstimateCalls++; }
-    public void incrementSizeEstimateCacheHits() { sizeEstimateCacheHits++; }
-    public void incrementSizeEstimateCacheMisses() { sizeEstimateCacheMisses++; }
     public void incrementFrozenWriterNodeFallbacks() { frozenWriterNodeFallbacks++; }
-    public void incrementFrozenWriterChildNodeRoundTrips() { frozenWriterChildNodeRoundTrips++; }
     public void addCompileNanos(long nanos) { compileNanos += Math.max(0L, nanos); }
     public void addExecuteNanos(long nanos) { executeNanos += Math.max(0L, nanos); }
 
@@ -148,11 +136,7 @@ public final class BexMetrics {
     public long pointerCacheHits() { return pointerCacheHits; }
     public long pointerCacheMisses() { return pointerCacheMisses; }
     public long functionArgMapAllocations() { return functionArgMapAllocations; }
-    public long sizeEstimateCalls() { return sizeEstimateCalls; }
-    public long sizeEstimateCacheHits() { return sizeEstimateCacheHits; }
-    public long sizeEstimateCacheMisses() { return sizeEstimateCacheMisses; }
     public long frozenWriterNodeFallbacks() { return frozenWriterNodeFallbacks; }
-    public long frozenWriterChildNodeRoundTrips() { return frozenWriterChildNodeRoundTrips; }
     public long compileNanos() { return compileNanos; }
     public long executeNanos() { return executeNanos; }
 }

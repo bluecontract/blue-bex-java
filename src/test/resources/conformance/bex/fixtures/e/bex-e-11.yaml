@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-11
+vectors:
+- BEX-E-11
+category: e
+description: Collection queries iterate in canonical order, restore bindings, and preserve short-circuiting.
+program:
+  expr:
+    $map:
+      in:
+        b: 2
+        a: 1
+      item: v
+      key: k
+      expr:
+        $var: k
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: locals.restored
+    op: equals
+    expected: true
+  result:
+  - a
+  - b

@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-09
+vectors:
+- BEX-E-09
+category: e
+description: Object keys are exposed in Unicode code-point order independent of host maps and locale.
+program:
+  expr:
+    $keys:
+      😀: 1
+      a: 2
+      : 3
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+  - a
+  - 
+  - 😀

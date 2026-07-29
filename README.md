@@ -110,12 +110,20 @@ processor registry decides whether that operation is supported:
 
 ```java
 BexEngine engine = BexEngine.builder()
-        .intrinsic(CommonCryptoEd25519Verify.class, invocation -> {
-            invocation.chargeGas(500);
-            // Read invocation.field("publicKey"), invocation.field("message"),
-            // and invocation.field("signature"), then return a BexValue boolean.
-            return BexValues.scalar(verifySignature(invocation));
-        })
+        .intrinsic(
+                CommonCryptoEd25519Verify.class,
+                COMMON_CRYPTO_REGISTRY_IDENTITY,
+                Collections.singletonMap("signatureVerification", 500L),
+                invocation -> {
+                    invocation.charge(
+                            "signatureVerification",
+                            1,
+                            "ed25519-verification");
+                    // Read invocation.field("publicKey"),
+                    // invocation.field("message"), and
+                    // invocation.field("signature"), then return a boolean.
+                    return BexValues.scalar(verifySignature(invocation));
+                })
         .build();
 ```
 
@@ -641,8 +649,15 @@ Rules:
   a shared compiled-program cache cannot bypass it.
 - The processor returns a `BexValue`. A `null` Java return is normalized to BEX
   `undefined`.
-- The processor is responsible for its own gas accounting by calling
-  `invocation.chargeGas(...)`.
+- The processor charges only counters declared by its exact registration,
+  using `invocation.charge(counter, quantity, reason)`. Arbitrary aggregate
+  intrinsic gas is not accepted.
+- Intrinsic namespaces are disjoint physical runtime-session children; they
+  are never flattened into `bex`. The `/` separator is reserved so several
+  BEX executions in one host session cannot produce ambiguous namespaces.
+- A compiled program opens only the intrinsic namespaces it statically
+  requires. Success, deterministic failure, evidence unavailability, and
+  exhaustion are separate host-ledger lifecycle callbacks.
 
 The Blue type definition and its description/spec text define what the
 operation means. For standard intrinsics, keep conformance vectors beside the
@@ -756,20 +771,22 @@ separately. The older form with only `item` still binds `{ key, val }`.
 - `value`, the primary return value;
 - `changeset`, the standard patch accumulator;
 - `events`, the standard event/data accumulator;
-- `gasUsed`;
+- `gasLedger`, the canonical ordered named child ledger (`gasUsed` is a
+  trace-derived convenience total);
 - `metrics`.
 
 BEX computes these values only. The host decides whether patches are applied,
 events are emitted, or accumulators are treated as ordinary data.
 
-`$resultValue` reads the document value after applying accumulated patches in
-order. Parent reads reflect descendant object patches, so reading
-`/hotelOrder` after replacing `/hotelOrder/status` returns the original
-`hotelOrder` object with the updated status. Current materialization supports
-object paths, list index replacement, and non-shifting list index removal.
-Removing a list index creates a sparse overlay slot: the removed index reads as
-`undefined`, later indexes keep their positions, and converting the whole sparse
-overlay list to Blue output fails under the strict host-boundary profile.
+`$resultValue` reads a transient overlay of the document after applying
+accumulated patches in order. Parent reads reflect descendant object patches,
+so reading `/hotelOrder` after replacing `/hotelOrder/status` returns the
+original `hotelOrder` object with the updated status. A list-index removal is
+non-shifting only in this `$resultValue` overlay: the removed index reads as
+`undefined`, later indexes keep their positions, and converting the whole
+sparse overlay list to Blue output fails. This sparse-slot rule does not apply
+to ordinary BEX list values, `$pointerSet`, or the host's eventual application
+of the changeset.
 
 `$appendChanges` validates each patch entry the same way as `$appendChange`.
 Supported patch operations are `add`, `replace`, and `remove`. `add` and
@@ -812,11 +829,11 @@ metrics.nodeMaterializations();
 ```
 
 The deterministic gas rules are specified in [docs/GAS.md](docs/GAS.md). The
-portable fixture format is documented in [docs/FIXTURES.md](docs/FIXTURES.md).
-The rich fixture suite lives under `src/test/resources/rich-fixtures/` and
-currently has 159 cases: 53 current behavior fixtures, 3 parse-error fixtures,
-and 103 gas fixtures. The local fixture package is kept aligned with the
-canonical BEX spec fixtures under `blue-spec/specifications/bex/1.0/fixtures/`.
+closed BEX 2.0 fixture format is documented in
+[docs/FIXTURES.md](docs/FIXTURES.md). The normative package under
+`src/test/resources/conformance/bex/` executes 105 behavior cases and 30 exact
+named-counter microfixtures, with direct coverage for all 86 published
+operators. Its inventory and package identities are verified before execution.
 
 The translated corpus strategy is documented in
 [docs/TRANSLATED_CORPUS.md](docs/TRANSLATED_CORPUS.md). It contains 80
@@ -828,12 +845,77 @@ query/transform cases, and 10 JSON Patch emission edge cases.
 
 ## Tests
 
+The local Blue Language composite is opt-in. Use the explicit property when
+developing against the sibling checkout:
+
 ```bash
-./gradlew test --tests '*BexRichFixtureTest'
-./gradlew test --tests '*BexTranslatedCorpusTest'
-./gradlew test
-./gradlew build
+./gradlew -PblueLanguageCompositePath=../blue-language-java test
+./gradlew -PblueLanguageCompositePath=../blue-language-java build
 ```
+
+With no property, Gradle uses the declared published dependency
+`blue.language:blue-language-java:3.1.0-rc.19`. Resolution is Maven
+Central-only—`mavenLocal` is not a dependency repository—and the resolved JAR
+must match the recorded Maven Central SHA-256:
+
+```bash
+CI=true ./gradlew clean bexReleaseEvidence
+```
+
+Each report invocation records its current dependency mode under
+`.gradle/bex-hosted-release/`. Publication therefore records standalone and
+local-composite runs separately, then makes one final standalone
+`bexReleaseEvidence` decision. The release workflows automate this sequence
+with `.github/scripts/run-final-publication-gates.sh`.
+
+Artifact evidence must use the non-snapshot CI version and the same source
+epoch in two clean checkouts. Every `GRADLE_USER_HOME` below must be a distinct
+fresh empty directory. For the required standalone publication pair:
+
+```bash
+export CI=true
+export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+
+(cd /first/clean/blue-bex-java && \
+  GRADLE_USER_HOME=/tmp/blue-bex-gradle-one \
+  ./gradlew --no-daemon clean test writeCleanBuildArtifactHashes)
+
+(cd /second/clean/blue-bex-java && \
+  GRADLE_USER_HOME=/tmp/blue-bex-gradle-two \
+  ./gradlew --no-daemon clean test writeCleanBuildArtifactHashes)
+
+./gradlew verifyIndependentCleanBuildReproducibility \
+  -PcleanBuildEvidenceOne=/first/clean/blue-bex-java/build/reports/bex-release/clean-build-artifacts.properties \
+  -PcleanBuildEvidenceTwo=/second/clean/blue-bex-java/build/reports/bex-release/clean-build-artifacts.properties
+
+GRADLE_USER_HOME=/tmp/blue-bex-standalone-mode \
+  ./gradlew --no-daemon clean test
+GRADLE_USER_HOME=/tmp/blue-bex-local-mode \
+  ./gradlew --no-daemon clean test \
+  -PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java
+GRADLE_USER_HOME=/tmp/blue-bex-final-standalone \
+  ./gradlew --no-daemon clean bexReleaseEvidence
+```
+
+For an additional local-composite reproducibility pair, add the same explicit
+`-PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java`
+argument to both clean-checkout builds. Never use one standalone build and one
+local-composite build as a two-run pair. The verifier rejects dirty checkouts,
+different commits, versions or dependency modes, and any mismatch among the
+four artifact hashes. Its commit-bound evidence is also compared with the
+artifacts from the reporting build. The same-working-tree archive gate remains
+a separate packaging check.
+
+The API gate compares the packaged JAR’s complete generated descriptor
+manifest with the exact source-controlled first-public BEX 2.0 baseline.
+Removals, descriptor changes, reordering, and unexpected public/protected
+additions all fail the gate. A clean dependency-cache run is
+separate evidence and remains
+`not-executed` unless a controlled isolated run records it. At this source
+state, the current
+hosted runtime session APIs exist only in the sibling working tree and are not
+present in the published `3.1.0-rc.19` JAR, so standalone release evidence is
+expected to remain blocked until Blue Language publishes that API surface.
 
 ## License
 

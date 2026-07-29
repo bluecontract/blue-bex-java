@@ -1,0 +1,8 @@
+name: BEX Fixture Intrinsic 2.0
+description: Conformance-only deterministic intrinsic returning its payload and a declared named child counter ledger.
+counter:
+  type:
+    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+quantity:
+  type:
+    blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq

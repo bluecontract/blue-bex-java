@@ -7,11 +7,10 @@ import blue.bex.api.BexStepResults;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.LruBexCompiledProgramCache;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
 import blue.bex.value.BexValue;
-import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
@@ -45,14 +44,14 @@ class BexEngineConformanceTest {
         cases.add(c("document literal path", op("$document", "/status"), "active"));
         cases.add(c("document dynamic path", op("$document", obj("path", op("$concat", list("/sta", "tus")))), "active"));
         cases.add(c("document resolved view", op("$document", obj("path", "/status", "view", "resolved")), "active"));
-        cases.add(c("document missing", op("$document", "/missing"), null));
+        cases.add(c("document missing is undefined", op("$exists", op("$document", "/missing")), false));
         cases.add(c("document metadata name", op("$document", "/name"), "Root"));
         cases.add(c("document value metadata", op("$document", "/status/value"), "active"));
         cases.add(c("event literal path", op("$event", "/kind"), "Created"));
         cases.add(c("event dynamic path", op("$event", obj("path", op("$concat", list("/ki", "nd")))), "Created"));
         cases.add(c("binding reads event short form", op("$binding", "event/kind"), "Created"));
         cases.add(c("binding reads custom binding", op("$binding", "policy/decision"), "allow"));
-        cases.add(c("binding missing returns undefined", op("$binding", "missing/value"), null));
+        cases.add(c("binding missing is undefined", op("$exists", op("$binding", "missing/value")), false));
         cases.add(c("binding dynamic path", op("$binding", obj("name", "event", "path", op("$concat", list("/ki", "nd")))), "Created"));
         cases.add(c("binding dynamic name", op("$binding", obj("name", op("$concat", list("current", "Contract")), "path", "/channel")), "main"));
         cases.add(c("current contract", op("$currentContract", "/channel"), "main"));
@@ -104,7 +103,8 @@ class BexEngineConformanceTest {
         cases.add(c("size object", op("$size", obj("a", 1, "b", 2)), BigInteger.valueOf(2)));
         cases.add(c("listGet hit", op("$listGet", obj("list", list("a", "b"), "index", 1)), "b"));
         cases.add(c("listGet default", op("$listGet", obj("list", list("a"), "index", 4, "default", "x")), "x"));
-        cases.add(c("listGet undefined", op("$listGet", obj("list", list("a"), "index", 4)), null));
+        cases.add(c("listGet missing item is undefined",
+                op("$exists", op("$listGet", obj("list", list("a"), "index", 4))), false));
         cases.add(c("listConcat", op("$listConcat", list(list("a"), list("b", "c"))), l("a", "b", "c")));
         cases.add(c("merge right wins", op("$merge", list(obj("a", 1, "b", 2), obj("b", 3))), m("a", bi(1), "b", bi(3))));
         cases.add(c("objectSet dynamic", op("$objectSet", obj("object", obj("a", 1), "key", op("$concat", list("b")), "val", true)), m("a", bi(1), "b", true)));
@@ -119,8 +119,10 @@ class BexEngineConformanceTest {
         cases.add(c("resultValue document fallback", op("$resultValue", "/status"), "active"));
         cases.add(c("document relative path", op("$document", "status"), "active"));
         cases.add(c("event nested path", op("$event", "/message/request/id"), "r1"));
-        cases.add(c("current contract missing path", op("$currentContract", "/missing"), null));
-        cases.add(c("get missing field", op("$get", obj("object", obj("a", "b"), "key", "z")), null));
+        cases.add(c("current contract missing path is undefined",
+                op("$exists", op("$currentContract", "/missing")), false));
+        cases.add(c("get missing field is undefined",
+                op("$exists", op("$get", obj("object", obj("a", "b"), "key", "z"))), false));
         cases.add(c("text on boolean", op("$text", true), "true"));
         cases.add(c("boolean on boolean", op("$boolean", true), true));
         cases.add(c("truthy zero integer", op("$truthy", 0), true));
@@ -162,8 +164,7 @@ class BexEngineConformanceTest {
         Node step = stepDo(list(
                 op("$appendChange", obj("op", "replace", "path", "/status", "val", "ready")),
                 op("$appendChange", obj("op", "replace", "path", "/status", "val", "done")),
-                op("$appendEvent", obj("kind", "Calculated")),
-                emptyStatement()
+                op("$appendEvent", obj("kind", "Calculated"))
         ));
 
         BexExecutionResult result = runStep(step, defaultContext());
@@ -189,8 +190,7 @@ class BexEngineConformanceTest {
         BexExecutionResult result = runStep(step, defaultContext());
 
         assertEquals(m("ready", true, "x", bi(1)), simple(result.value()));
-        assertEquals(1, result.metrics().resultOverlayExactHits());
-        assertEquals(1, result.metrics().resultOverlayAncestorHits());
+        assertEquals(2L, result.gasLedger().quantity(BexGasCounter.RESULT_VALUE_READ));
     }
 
     @Test
@@ -274,7 +274,7 @@ class BexEngineConformanceTest {
     }
 
     @Test
-    void nodeBexValueMetadataReadsWork() {
+    void nodeBexValueMetadataReadsExcludePhysicalBlueId() {
         Node type = new Node().value("EventType");
         Node event = new Node()
                 .name("EventRoot")
@@ -285,7 +285,7 @@ class BexEngineConformanceTest {
                 .properties(props("kind", "Created"));
         BexExecutionContext context = BexExecutionContext.builder()
                 .document(defaultDocumentView())
-                .event(BexValues.nodeCursor(event))
+                .event(BexValues.nodeCursorTrustedImmutable(event))
                 .gasLimit(1_000_000)
                 .build();
         Node step = stepExpr(obj(
@@ -296,7 +296,7 @@ class BexEngineConformanceTest {
                 "type", op("$event", "/type/value")
         ));
 
-        assertEquals(m("blueId", "event-blue-id", "description", "metadata", "name", "EventRoot", "type", "EventType", "value", "payload-value"),
+        assertEquals(m("description", "metadata", "name", "EventRoot", "type", "EventType", "value", "payload-value"),
                 simple(runStep(step, context).value()));
     }
 
@@ -399,7 +399,7 @@ class BexEngineConformanceTest {
         assertEquals(a.gasUsed(), b.gasUsed());
 
         BexEngine engine = BexEngine.builder()
-                .gasSchedule(BexGasSchedule.builder().expressionBase(100).build())
+                .gasSchedule(BexGasSchedule.builder().expressionEvaluated(100).build())
                 .build();
         BexExecutionContext context = BexExecutionContext.builder()
                 .document(defaultDocumentView())
@@ -409,7 +409,7 @@ class BexEngineConformanceTest {
     }
 
     @Test
-    void gasSizeEstimatorCachesFrozenValues() {
+    void repeatedOutputsUsePortableNamedGasCounters() {
         Node large = largeObject(300);
         Node step = obj(
                 "type", "Blue/BEX Program",
@@ -417,33 +417,15 @@ class BexEngineConformanceTest {
                 "do", list(
                         op("$appendEvent", op("$const", "large")),
                         op("$appendEvent", op("$const", "large")),
-                        emptyStatement()
+                        op("$return", obj("eventCount", op("$size", op("$events", true))))
                 )
         );
 
         BexExecutionResult result = runStep(step, defaultContext());
 
-        assertTrue(result.metrics().sizeEstimateCalls() >= 2);
-        assertTrue(result.metrics().sizeEstimateCacheMisses() > 0);
-        assertTrue(result.metrics().sizeEstimateCacheHits() > 0);
-    }
-
-    @Test
-    void frozenWriterTracksChildNodeRoundTripsSeparatelyFromGenericFallback() {
-        BexMetrics metrics = new BexMetrics();
-        BexValue computed = BexValues.pointerSet(
-                BexValues.overlay(BexValues.fromSimple(m("a", bi(1))), "b", BexValues.list(Arrays.asList(BexValues.scalar("x")))),
-                Arrays.asList("c", "d"),
-                BexValues.scalar(true),
-                "set"
-        );
-
-        FrozenNode frozen = BexFrozenWriter.toFrozen(computed, metrics);
-
-        assertEquals(m("a", bi(1), "b", l("x"), "c", m("d", true)), simple(BexValues.frozen(frozen)));
-        assertEquals(1, metrics.frozenOutputConversions());
-        assertEquals(0, metrics.frozenWriterNodeFallbacks());
-        assertTrue(metrics.frozenWriterChildNodeRoundTrips() > 0);
+        assertEquals(m("eventCount", bi(2)), simple(result.value()));
+        assertEquals(2L, result.gasLedger().quantity(BexGasCounter.EVENT_APPENDED));
+        assertTrue(result.gasLedger().quantity(BexGasCounter.BLUE_OUTPUT_BOUNDARY) >= 3L);
     }
 
     @Test
@@ -549,10 +531,6 @@ class BexEngineConformanceTest {
 
     private static Node op(String name, Object body) {
         return obj(name, body);
-    }
-
-    private static Node emptyStatement() {
-        return obj("$empty", true);
     }
 
     private static Node obj(Object... keysAndValues) {

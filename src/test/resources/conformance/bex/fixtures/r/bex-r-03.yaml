@@ -1,0 +1,29 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-03
+vectors:
+- BEX-R-03
+category: r
+description: A pure reference wrapper does not create a semantic child named `blueId`.
+program:
+  expr:
+    $exists:
+      $document: /x/blueId
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions: []
+  result: false

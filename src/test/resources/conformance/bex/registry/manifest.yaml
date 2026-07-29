@@ -1,0 +1,30 @@
+registry: blue-bex-runtime
+registryKind: runtime-type
+specificationVersion: '2.0'
+languageVersion: '1.0'
+contractsVersion: '1.0'
+fixturePackageIdentity: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+entries:
+- key: Compute2
+  path: Compute2.blue
+  blueId: H7Z5Wyg8oxA63EdauGhw8nHtNysdmWh7CWdV1osKTKbb
+  sha256: b4f00a1f953e337982fdb668eee1e9fa987143c1fcfaba91cebd62a0a35956fa
+  semanticDescriptionIdentityBearing: true
+  fixtureOnly: false
+- key: FixtureIntrinsic
+  path: FixtureIntrinsic.blue
+  blueId: 5Zbnaiu1hzRNEpuQmKNHuSmkiq5VqdZ5ros49gwGB674
+  sha256: 8cfaf7cd9ff8bb4b833692001f2f68cda50179112d58e8f2e98fa2bfce72f4ea
+  semanticDescriptionIdentityBearing: true
+  fixtureOnly: true
+- key: SortFixtureIntrinsic
+  path: SortFixtureIntrinsic.blue
+  blueId: 2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG
+  sha256: 243833c0ac8a34a11c976c20199c6a89e815361447b1578e86e526b2942ea18a
+  semanticDescriptionIdentityBearing: true
+  fixtureOnly: true
+packageIdentityAlgorithm:
+  digest: sha256
+  encoding: UTF-8 canonical JSON with sorted keys
+  normalization: packageIdentity and fixturePackageIdentity are null before hashing
+packageIdentity: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1

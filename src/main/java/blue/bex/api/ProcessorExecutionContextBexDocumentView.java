@@ -2,7 +2,7 @@ package blue.bex.api;
 
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.model.Node;
+import blue.language.snapshot.FrozenNode;
 import blue.language.processor.ProcessorExecutionContext;
 import blue.language.utils.JsonPointer;
 
@@ -25,12 +25,12 @@ public final class ProcessorExecutionContextBexDocumentView implements BexDocume
 
     @Override
     public BexValue canonicalAt(String absolutePointer) {
-        return documentAt(absolutePointer);
+        return exactAt(absolutePointer);
     }
 
     @Override
     public BexValue resolvedAt(String absolutePointer) {
-        return documentAt(absolutePointer);
+        return exactAt(absolutePointer);
     }
 
     @Override
@@ -39,8 +39,11 @@ public final class ProcessorExecutionContextBexDocumentView implements BexDocume
         return pointer != null ? JsonPointer.canonicalize(pointer) : "/";
     }
 
-    private BexValue documentAt(String absolutePointer) {
-        Node selected = context.documentAt(absolutePointer);
-        return selected != null ? BexValues.nodeSnapshot(selected) : BexValues.undefined();
+    private BexValue exactAt(String absolutePointer) {
+        FrozenNode canonical = context.canonicalFrozenAt(absolutePointer);
+        FrozenNode resolved = context.resolvedFrozenAt(absolutePointer);
+        return canonical != null || resolved != null
+                ? BexValues.exact(canonical, resolved)
+                : BexValues.undefined();
     }
 }

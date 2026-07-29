@@ -1,6 +1,7 @@
 package blue.bex.compile;
 
 import blue.bex.BexException;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.runtime.CompiledStatement;
@@ -120,15 +121,22 @@ public final class BexCompiledProgram {
         }
 
         public BexValue invokePrepared(BexRuntime runtime, CompiledFrame parent, int[] slots, BexValue[] values) {
+            runtime.gas().charge(BexGasCounter.FUNCTION_CALLED);
             runtime.metrics().incrementFunctionCalls();
-            runtime.gas().charge(runtime.gas().schedule().functionCall);
+            if (parent == null) {
+                runtime.metrics().incrementCompiledExecutions();
+            }
             CompiledFrame frame = new CompiledFrame(runtime, frameSize, parent);
             for (int i = 0; i < slots.length; i++) {
                 if (slots[i] >= 0) {
                     BexValue value = values[i];
                     ArgSpec arg = slots[i] < argBySlot.length ? argBySlot[slots[i]] : null;
                     if (arg != null && arg.typed()
-                            && !runtime.typeMatcher().matches(value, arg.pattern())) {
+                            && !runtime.typeMatcher().matches(
+                            value,
+                            arg.pattern(),
+                            runtime.gas(),
+                            parent != null ? parent.sourcePath() : null)) {
                         throw new BexException("Function " + name
                                 + " argument " + arg.name()
                                 + " does not match declared Blue pattern at "

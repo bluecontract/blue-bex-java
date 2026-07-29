@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-09
+vectors:
+- BEX-R-09
+category: r
+description: 'A final cyclic-set member is an exact opaque value: $nodeBlueId returns MASTER#index without independent member hashing or provider demand.'
+program:
+  expr:
+    $nodeBlueId:
+      $document: /x
+context:
+  rootDocument:
+    x:
+      blueId: GX7CFU287wrZ7qw3LQG7gQi6UUoy1FFpM3tzupQJKi3N#0
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: demands
+    op: notContains
+    expected: GX7CFU287wrZ7qw3LQG7gQi6UUoy1FFpM3tzupQJKi3N#0
+  result: GX7CFU287wrZ7qw3LQG7gQi6UUoy1FFpM3tzupQJKi3N#0

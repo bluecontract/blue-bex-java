@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-01
+vectors:
+- BEX-E-01
+category: e
+description: '`$document` uses document-scope-relative and absolute pointers correctly.'
+program:
+  expr:
+    relative:
+      $document: value
+    absolute:
+      $document: /child/value
+context:
+  rootDocument:
+    child:
+      value: 2
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /child
+expected:
+  assertions: []
+  result:
+    relative: 2
+    absolute: 2

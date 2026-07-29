@@ -38,17 +38,4 @@ class BexNodeCursorTest {
         assertEquals("before", simple(runStep(stepExpr(op("$event", "/payload/status")), context).value()));
     }
 
-    @SuppressWarnings("deprecation")
-    @Test
-    void deprecatedNodeFactoryUsesSafeSnapshotSemantics() {
-        Node event = obj("payload", obj("status", "before"));
-        BexExecutionContext context = BexExecutionContext.builder()
-                .document(defaultDocumentView())
-                .event(BexValues.node(event))
-                .gasLimit(1_000_000)
-                .build();
-        event.getProperties().put("payload", obj("status", "after"));
-
-        assertEquals("before", simple(runStep(stepExpr(op("$event", "/payload/status")), context).value()));
-    }
 }

@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-04
+vectors:
+- BEX-E-04
+category: e
+description: '`$pointerJoin` escapes `~` and `/`.'
+program:
+  expr:
+    $pointerJoin:
+    - a/b
+    - a~b
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result: /a~1b/a~0b

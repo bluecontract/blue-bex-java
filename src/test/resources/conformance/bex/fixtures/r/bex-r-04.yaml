@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-04
+vectors:
+- BEX-R-04
+category: r
+description: '`$nodeBlueId` returns exact identity without transitive expansion.'
+program:
+  expr:
+    $nodeBlueId:
+      $document: /x
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions:
+  - actual: demands
+    op: notContains
+    expected: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v/descendants
+  result: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v

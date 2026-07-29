@@ -11,6 +11,7 @@ import java.util.Map;
 public final class CompileScope {
     private final CompileScope parent;
     private final Map<String, Integer> slots = new LinkedHashMap<>();
+    private int nextSlot;
 
     public CompileScope() {
         this(null);
@@ -18,6 +19,7 @@ public final class CompileScope {
 
     public CompileScope(CompileScope parent) {
         this.parent = parent;
+        this.nextSlot = parent != null ? parent.frameSize() : 0;
     }
 
     public int declareOrGetSlot(String name) {
@@ -25,7 +27,10 @@ public final class CompileScope {
         if (existing != null) {
             return existing;
         }
-        int slot = slots.size();
+        if (parent != null && parent.hasSlot(name)) {
+            return parent.resolveSlot(name);
+        }
+        int slot = nextSlot++;
         slots.put(name, slot);
         return slot;
     }
@@ -46,6 +51,34 @@ public final class CompileScope {
     }
 
     public int frameSize() {
-        return slots.size();
+        return Math.max(nextSlot, parent != null ? parent.frameSize() : 0);
+    }
+
+    /**
+     * Captures which names are visible without rewinding allocated frame slots.
+     *
+     * <p>Collection-query bindings are lexical only for the query expression.
+     * Restoring visibility removes names introduced by the query while keeping
+     * the allocated slots in the function frame so the compiled expression can
+     * still use them at runtime.</p>
+     */
+    public Visibility captureVisibility() {
+        return new Visibility(new LinkedHashMap<>(slots));
+    }
+
+    public void restoreVisibility(Visibility visibility) {
+        if (visibility == null) {
+            throw new IllegalArgumentException("visibility is required");
+        }
+        slots.clear();
+        slots.putAll(visibility.slots);
+    }
+
+    public static final class Visibility {
+        private final Map<String, Integer> slots;
+
+        private Visibility(Map<String, Integer> slots) {
+            this.slots = slots;
+        }
     }
 }

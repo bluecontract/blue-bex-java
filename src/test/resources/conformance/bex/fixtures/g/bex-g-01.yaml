@@ -1,0 +1,21 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-01
+vectors:
+- BEX-G-01
+category: g
+description: Every named counter has an exact microfixture and frozen weight.
+program:
+  expr: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: manifest.counterCoverage.complete
+    op: equals
+    expected: true

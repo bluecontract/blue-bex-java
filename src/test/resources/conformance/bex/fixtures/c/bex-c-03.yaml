@@ -1,0 +1,29 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-03
+vectors:
+- BEX-C-03
+category: c
+description: '`$literal` preserves nested unknown operators but cannot place expressions in static Blue fields.'
+program:
+  expr:
+    $literal:
+      $unknown: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    $unknown: 1
+  additionalCase:
+    program:
+      expr:
+        $literal:
+          type:
+            $const: T
+    errorClass: compile-error

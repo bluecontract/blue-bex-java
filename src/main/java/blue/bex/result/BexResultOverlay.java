@@ -3,6 +3,7 @@ package blue.bex.result;
 import blue.bex.api.BexDocumentView;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.Blue;
 import blue.language.utils.JsonPointer;
 
 import java.util.ArrayList;
@@ -15,10 +16,19 @@ public final class BexResultOverlay {
     private final BexDocumentView document;
     private final List<BexPatchEntry> entries = new ArrayList<>();
     private final BexMetrics metrics;
+    private final Blue blue;
 
     public BexResultOverlay(BexDocumentView document, BexMetrics metrics) {
+        this(document, metrics, null);
+    }
+
+    public BexResultOverlay(
+            BexDocumentView document,
+            BexMetrics metrics,
+            Blue blue) {
         this.document = document;
         this.metrics = metrics;
+        this.blue = blue;
     }
 
     public void append(BexPatchEntry entry) {
@@ -33,20 +43,44 @@ public final class BexResultOverlay {
         List<String> selected = segments != null ? segments : JsonPointer.split(pointer);
         recordOverlayMetric(pointer, selected);
         if (entries.isEmpty()) {
-            return document.canonicalAt(pointer);
+            return exactAt(pointer);
         }
-        BexValue materialized = document.canonicalAt("/");
+        BexValue materialized = exactAt("/");
         for (BexPatchEntry entry : entries) {
             materialized = apply(materialized, entry);
         }
         return materialized.at(selected);
     }
 
+    /**
+     * Returns the current transient overlay root without selecting a child.
+     * Pointer traversal and its gas belong to the BEX runtime.
+     */
+    public BexValue rootValue() {
+        if (entries.isEmpty()) {
+            return exactAt("/");
+        }
+        BexValue materialized = exactAt("/");
+        for (BexPatchEntry entry : entries) {
+            materialized = apply(materialized, entry);
+        }
+        return materialized;
+    }
+
+    private BexValue exactAt(String pointer) {
+        return BexValues.referenceBacked(
+                document.canonicalAt(pointer),
+                blue);
+    }
+
     private BexValue apply(BexValue root, BexPatchEntry entry) {
         if (entry.absoluteSegments().isEmpty()) {
             return "remove".equals(entry.op()) ? BexValues.undefined() : entry.val();
         }
-        return BexValues.pointerSet(root, entry.absoluteSegments(), entry.val(),
+        return BexValues.resultOverlayPointerSet(
+                root,
+                entry.absoluteSegments(),
+                entry.val(),
                 "remove".equals(entry.op()) ? "remove" : "set");
     }
 

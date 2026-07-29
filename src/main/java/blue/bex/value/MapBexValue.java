@@ -7,15 +7,14 @@ import blue.language.utils.JsonPointer;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 
 final class MapBexValue extends AbstractBexValue {
     private final Map<String, BexValue> values;
+    private final List<String> canonicalKeys;
 
     MapBexValue(Map<String, BexValue> values) {
         LinkedHashMap<String, BexValue> copy = new LinkedHashMap<>();
@@ -26,7 +25,16 @@ final class MapBexValue extends AbstractBexValue {
                 }
             }
         }
-        this.values = Collections.unmodifiableMap(copy);
+        List<String> ordered =
+                BexUnicodeOrder.sortedCopy(copy.keySet());
+        LinkedHashMap<String, BexValue> canonical =
+                new LinkedHashMap<>();
+        for (String key : ordered) {
+            canonical.put(key, copy.get(key));
+        }
+        this.values = Collections.unmodifiableMap(canonical);
+        this.canonicalKeys =
+                Collections.unmodifiableList(ordered);
     }
 
     @Override
@@ -40,9 +48,7 @@ final class MapBexValue extends AbstractBexValue {
 
     @Override
     public List<String> keys() {
-        ArrayList<String> keys = new ArrayList<>(values.keySet());
-        Collections.sort(keys);
-        return keys;
+        return canonicalKeys;
     }
 
     @Override

@@ -1,9 +1,11 @@
 package blue.bex.compile;
 
 import blue.bex.BexException;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.value.BexValue;
+import blue.bex.value.BexUnicodeOrder;
 import blue.bex.value.BexValues;
 import blue.language.snapshot.FrozenNode;
 
@@ -13,7 +15,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 enum UnaryOp { UNWRAP, TEXT, INTEGER, NUMBER, BOOLEAN, OBJECT, LIST, TRUTHY, EMPTY, EXISTS, KEYS, ENTRIES, SIZE }
 
@@ -31,16 +32,25 @@ final class UnaryExpr extends Expr {
         BexValue value = expression.eval(frame);
         switch (op) {
             case UNWRAP:
-                while (value.isObject() && !value.get("value").isUndefined()) {
-                    value = value.get("value");
+                while (value.isObject()) {
+                    BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
+                    BexValue next = value.get("value");
+                    if (next.isUndefined()) {
+                        break;
+                    }
+                    value = next;
                 }
                 return value;
             case TEXT:
-                return BexValues.scalar(value.asText());
+                BexGasWork.MeteredText text =
+                        BexGasWork.constructedText(frame, value);
+                return BexValues.scalar(text.text());
             case INTEGER:
-                return BexValues.scalar(value.asInteger());
+                return BexValues.scalar(
+                        BexGasWork.convertInteger(frame, value));
             case NUMBER:
-                return BexValues.scalar(value.asNumber());
+                return BexValues.scalar(
+                        BexGasWork.convertNumber(frame, value));
             case BOOLEAN:
                 return BexValues.scalar(value.asBoolean());
             case OBJECT:
@@ -59,14 +69,26 @@ final class UnaryExpr extends Expr {
                 return BexValues.scalar(!value.isUndefined());
             case KEYS:
                 List<BexValue> keys = new ArrayList<>();
-                for (String key : value.keys()) keys.add(BexValues.scalar(key));
+                for (String key : value.keys()) {
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                    BexGasWork.charge(frame, BexGasCounter.TRANSIENT_LIST_ITEM_PRODUCED);
+                    BexGasWork.chargeTextConstruction(
+                            frame, key);
+                    keys.add(BexValues.scalar(key));
+                }
                 return BexValues.list(keys);
             case ENTRIES:
                 List<BexValue> entries = new ArrayList<>();
                 for (String key : value.keys()) {
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                    BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
                     Map<String, BexValue> entry = new LinkedHashMap<>();
+                    BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED, 2L);
                     entry.put("key", BexValues.scalar(key));
                     entry.put("val", value.get(key));
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                    BexGasWork.charge(frame, BexGasCounter.TRANSIENT_LIST_ITEM_PRODUCED);
                     entries.add(BexValues.map(entry));
                 }
                 return BexValues.list(entries);
@@ -90,7 +112,11 @@ final class IsExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         BexValue value = valueExpression.eval(frame);
-        return BexValues.scalar(frame.runtime().typeMatcher().matches(value, pattern));
+        return BexValues.scalar(frame.runtime().typeMatcher().matches(
+                value,
+                pattern,
+                frame.runtime().gas(),
+                frame.sourcePath()));
     }
 }
 
@@ -108,24 +134,79 @@ final class VariadicExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         if (op == VariadicOp.CONCAT) {
+            List<BexGasWork.MeteredText> items =
+                    new ArrayList<>(expressions.size());
+            TextConstructionShape resultShape =
+                    new TextConstructionShape();
+            for (CompiledExpression expression : expressions) {
+                BexGasWork.MeteredText item =
+                        BexGasWork.fullText(
+                                frame,
+                                expression.eval(frame));
+                resultShape.append(item);
+                items.add(item);
+            }
+            BexGasWork.charge(frame, BexGasCounter.TEXT_BLOCK_CONSTRUCTED,
+                    BexGasWork.textBlocksForCodePoints(
+                            resultShape.codePoints()));
+
+            /*
+             * The aggregate construction charge is now admitted before any
+             * result buffer allocation, append, or toString work.
+             */
             StringBuilder builder = new StringBuilder();
-            for (CompiledExpression expression : expressions) builder.append(expression.eval(frame).asText());
-            return BexValues.scalar(builder.toString());
+            for (BexGasWork.MeteredText item : items) {
+                builder.append(item.text());
+            }
+            String result = builder.toString();
+            return BexValues.scalar(result);
         }
         if (op == VariadicOp.LIST_CONCAT) {
             List<BexValue> out = new ArrayList<>();
             for (CompiledExpression expression : expressions) {
                 BexValue list = expression.eval(frame);
                 if (!list.isList()) throw new BexException("$listConcat operand must be list");
-                for (int i = 0; i < list.size(); i++) out.add(list.get(String.valueOf(i)));
+                for (int i = 0; i < list.size(); i++) {
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                    BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                    BexGasWork.charge(frame, BexGasCounter.TRANSIENT_LIST_ITEM_PRODUCED);
+                    out.add(list.get(String.valueOf(i)));
+                }
             }
             return BexValues.list(out);
         }
-        Map<String, BexValue> out = new LinkedHashMap<>();
+        Map<String, BexValue> retained = new LinkedHashMap<>();
         for (CompiledExpression expression : expressions) {
             BexValue object = expression.eval(frame);
             if (!object.isObject()) throw new BexException("$merge operand must be object");
-            for (String key : object.keys()) out.put(key, object.get(key));
+            for (String key : object.keys()) {
+                BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
+                retained.put(key, object.get(key));
+            }
+        }
+        Map<String, BexValue> out = new LinkedHashMap<>();
+        for (String key : BexUnicodeOrder.sortedCopy(
+                retained.keySet(),
+                new BexUnicodeOrder.Comparison() {
+                    @Override
+                    public int compare(
+                            String left,
+                            String right) {
+                        BexGasWork.charge(
+                                frame,
+                                BexGasCounter.SORT_COMPARISON);
+                        BexGasWork.charge(
+                                frame,
+                                BexGasCounter.COMPARISON_NODE_VISITED);
+                        return BexGasWork.compareText(
+                                frame, left, right);
+                    }
+                })) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+            BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED);
+            out.put(key, retained.get(key));
         }
         return BexValues.map(out);
     }
@@ -144,13 +225,38 @@ final class JoinExpr extends Expr {
     protected BexValue doEval(CompiledFrame frame) {
         BexValue list = items.eval(frame);
         if (!list.isList()) throw new BexException("$join list must be a list");
-        String sep = separator.eval(frame).asText();
-        StringBuilder out = new StringBuilder();
+        BexGasWork.MeteredText sep = BexGasWork.fullText(
+                frame, separator.eval(frame));
+        List<BexGasWork.MeteredText> values =
+                new ArrayList<>();
+        TextConstructionShape resultShape =
+                new TextConstructionShape();
         for (int i = 0; i < list.size(); i++) {
-            if (i > 0) out.append(sep);
-            out.append(list.get(String.valueOf(i)).asText());
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
+            if (i > 0) {
+                resultShape.append(sep);
+            }
+            BexGasWork.MeteredText item =
+                    BexGasWork.fullText(
+                            frame,
+                            list.get(String.valueOf(i)));
+            resultShape.append(item);
+            values.add(item);
         }
-        return BexValues.scalar(out.toString());
+        BexGasWork.charge(frame, BexGasCounter.TEXT_BLOCK_CONSTRUCTED,
+                BexGasWork.textBlocksForCodePoints(
+                        resultShape.codePoints()));
+
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                out.append(sep.text());
+            }
+            out.append(values.get(i).text());
+        }
+        String result = out.toString();
+        return BexValues.scalar(result);
     }
 }
 
@@ -164,22 +270,52 @@ final class PointerJoinExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         if (segments.isEmpty()) {
+            BexGasWork.charge(frame, BexGasCounter.TEXT_BLOCK_CONSTRUCTED, 1L);
             return BexValues.scalar("/");
         }
-        StringBuilder out = new StringBuilder();
+        List<BexGasWork.MeteredText> items =
+                new ArrayList<>(segments.size());
+        long resultCodePoints = segments.size();
         for (CompiledExpression expression : segments) {
             BexValue value = expression.eval(frame);
             if (value.isUndefined() || value.isNull()) {
                 throw new BexException("$pointerJoin segment cannot be null or undefined");
             }
-            out.append('/');
-            out.append(escapeSegment(value.asText()));
+            BexGasWork.MeteredText segment =
+                    BexGasWork.fullText(frame, value);
+            resultCodePoints = Math.addExact(
+                    resultCodePoints,
+                    Math.addExact(
+                            segment.codePoints(),
+                            segment.pointerEscapeExpansions()));
+            items.add(segment);
         }
-        return BexValues.scalar(out.toString());
+        BexGasWork.charge(frame, BexGasCounter.TEXT_BLOCK_CONSTRUCTED,
+                BexGasWork.textBlocksForCodePoints(
+                        resultCodePoints));
+
+        StringBuilder out = new StringBuilder();
+        for (BexGasWork.MeteredText segment : items) {
+            out.append('/');
+            appendEscaped(out, segment.text());
+        }
+        String result = out.toString();
+        return BexValues.scalar(result);
     }
 
-    private String escapeSegment(String segment) {
-        return segment.replace("~", "~0").replace("/", "~1");
+    private void appendEscaped(
+            StringBuilder destination,
+            String segment) {
+        for (int index = 0; index < segment.length(); index++) {
+            char character = segment.charAt(index);
+            if (character == '~') {
+                destination.append("~0");
+            } else if (character == '/') {
+                destination.append("~1");
+            } else {
+                destination.append(character);
+            }
+        }
     }
 }
 
@@ -196,15 +332,46 @@ final class SplitExpr extends Expr {
 
     @Override
     protected BexValue doEval(CompiledFrame frame) {
-        String input = text.eval(frame).asText();
-        String sep = separator.eval(frame).asText();
+        String input = BexGasWork.fullText(
+                frame, text.eval(frame)).text();
+        String sep = BexGasWork.fullText(
+                frame, separator.eval(frame)).text();
         if (sep.isEmpty()) throw new BexException("$split separator must not be empty");
         int max = limit != null ? limit.eval(frame).asInteger().intValueExact() : -1;
         if (max == 0 || max < -1) throw new BexException("$split limit must be positive");
-        String[] parts = input.split(Pattern.quote(sep), max == -1 ? -1 : max);
+
         List<BexValue> out = new ArrayList<>();
-        for (String part : parts) out.add(BexValues.scalar(part));
+        int start = 0;
+        int produced = 0;
+        while (max == -1 || produced < max - 1) {
+            int match = input.indexOf(sep, start);
+            if (match < 0) {
+                break;
+            }
+            addPart(frame, out, input, start, match);
+            produced++;
+            start = match + sep.length();
+        }
+        addPart(frame, out, input, start, input.length());
         return BexValues.list(out);
+    }
+
+    private void addPart(
+            CompiledFrame frame,
+            List<BexValue> out,
+            String input,
+            int start,
+            int end) {
+        BexGasWork.chargeSubstringConstruction(
+                frame, input, start, end);
+        BexGasWork.charge(
+                frame,
+                BexGasCounter.COLLECTION_ITEM_PRODUCED);
+        BexGasWork.charge(
+                frame,
+                BexGasCounter.TRANSIENT_LIST_ITEM_PRODUCED);
+        String part = input.substring(start, end);
+        out.add(BexValues.scalar(part));
     }
 }
 
@@ -222,9 +389,42 @@ final class BinaryTextExpr extends Expr {
     @Override
     protected BexValue doEval(CompiledFrame frame) {
         if (expressions.size() != 2) throw new BexException("Text operator expects two operands");
-        String text = expressions.get(0).eval(frame).asText();
-        String prefix = expressions.get(1).eval(frame).asText();
-        if (op == BinaryTextOp.STARTS_WITH) return BexValues.scalar(text.startsWith(prefix));
-        return BexValues.scalar(text.startsWith(prefix) ? text.substring(prefix.length()) : "");
+        BexGasWork.PrefixResult result =
+                BexGasWork.comparePrefix(
+                        frame,
+                        expressions.get(0).eval(frame),
+                        expressions.get(1).eval(frame));
+        if (op == BinaryTextOp.STARTS_WITH) {
+            return BexValues.scalar(result.matched());
+        }
+        return BexValues.scalar(
+                result.constructSuffix(frame));
+    }
+}
+
+final class TextConstructionShape {
+    private long codePoints;
+    private boolean endsWithHighSurrogate;
+
+    void append(BexGasWork.MeteredText value) {
+        String text = value.text();
+        if (endsWithHighSurrogate
+                && !text.isEmpty()
+                && Character.isLowSurrogate(
+                text.charAt(0))) {
+            codePoints--;
+        }
+        codePoints = Math.addExact(
+                codePoints, value.codePoints());
+        if (!text.isEmpty()) {
+            endsWithHighSurrogate =
+                    Character.isHighSurrogate(
+                            text.charAt(
+                                    text.length() - 1));
+        }
+    }
+
+    long codePoints() {
+        return codePoints;
     }
 }

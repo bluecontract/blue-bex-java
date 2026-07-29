@@ -1,8 +1,8 @@
 fixtureId: GAS-123
-title: Custom appendEventBase schedule applies
+title: Custom eventAppended schedule applies
 tags: [gas]
 gasSchedule:
-  appendEventBase: 10
+  eventAppended: 10
 programSource: |
   type: Blue/BEX Program
   do:

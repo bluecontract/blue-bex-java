@@ -1,0 +1,40 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-01
+vectors:
+- BEX-R-01
+category: r
+description: Inline, pure-reference, eagerly materialized, and lazily materialized forms of the same exact value produce the same result and gas.
+program:
+  expr:
+    $document: /x/a
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions:
+  - actual: result
+    op: sameAcrossVariants
+  - actual: gasTrace
+    op: sameAcrossVariants
+  variants:
+  - name: inline
+    rootForm: inline
+  - name: reference
+    rootForm: reference
+  - name: eager
+    rootForm: eager
+  - name: lazy
+    rootForm: lazy

@@ -3,6 +3,7 @@ package blue.bex.compile;
 import blue.language.snapshot.FrozenNode;
 import blue.language.model.Node;
 import blue.language.model.Schema;
+import blue.bex.value.BexUnicodeOrder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -83,7 +84,7 @@ final class BexNodeFingerprint {
         if (node.getProperties() != null) {
             update(digest, "properties{");
             List<String> keys = new ArrayList<>(node.getProperties().keySet());
-            Collections.sort(keys);
+            Collections.sort(keys, BexUnicodeOrder.CODE_POINT_COMPARATOR);
             for (String key : keys) {
                 updateField(digest, "key", key);
                 updateNode(digest, node.getProperties().get(key));

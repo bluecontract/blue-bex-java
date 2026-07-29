@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-flatmap
+vectors:
+- BEX-E-11
+category: operator
+description: Direct executable coverage for `$flatMap`.
+program:
+  expr:
+    $flatMap:
+      in:
+      - 1
+      - 2
+      item: x
+      expr:
+      - $var: x
+      - $var: x
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - 1
+  - 1
+  - 2
+  - 2
+  assertions: []

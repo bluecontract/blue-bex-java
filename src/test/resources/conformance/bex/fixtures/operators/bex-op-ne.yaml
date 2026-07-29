@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-ne
+vectors:
+- BEX-E-14
+category: operator
+description: Direct executable coverage for `$ne`.
+program:
+  expr:
+    $ne:
+    - 1
+    - 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: true
+  assertions: []

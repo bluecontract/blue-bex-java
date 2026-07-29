@@ -1,8 +1,8 @@
 fixtureId: GAS-127
-title: Custom forEachItem schedule applies
+title: Custom collectionItemVisited schedule applies
 tags: [gas]
 gasSchedule:
-  forEachItem: 10
+  collectionItemVisited: 10
 programSource: |
   type: Blue/BEX Program
   do:

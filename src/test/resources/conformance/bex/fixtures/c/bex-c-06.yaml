@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-06
+vectors:
+- BEX-C-06
+category: c
+description: Dynamic `$is.pattern` and `$intrinsic.type` fail.
+program:
+  expr:
+    $is:
+      node: 1
+      pattern:
+        $const: P
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: compile-error

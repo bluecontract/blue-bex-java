@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-findentry
+vectors:
+- BEX-E-11
+category: operator
+description: Direct executable coverage for `$findEntry`.
+program:
+  expr:
+    $findEntry:
+      in:
+        b: 2
+        a: 1
+      item: x
+      key: k
+      where:
+        $gt:
+        - $var: x
+        - 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    key: b
+    val: 2
+  assertions: []

@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-default
+vectors:
+- BEX-E-07
+category: operator
+description: Direct executable coverage for `$default`.
+program:
+  expr:
+    $default:
+    - $document: /missing
+    - fallback
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: fallback
+  assertions: []

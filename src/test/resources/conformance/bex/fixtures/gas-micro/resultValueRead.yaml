@@ -1,0 +1,19 @@
+schema: blue-bex-fixture/2.0
+id: gas-resultValueRead
+vectors:
+- BEX-G-01
+category: gas
+program:
+  expr: 0
+context:
+  directCounterFixture:
+    counter: resultValueRead
+    quantity: 3
+expected:
+  gasTrace:
+  - sequence: 0
+    counter: resultValueRead
+    quantity: 3
+    weight: 2
+    gas: 6
+  totalGas: 6

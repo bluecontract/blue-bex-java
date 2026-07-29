@@ -1,0 +1,30 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-06
+vectors:
+- BEX-R-06
+category: r
+description: Passing an existing large exact node through patches, events, constants, functions, and output has no recursive size charge.
+program:
+  do:
+  - $appendEvent:
+      $document: /x
+context:
+  rootDocument:
+    x:
+      blueId: 4Y2G5fYdCn2jELXoZj9yk6UXUbt54U8W2iYKfKg5CQzi
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    4Y2G5fYdCn2jELXoZj9yk6UXUbt54U8W2iYKfKg5CQzi:
+      largeExactText: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expected:
+  assertions:
+  - actual: gas.textBlockExamined
+    op: equals
+    expected: 0
+  - actual: gas.recursiveSizeCounter
+    op: absent

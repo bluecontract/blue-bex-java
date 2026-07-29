@@ -1,7 +1,13 @@
 package blue.bex.api;
 
+import blue.bex.output.BexSemanticIdentityBoundary;
+import blue.bex.output.ProcessorExecutionContextBexSemanticIdentityBoundary;
+import blue.bex.gas.BexGasMeter;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.processor.ProcessorExecutionContext;
+import blue.language.snapshot.FrozenNode;
 
 import java.util.ArrayDeque;
 import java.util.Collections;
@@ -24,16 +30,32 @@ public final class BexExecutionContext {
     private final BexDocumentView document;
     private final Map<String, BindingSlot> bindingSlots;
     private final BexValue event;
+    private final BexValue processingEvent;
     private final BexValue currentContract;
     private final BexStepResults steps;
+    private final long parentRemainingGas;
     private final long gasLimit;
+    private final BexGasLedgerHost gasLedgerHost;
+    private final BexSemanticIdentityBoundary semanticIdentityBoundary;
     private final ResolutionCoordinator resolutionCoordinator;
     private volatile Map<String, BexValue> materializedBindings;
 
     private BexExecutionContext(Builder builder) {
         this.document = builder.document;
         this.steps = builder.steps != null ? builder.steps : BexStepResults.empty();
+        this.parentRemainingGas = builder.parentRemainingGas;
         this.gasLimit = builder.gasLimit;
+        this.gasLedgerHost = builder.gasLedgerHost;
+        if (builder.semanticIdentityBoundary == null
+                && builder.gasLedgerHost != null) {
+            throw new IllegalArgumentException(
+                    "Hosted BEX execution requires an explicit "
+                            + "semantic identity boundary");
+        }
+        this.semanticIdentityBoundary =
+                builder.semanticIdentityBoundary != null
+                        ? builder.semanticIdentityBoundary
+                        : BexSemanticIdentityBoundary.STANDALONE;
         if (document == null) {
             throw new IllegalArgumentException("document is required");
         }
@@ -47,6 +69,7 @@ public final class BexExecutionContext {
         }
         this.bindingSlots = Collections.unmodifiableMap(copy);
         this.event = bindingFrom(copy, "event");
+        this.processingEvent = bindingFrom(copy, "processingEvent");
         this.currentContract = bindingFrom(copy, "currentContract");
     }
 
@@ -60,6 +83,14 @@ public final class BexExecutionContext {
 
     public BexValue event() {
         return event;
+    }
+
+    /**
+     * Original external Processing Event, distinct from the current channel
+     * event used by triggered/lifecycle/embedded delivery.
+     */
+    public BexValue processingEvent() {
+        return processingEvent;
     }
 
     public BexValue currentContract() {
@@ -107,10 +138,29 @@ public final class BexExecutionContext {
         return gasLimit;
     }
 
+    /**
+     * Standalone parent budget. Hosted execution obtains the exact value from
+     * the live child ledger instead.
+     */
+    public long parentRemainingGas() {
+        return parentRemainingGas;
+    }
+
+    public BexGasLedgerHost gasLedgerHost() {
+        return gasLedgerHost;
+    }
+
+    public BexSemanticIdentityBoundary semanticIdentityBoundary() {
+        return semanticIdentityBoundary;
+    }
+
     public static final class Builder {
         private BexDocumentView document;
         private BexStepResults steps;
-        private long gasLimit = 100_000L;
+        private long parentRemainingGas = Long.MAX_VALUE;
+        private long gasLimit = BexGasMeter.NO_LOCAL_LIMIT;
+        private BexGasLedgerHost gasLedgerHost;
+        private BexSemanticIdentityBoundary semanticIdentityBoundary;
         private final LinkedHashMap<String, BindingDefinition> bindings = new LinkedHashMap<>();
 
         public Builder document(BexDocumentView document) {
@@ -118,8 +168,54 @@ public final class BexExecutionContext {
             return this;
         }
 
+        /**
+         * Configures the standard Contracts 1.0 host views, live gas bridge,
+         * and invocation-owned semantic identity boundary under the default
+         * physical runtime namespace {@code bex}.
+         *
+         * <p>Use {@link #processorExecutionContext(ProcessorExecutionContext,
+         * String)} when one host invocation executes more than one BEX
+         * program.</p>
+         */
+        public Builder processorExecutionContext(ProcessorExecutionContext context) {
+            return processorExecutionContext(
+                    context, BexGasCounter.NAMESPACE);
+        }
+
+        /**
+         * Configures hosted execution under an explicit deterministic physical
+         * runtime namespace.  Distinct BEX executions in one processor work
+         * session must use distinct namespaces so they share one live parent
+         * budget without producing ambiguous traces.
+         */
+        public Builder processorExecutionContext(
+                ProcessorExecutionContext context,
+                String runtimeNamespace) {
+            Objects.requireNonNull(context, "context");
+            document(new ProcessorExecutionContextBexDocumentView(context));
+            gasLedgerHost(new ProcessorExecutionContextBexGasLedgerHost(
+                    context, runtimeNamespace));
+            semanticIdentityBoundary(
+                    new ProcessorExecutionContextBexSemanticIdentityBoundary(
+                            context));
+            event(BexValues.nodeSnapshot(context.event()));
+            FrozenNode processEvent = context.frozenProcessEvent();
+            processingEvent(processEvent != null
+                    ? BexValues.frozen(processEvent)
+                    : BexValues.undefined());
+            FrozenNode contract = context.frozenContractNode();
+            currentContract(contract != null
+                    ? BexValues.frozen(contract)
+                    : BexValues.undefined());
+            return this;
+        }
+
         public Builder event(BexValue event) {
             return binding("event", event);
+        }
+
+        public Builder processingEvent(BexValue processingEvent) {
+            return binding("processingEvent", processingEvent);
         }
 
         public Builder currentContract(BexValue currentContract) {
@@ -176,18 +272,34 @@ public final class BexExecutionContext {
             return this;
         }
 
-        /**
-         * @deprecated current scope belongs to the configured
-         * {@link BexDocumentView}. This method is retained as a no-op for
-         * source compatibility.
-         */
-        @Deprecated
-        public Builder currentScopePath(String currentScopePath) {
+        public Builder gasLimit(long gasLimit) {
+            if (gasLimit < BexGasMeter.NO_LOCAL_LIMIT) {
+                throw new IllegalArgumentException(
+                        "gasLimit must be non-negative or NO_LOCAL_LIMIT");
+            }
+            this.gasLimit = gasLimit;
             return this;
         }
 
-        public Builder gasLimit(long gasLimit) {
-            this.gasLimit = gasLimit;
+        public Builder parentRemainingGas(long parentRemainingGas) {
+            if (parentRemainingGas < 0L) {
+                throw new IllegalArgumentException(
+                        "parentRemainingGas must be non-negative");
+            }
+            this.parentRemainingGas = parentRemainingGas;
+            return this;
+        }
+
+        public Builder gasLedgerHost(BexGasLedgerHost gasLedgerHost) {
+            this.gasLedgerHost = gasLedgerHost;
+            return this;
+        }
+
+        public Builder semanticIdentityBoundary(
+                BexSemanticIdentityBoundary semanticIdentityBoundary) {
+            this.semanticIdentityBoundary = semanticIdentityBoundary != null
+                    ? semanticIdentityBoundary
+                    : null;
             return this;
         }
 
@@ -204,6 +316,7 @@ public final class BexExecutionContext {
 
     private static boolean isStandardBindingName(String name) {
         return "event".equals(name)
+                || "processingEvent".equals(name)
                 || "currentContract".equals(name)
                 || "steps".equals(name);
     }

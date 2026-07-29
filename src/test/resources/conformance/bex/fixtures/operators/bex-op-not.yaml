@@ -1,0 +1,20 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-not
+vectors:
+- BEX-E-06
+category: operator
+description: Direct executable coverage for `$not`.
+program:
+  expr:
+    $not: false
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: true
+  assertions: []

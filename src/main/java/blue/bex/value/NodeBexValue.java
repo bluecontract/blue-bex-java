@@ -15,9 +15,11 @@ import java.util.List;
 
 final class NodeBexValue extends AbstractBexValue {
     private final Node node;
+    private final List<String> canonicalKeys;
 
     NodeBexValue(Node node) {
         this.node = node;
+        this.canonicalKeys = establishCanonicalKeys();
     }
 
     Object rawScalar() {
@@ -60,13 +62,15 @@ final class NodeBexValue extends AbstractBexValue {
     @Override
     public BexValue get(String key) {
         if (node.getProperties() != null && node.getProperties().containsKey(key)) {
-            return BexValues.nodeCursor(node.getProperties().get(key));
+            return BexValues.nodeCursorTrustedImmutable(
+                    node.getProperties().get(key));
         }
         if (node.getItems() != null) {
             try {
                 int index = Integer.parseInt(key);
                 return index >= 0 && index < node.getItems().size()
-                        ? BexValues.nodeCursor(node.getItems().get(index))
+                        ? BexValues.nodeCursorTrustedImmutable(
+                                node.getItems().get(index))
                         : BexValues.UNDEFINED;
             } catch (NumberFormatException ignored) {
                 return BexValues.UNDEFINED;
@@ -79,28 +83,28 @@ final class NodeBexValue extends AbstractBexValue {
             return node.getDescription() != null ? BexValues.scalar(node.getDescription()) : BexValues.UNDEFINED;
         }
         if ("blueId".equals(key)) {
-            return node.getBlueId() != null ? BexValues.scalar(node.getBlueId()) : BexValues.UNDEFINED;
+            return BexValues.UNDEFINED;
         }
         if ("value".equals(key)) {
             return node.getValue() != null ? BexValues.scalar(node.getValue()) : BexValues.UNDEFINED;
         }
         if ("type".equals(key)) {
-            return node.getType() != null ? BexValues.nodeCursor(node.getType()) : BexValues.UNDEFINED;
+            return node.getType() != null ? BexValues.nodeCursorTrustedImmutable(node.getType()) : BexValues.UNDEFINED;
         }
         if ("itemType".equals(key)) {
-            return node.getItemType() != null ? BexValues.nodeCursor(node.getItemType()) : BexValues.UNDEFINED;
+            return node.getItemType() != null ? BexValues.nodeCursorTrustedImmutable(node.getItemType()) : BexValues.UNDEFINED;
         }
         if ("keyType".equals(key)) {
-            return node.getKeyType() != null ? BexValues.nodeCursor(node.getKeyType()) : BexValues.UNDEFINED;
+            return node.getKeyType() != null ? BexValues.nodeCursorTrustedImmutable(node.getKeyType()) : BexValues.UNDEFINED;
         }
         if ("valueType".equals(key)) {
-            return node.getValueType() != null ? BexValues.nodeCursor(node.getValueType()) : BexValues.UNDEFINED;
+            return node.getValueType() != null ? BexValues.nodeCursorTrustedImmutable(node.getValueType()) : BexValues.UNDEFINED;
         }
         if ("blue".equals(key)) {
-            return node.getBlue() != null ? BexValues.nodeCursor(node.getBlue()) : BexValues.UNDEFINED;
+            return node.getBlue() != null ? BexValues.nodeCursorTrustedImmutable(node.getBlue()) : BexValues.UNDEFINED;
         }
         if ("contracts".equals(key)) {
-            return node.getContracts() != null ? BexValues.nodeCursor(node.getContracts()) : BexValues.UNDEFINED;
+            return node.getContracts() != null ? BexValues.nodeCursorTrustedImmutable(node.getContracts()) : BexValues.UNDEFINED;
         }
         if ("schema".equals(key)) {
             return BexValues.schemaSnapshot(node.getSchema());
@@ -148,6 +152,10 @@ final class NodeBexValue extends AbstractBexValue {
 
     @Override
     public List<String> keys() {
+        return canonicalKeys;
+    }
+
+    private List<String> establishCanonicalKeys() {
         if (node.getProperties() == null && !hasObjectCompatibleLanguageFields()) {
             return Collections.emptyList();
         }
@@ -158,9 +166,8 @@ final class NodeBexValue extends AbstractBexValue {
         if (node.getProperties() != null) {
             fields.addAll(node.getProperties().keySet());
         }
-        ArrayList<String> keys = new ArrayList<>(fields);
-        Collections.sort(keys);
-        return keys;
+        return Collections.unmodifiableList(
+                BexUnicodeOrder.sortedCopy(fields));
     }
 
     @Override
@@ -185,7 +192,7 @@ final class NodeBexValue extends AbstractBexValue {
         if (node.getItems() != null) {
             ArrayList<Object> out = new ArrayList<>();
             for (Node item : node.getItems()) {
-                out.add(BexValues.nodeCursor(item).toSimple());
+                out.add(BexValues.nodeCursorTrustedImmutable(item).toSimple());
             }
             return out;
         }
@@ -211,7 +218,6 @@ final class NodeBexValue extends AbstractBexValue {
                 || node.getItemType() != null
                 || node.getKeyType() != null
                 || node.getValueType() != null
-                || node.getBlueId() != null
                 || node.getBlue() != null
                 || node.getContracts() != null
                 || node.getSchema() != null
@@ -225,7 +231,6 @@ final class NodeBexValue extends AbstractBexValue {
         if (node.getItemType() != null) keys.add("itemType");
         if (node.getKeyType() != null) keys.add("keyType");
         if (node.getValueType() != null) keys.add("valueType");
-        if (node.getBlueId() != null) keys.add("blueId");
         if (node.getBlue() != null) keys.add("blue");
         if (node.getContracts() != null) keys.add("contracts");
         if (node.getSchema() != null) keys.add("schema");

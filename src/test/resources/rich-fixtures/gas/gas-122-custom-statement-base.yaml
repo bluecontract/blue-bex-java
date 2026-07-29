@@ -1,8 +1,8 @@
 fixtureId: GAS-122
-title: Custom statementBase schedule applies
+title: Custom statementExecuted schedule applies
 tags: [gas]
 gasSchedule:
-  statementBase: 10
+  statementExecuted: 10
 programSource: |
   type: Blue/BEX Program
   do:

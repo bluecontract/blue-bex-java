@@ -41,7 +41,7 @@ class BexDiagnosticsTest {
     @Test
     void gasExhaustionIncludesCurrentOperatorWhenPossible() {
         BexEngine engine = BexEngine.builder()
-                .gasSchedule(BexGasSchedule.builder().expressionBase(100).build())
+                .gasSchedule(BexGasSchedule.builder().expressionEvaluated(100).build())
                 .build();
         BexExecutionContext context = BexExecutionContext.builder()
                 .document(defaultDocumentView())

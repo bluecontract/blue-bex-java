@@ -12,6 +12,9 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.bex.runtime.BexRuntime;
 import blue.language.Blue;
+import blue.language.registry.BlueCoreTypeRegistry;
+
+import java.util.Map;
 
 /**
  * Public entry point for compiling and executing selected BEX programs.
@@ -84,8 +87,9 @@ public final class BexEngine {
         return new BexExecutionResult(result.value(),
                 result.changeset(),
                 result.events(),
-                result.gasUsed(),
-                metrics);
+                result.gasLedger(),
+                metrics,
+                result.output());
     }
 
     public BexExecutionResult compileAndExecute(BexProgramSource source, BexExecutionContext context) {
@@ -97,7 +101,18 @@ public final class BexEngine {
     }
 
     private BexCompiledProgramKey key(BexProgramSource source) {
-        return BexCompiledProgramKey.from(source);
+        return BexCompiledProgramKey.from(source, compileEnvironmentIdentity());
+    }
+
+    private String compileEnvironmentIdentity() {
+        return BexCompiledProgramKey.COMPILER_IDENTITY
+                + "|runtimeRegistry="
+                + BexCompiledProgramKey.BEX_RUNTIME_REGISTRY_IDENTITY
+                + "|gasManifest=" + gasSchedule.manifestIdentity()
+                + "|gasWeights=" + gasSchedule.counterWeights()
+                + "|languageRegistry="
+                + BlueCoreTypeRegistry.INSTANCE.packageIdentity()
+                + "|intrinsics=" + intrinsics.identity();
     }
 
     private void validateIntrinsicSupport(BexCompiledProgram program) {
@@ -140,13 +155,24 @@ public final class BexEngine {
             return this;
         }
 
-        public Builder intrinsic(String blueId, BexIntrinsicProcessor processor) {
-            this.intrinsics = this.intrinsics.with(blueId, processor);
+        public Builder intrinsic(String blueId,
+                                 String registryIdentity,
+                                 Map<String, Long> counterWeights,
+                                 BexIntrinsicProcessor processor) {
+            this.intrinsics = this.intrinsics.with(
+                    blueId, registryIdentity, counterWeights, processor);
             return this;
         }
 
-        public Builder intrinsic(Class<?> typeClass, BexIntrinsicProcessor processor) {
-            this.intrinsics = this.intrinsics.with(typeClass, processor);
+        public Builder intrinsic(Class<?> typeClass,
+                                 String registryIdentity,
+                                 Map<String, Long> counterWeights,
+                                 BexIntrinsicProcessor processor) {
+            this.intrinsics = this.intrinsics.with(
+                    typeClass,
+                    registryIdentity,
+                    counterWeights,
+                    processor);
             return this;
         }
 

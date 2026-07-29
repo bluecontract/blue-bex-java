@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-appendevents
+vectors:
+- BEX-S-04
+category: operator
+description: Direct executable coverage for `$appendEvents`.
+program:
+  do:
+  - $appendEvents:
+    - id: A
+    - id: A
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  events:
+  - id: A
+  - id: A
+  assertions: []

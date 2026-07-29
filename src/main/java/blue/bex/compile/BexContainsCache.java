@@ -65,11 +65,9 @@ public final class BexContainsCache {
             return true;
         }
         if (node.getProperties() != null) {
-            if (node.getProperties().size() == 1) {
+            if (isExactOperatorShape(node)) {
                 String key = node.getProperties().keySet().iterator().next();
-                if (key.startsWith("$")) {
-                    return true;
-                }
+                return key.startsWith("$");
             }
             for (FrozenNode child : node.getProperties().values()) {
                 if (scan(child)) {
@@ -85,5 +83,25 @@ public final class BexContainsCache {
             }
         }
         return false;
+    }
+
+    private boolean isExactOperatorShape(FrozenNode node) {
+        return node.getProperties() != null
+                && node.getProperties().size() == 1
+                && node.getName() == null
+                && node.getDescription() == null
+                && node.getType() == null
+                && node.getItemType() == null
+                && node.getKeyType() == null
+                && node.getValueType() == null
+                && node.getValue() == null
+                && node.getItems() == null
+                && node.getContracts() == null
+                && node.getReferenceBlueId() == null
+                && node.getSchema() == null
+                && node.getMergePolicy() == null
+                && node.getPreviousBlueId() == null
+                && node.getPosition() == null
+                && node.getBlue() == null;
     }
 }

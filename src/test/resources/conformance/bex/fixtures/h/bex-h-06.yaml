@@ -1,0 +1,36 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-06
+vectors:
+- BEX-H-06
+category: h
+description: '`$processingEvent` remains the original external event in Document Update, Triggered, Lifecycle, and Embedded deliveries.'
+program:
+  expr:
+    current:
+      $event: /id
+    causal:
+      $processingEvent: /id
+context:
+  rootDocument: {}
+  event:
+    id: internal
+  processingEvent:
+    id: external
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    current: internal
+    causal: external
+  variants:
+  - name: document-update
+    deliveryKind: document-update
+  - name: triggered
+    deliveryKind: triggered
+  - name: lifecycle
+    deliveryKind: lifecycle
+  - name: embedded
+    deliveryKind: embedded

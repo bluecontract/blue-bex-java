@@ -1,0 +1,35 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-07
+vectors:
+- BEX-R-07
+category: r
+description: Constructing or scanning a large value pays member/Text/numeric work.
+program:
+  expr:
+    $concat:
+    - xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    - yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions:
+  - actual: gas.textBlockExamined
+    op: greaterThan
+    expected: 0
+  - actual: gas.textBlockConstructed
+    op: greaterThan
+    expected: 0

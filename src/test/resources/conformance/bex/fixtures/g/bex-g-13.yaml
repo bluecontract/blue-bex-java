@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-13
+vectors:
+- BEX-G-13
+category: g
+description: A BEX-local gas limit can reduce but never replenish the parent budget.
+program:
+  expr: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  parentRemainingGas: 100
+  gasLimit: 10
+expected:
+  assertions:
+  - actual: effectiveRuntimeBudget
+    op: equals
+    expected: 10
+  - actual: parentBudgetAfter
+    op: lessThan
+    expected: 100

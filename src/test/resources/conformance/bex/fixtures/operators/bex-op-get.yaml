@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-get
+vectors:
+- BEX-E-02
+category: operator
+description: Direct executable coverage for `$get`.
+program:
+  expr:
+    $get:
+      object:
+        a: 1
+      key: a
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: 1
+  assertions: []

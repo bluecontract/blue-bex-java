@@ -67,8 +67,10 @@ jobs:
           git commit -m "chore: release ${{ steps.version.outputs.version }}"
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
 
-      - name: Execute Gradle build
-        run: ./gradlew clean build
+      - name: Prove full BEX publication readiness
+        env:
+          BLUE_LANGUAGE_REPOSITORY_URL: https://github.com/bluecontract/blue-language-java.git
+        run: bash .github/scripts/run-final-publication-gates.sh
 
       - name: Execute Gradle publish
         run: ./gradlew publish
@@ -92,6 +94,10 @@ jobs:
         with:
           name: rc-artifacts
           path: |
+            build/distributions
             build/libs
             build/publications
+            build/reports
+            build/test-results
             build/jreleaser
+            .gradle/bex-hosted-release

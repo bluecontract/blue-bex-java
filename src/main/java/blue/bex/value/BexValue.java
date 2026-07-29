@@ -14,6 +14,25 @@ import java.util.List;
  * {@link Node} or simple Java object is an explicit boundary operation.</p>
  */
 public interface BexValue {
+    /**
+     * Whether this value is an already established Blue node.
+     *
+     * <p>Exactness is provenance, not shape. In particular, a transient object
+     * containing a {@code blueId} member is not exact.</p>
+     */
+    default boolean isExact() {
+        return false;
+    }
+
+    /**
+     * Returns the retained Node BlueId of an exact value.
+     *
+     * @throws IllegalStateException when this value is transient
+     */
+    default String exactBlueId() {
+        throw new IllegalStateException("Transient BEX values do not have a Node BlueId");
+    }
+
     boolean isUndefined();
     boolean isNull();
     boolean isScalar();
@@ -26,6 +45,13 @@ public interface BexValue {
     BigInteger asInteger();
     BigDecimal asNumber();
     boolean asBoolean();
+    /**
+     * Returns this object's already-established canonical Unicode key cursor.
+     *
+     * <p>Callers must consume this order directly. Implementations establish
+     * and retain it before exposing the value; enumerating the cursor is not a
+     * request to sort it again.</p>
+     */
     List<String> keys();
     int size();
     Node toNode();

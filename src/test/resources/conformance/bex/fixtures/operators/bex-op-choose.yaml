@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-choose
+vectors:
+- BEX-E-07
+category: operator
+description: Direct executable coverage for `$choose`.
+program:
+  expr:
+    $choose:
+      cond: true
+      then: 1
+      else:
+        $fail: must-not-run
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: 1
+  assertions: []

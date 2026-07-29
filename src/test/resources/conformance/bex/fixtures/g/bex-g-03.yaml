@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-03
+vectors:
+- BEX-G-03
+category: g
+description: Skipped operands and post-short-circuit items produce no charges.
+program:
+  expr:
+    $or:
+    - true
+    - $fail: skip
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.skippedOperandCharges
+    op: equals
+    expected: 0

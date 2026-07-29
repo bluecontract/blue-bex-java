@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-gt
+vectors:
+- BEX-E-08
+category: operator
+description: Direct executable coverage for `$gt`.
+program:
+  expr:
+    $gt:
+    - 2
+    - 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: true
+  assertions: []

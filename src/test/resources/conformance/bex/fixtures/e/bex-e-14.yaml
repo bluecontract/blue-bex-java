@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-14
+vectors:
+- BEX-E-14
+category: e
+description: BEX numeric equality remains distinct from Blue identity.
+program:
+  expr:
+    semantic:
+      $eq:
+      - 1
+      - 1.0
+    identityA:
+      $nodeBlueId: 1
+    identityB:
+      $nodeBlueId: 1.0
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: result.semantic
+    op: equals
+    expected: true
+  - actual: result.identityA
+    op: notEquals
+    expected: result.identityB

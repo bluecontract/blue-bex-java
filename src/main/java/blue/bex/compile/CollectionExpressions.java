@@ -1,9 +1,11 @@
 package blue.bex.compile;
 
 import blue.bex.BexException;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledFrame;
 import blue.bex.value.BexValue;
+import blue.bex.value.BexUnicodeOrder;
 import blue.bex.value.BexValues;
 
 import java.math.BigInteger;
@@ -85,22 +87,25 @@ final class CollectionQueryExpr extends Expr {
     private BexValue evalList(CompiledFrame frame, BexValue list) {
         List<BexValue> out = needsListOutput() ? new ArrayList<BexValue>() : null;
         for (int i = 0; i < list.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
             frame.runtime().metrics().incrementLoopIterations();
-            frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
             BexValue item = list.get(String.valueOf(i));
             bind(frame, item, BexValues.undefined(), BexValues.scalar(BigInteger.valueOf(i)));
             BexValue result = body.eval(frame);
             switch (op) {
                 case MAP:
+                    producedListItem(frame);
                     out.add(result);
                     break;
                 case FILTER:
                     if (BexValues.truthy(result)) {
+                        producedListItem(frame);
                         out.add(item);
                     }
                     break;
                 case FLAT_MAP:
-                    appendList(out, result);
+                    appendList(frame, out, result);
                     break;
                 case SOME:
                     if (BexValues.truthy(result)) {
@@ -115,6 +120,8 @@ final class CollectionQueryExpr extends Expr {
                 case FIND_ENTRY:
                     if (BexValues.truthy(result)) {
                         Map<String, BexValue> entry = new LinkedHashMap<>();
+                        BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                        BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED, 2L);
                         entry.put("val", item);
                         entry.put("index", BexValues.scalar(BigInteger.valueOf(i)));
                         return BexValues.map(entry);
@@ -133,22 +140,26 @@ final class CollectionQueryExpr extends Expr {
         List<String> keys = object.keys();
         for (int i = 0; i < keys.size(); i++) {
             String key = keys.get(i);
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
             frame.runtime().metrics().incrementLoopIterations();
-            frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
             BexValue item = object.get(key);
             bind(frame, item, BexValues.scalar(key), BexValues.scalar(BigInteger.valueOf(i)));
             BexValue result = body.eval(frame);
             switch (op) {
                 case MAP:
+                    producedListItem(frame);
                     listOut.add(result);
                     break;
                 case FILTER:
                     if (BexValues.truthy(result)) {
+                        BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                        BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED);
                         objectOut.put(key, item);
                     }
                     break;
                 case FLAT_MAP:
-                    appendList(listOut, result);
+                    appendList(frame, listOut, result);
                     break;
                 case SOME:
                     if (BexValues.truthy(result)) {
@@ -163,6 +174,8 @@ final class CollectionQueryExpr extends Expr {
                 case FIND_ENTRY:
                     if (BexValues.truthy(result)) {
                         Map<String, BexValue> entry = new LinkedHashMap<>();
+                        BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+                        BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED, 3L);
                         entry.put("key", BexValues.scalar(key));
                         entry.put("val", item);
                         entry.put("index", BexValues.scalar(BigInteger.valueOf(i)));
@@ -209,13 +222,20 @@ final class CollectionQueryExpr extends Expr {
         }
     }
 
-    private void appendList(List<BexValue> out, BexValue value) {
+    private void appendList(CompiledFrame frame, List<BexValue> out, BexValue value) {
         if (!value.isList()) {
             throw new BexException("$flatMap expr must return a list");
         }
         for (int i = 0; i < value.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
+            producedListItem(frame);
             out.add(value.get(String.valueOf(i)));
         }
+    }
+
+    private void producedListItem(CompiledFrame frame) {
+        BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+        BexGasWork.charge(frame, BexGasCounter.TRANSIENT_LIST_ITEM_PRODUCED);
     }
 
     private String collectionName() {
@@ -272,8 +292,9 @@ final class ReduceExpr extends Expr {
             frame.set(accSlot, acc);
             if (collection.isList()) {
                 for (int i = 0; i < collection.size(); i++) {
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                    BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
                     frame.runtime().metrics().incrementLoopIterations();
-                    frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
                     bind(frame, collection.get(String.valueOf(i)), BexValues.undefined(),
                             BexValues.scalar(BigInteger.valueOf(i)));
                     acc = expr.eval(frame);
@@ -285,8 +306,9 @@ final class ReduceExpr extends Expr {
                 List<String> keys = collection.keys();
                 for (int i = 0; i < keys.size(); i++) {
                     String key = keys.get(i);
+                    BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+                    BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
                     frame.runtime().metrics().incrementLoopIterations();
-                    frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
                     bind(frame, collection.get(key), BexValues.scalar(key), BexValues.scalar(BigInteger.valueOf(i)));
                     acc = expr.eval(frame);
                     frame.set(accSlot, acc);
@@ -313,33 +335,43 @@ final class ReduceExpr extends Expr {
 final class SlotSnapshot {
     private final int[] slots;
     private final BexValue[] values;
+    private final boolean[] initialized;
 
-    private SlotSnapshot(int[] slots, BexValue[] values) {
+    private SlotSnapshot(int[] slots, BexValue[] values, boolean[] initialized) {
         this.slots = slots;
         this.values = values;
+        this.initialized = initialized;
     }
 
     static SlotSnapshot capture(CompiledFrame frame, int... candidates) {
         List<Integer> slotList = new ArrayList<>();
         List<BexValue> valueList = new ArrayList<>();
+        List<Boolean> initializedList = new ArrayList<>();
         for (int slot : candidates) {
             if (slot >= 0 && !slotList.contains(slot)) {
                 slotList.add(slot);
+                initializedList.add(frame.isInitialized(slot));
                 valueList.add(frame.get(slot));
             }
         }
         int[] slots = new int[slotList.size()];
         BexValue[] values = new BexValue[valueList.size()];
+        boolean[] initialized = new boolean[initializedList.size()];
         for (int i = 0; i < slotList.size(); i++) {
             slots[i] = slotList.get(i);
             values[i] = valueList.get(i);
+            initialized[i] = initializedList.get(i);
         }
-        return new SlotSnapshot(slots, values);
+        return new SlotSnapshot(slots, values, initialized);
     }
 
     void restore(CompiledFrame frame) {
         for (int i = 0; i < slots.length; i++) {
-            frame.set(slots[i], values[i]);
+            if (initialized[i]) {
+                frame.set(slots[i], values[i]);
+            } else {
+                frame.clear(slots[i]);
+            }
         }
     }
 }
@@ -361,9 +393,11 @@ final class IncludesExpr extends Expr {
         }
         BexValue val = valExpr.eval(frame);
         for (int i = 0; i < list.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
             frame.runtime().metrics().incrementLoopIterations();
-            frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
-            if (BexValues.equal(list.get(String.valueOf(i)), val)) {
+            if (MeteredEquality.equal(
+                    frame, list.get(String.valueOf(i)), val)) {
                 return BexValues.scalar(true);
             }
         }
@@ -386,7 +420,9 @@ final class HasKeyExpr extends Expr {
         if (!object.isObject()) {
             return BexValues.scalar(false);
         }
-        return BexValues.scalar(!object.get(key.get(frame)).isUndefined());
+        String evaluatedKey = key.get(frame);
+        BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
+        return BexValues.scalar(!object.get(evaluatedKey).isUndefined());
     }
 }
 
@@ -403,24 +439,47 @@ final class ObjectFromEntriesExpr extends Expr {
         if (!entries.isList()) {
             throw new BexException("$objectFromEntries input must be a list");
         }
-        Map<String, BexValue> out = new LinkedHashMap<>();
+        Map<String, BexValue> retained = new LinkedHashMap<>();
         for (int i = 0; i < entries.size(); i++) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_VISITED);
+            BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
             frame.runtime().metrics().incrementLoopIterations();
-            frame.runtime().gas().charge(frame.runtime().gas().schedule().forEachItem);
             BexValue entry = entries.get(String.valueOf(i));
             if (!entry.isObject()) {
                 throw new BexException("$objectFromEntries entries must be objects");
             }
+            BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
             BexValue key = entry.get("key");
             if (key.isUndefined() || key.isNull()) {
                 throw new BexException("$objectFromEntries key cannot be null or undefined");
             }
+            BexGasWork.MeteredText convertedKey =
+                    BexGasWork.constructedText(frame, key);
+            String textKey = convertedKey.text();
+            BexGasWork.charge(frame, BexGasCounter.OBJECT_MEMBER_READ);
             BexValue val = entry.get("val");
             if (val.isUndefined()) {
-                out.remove(key.asText());
+                retained.remove(textKey);
             } else {
-                out.put(key.asText(), val);
+                retained.put(textKey, val);
             }
+        }
+        Map<String, BexValue> out = new LinkedHashMap<>();
+        for (String key : BexUnicodeOrder.sortedCopy(
+                retained.keySet(),
+                (left, right) -> {
+                    BexGasWork.charge(
+                            frame,
+                            BexGasCounter.SORT_COMPARISON);
+                    BexGasWork.charge(
+                            frame,
+                            BexGasCounter.COMPARISON_NODE_VISITED);
+                    return BexGasWork.compareText(
+                            frame, left, right);
+                })) {
+            BexGasWork.charge(frame, BexGasCounter.COLLECTION_ITEM_PRODUCED);
+            BexGasWork.charge(frame, BexGasCounter.TRANSIENT_OBJECT_MEMBER_PRODUCED);
+            out.put(key, retained.get(key));
         }
         return BexValues.map(out);
     }

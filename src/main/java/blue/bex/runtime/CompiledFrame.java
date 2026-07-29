@@ -1,5 +1,6 @@
 package blue.bex.runtime;
 
+import blue.bex.BexException;
 import blue.bex.BexSourcePath;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
@@ -31,6 +32,27 @@ public final class CompiledFrame {
         return value != null ? value : BexValues.undefined();
     }
 
+    /**
+     * Reads a declared slot and fails when its initializer has not completed.
+     */
+    public BexValue getRequired(int slot) {
+        BexValue value = slots[slot];
+        if (value != null) {
+            return value;
+        }
+        BexSourcePath path = sourcePath();
+        String message = "Binding is uninitialized";
+        throw path != null ? BexException.at(path, message) : new BexException(message);
+    }
+
+    public boolean isInitialized(int slot) {
+        return slots[slot] != null;
+    }
+
+    public void clear(int slot) {
+        slots[slot] = null;
+    }
+
     public void set(int slot, BexValue value) {
         slots[slot] = value != null ? value : BexValues.undefined();
     }
@@ -45,6 +67,10 @@ public final class CompiledFrame {
 
     public BexValue readEvent(List<String> precompiledSegments) {
         return runtime.readEvent(precompiledSegments);
+    }
+
+    public BexValue readProcessingEvent(List<String> precompiledSegments) {
+        return runtime.readProcessingEvent(precompiledSegments);
     }
 
     public BexValue readCurrentContract(List<String> precompiledSegments) {

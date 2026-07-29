@@ -1,5 +1,7 @@
 package blue.bex.value;
 
+import blue.bex.BexException;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
@@ -20,7 +22,12 @@ public final class BexSimpleWriter {
         if (value.isList()) {
             ArrayList<Object> out = new ArrayList<>();
             for (int i = 0; i < value.size(); i++) {
-                out.add(toSimple(value.get(String.valueOf(i))));
+                BexValue item = value.get(String.valueOf(i));
+                if (item == null || item.isUndefined()) {
+                    throw new BexException(
+                            "Sparse overlay list cannot be materialized as a dense BEX list");
+                }
+                out.add(toSimple(item));
             }
             return out;
         }

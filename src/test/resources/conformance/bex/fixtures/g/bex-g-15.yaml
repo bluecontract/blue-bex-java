@@ -1,0 +1,108 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-15
+vectors:
+- BEX-G-15
+category: g
+description: A finite but deliberately oversized iteration is bounded by live gas admission; the failing charge is absent and all buffered effects are discarded.
+program:
+  do:
+  - $forEach:
+      in:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
+      - 51
+      - 52
+      - 53
+      - 54
+      - 55
+      - 56
+      - 57
+      - 58
+      - 59
+      - 60
+      - 61
+      - 62
+      - 63
+      item: x
+      index: i
+      do:
+      - $appendEvent:
+          index:
+            $var: i
+          value:
+            $var: x
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  gasLimit: 40
+  parentRemainingGas: 40
+expected:
+  errorClass: gas-limit-exceeded
+  changes: []
+  events: []
+  assertions:
+  - actual: gas.failedChargePresent
+    op: equals
+    expected: false
+  - actual: gas.totalAdmitted
+    op: lessThan
+    expected: 41
+  - actual: gas.trace
+    op: present
+  - actual: runtime.bufferedEffectsCommitted
+    op: equals
+    expected: false

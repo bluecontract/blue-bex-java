@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-changeset
+vectors:
+- BEX-S-05
+category: operator
+description: Direct executable coverage for `$changeset`.
+program:
+  do:
+  - $appendChange:
+      op: add
+      path: /a
+      val: 1
+  - $return:
+      $changeset: null
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - op: add
+    path: /a
+    val: 1
+  changes:
+  - op: add
+    path: /a
+    val: 1
+  assertions: []

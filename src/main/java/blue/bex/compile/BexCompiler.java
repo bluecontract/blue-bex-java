@@ -7,6 +7,7 @@ import blue.bex.runtime.CompileScope;
 import blue.bex.runtime.CompiledExpression;
 import blue.bex.runtime.CompiledStatement;
 import blue.bex.value.BexValue;
+import blue.bex.value.BexUnicodeOrder;
 import blue.bex.value.BexValues;
 import blue.bex.result.BexMetrics;
 import blue.language.model.Node;
@@ -21,6 +22,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static blue.language.utils.Properties.BOOLEAN_TYPE_BLUE_ID;
+import static blue.language.utils.Properties.DOUBLE_TYPE_BLUE_ID;
+import static blue.language.utils.Properties.INTEGER_TYPE_BLUE_ID;
+import static blue.language.utils.Properties.TEXT_TYPE_BLUE_ID;
 
 /**
  * Compiler from frozen BEX Blue data to specialized runtime objects.
@@ -46,6 +52,7 @@ public final class BexCompiler {
     }
 
     public BexCompiledProgram compile(blue.bex.api.BexProgramSource source) {
+        requiredIntrinsicBlueIds.clear();
         FrozenNode step = source.programNode();
         FrozenNode definition = source.definitionNode().orElse(null);
         if (source.isExpression()) {
@@ -67,28 +74,38 @@ public final class BexCompiler {
             return new BexCompiledProgram(root, Collections.emptyMap(), constants, scope.frameSize(),
                     BexNodeIdentity.safeBlueId(step), requiredIntrinsicBlueIds);
         }
+        requireProgramNode(step, "program");
+        if (definition != null) {
+            requireProgramNode(definition, "definition");
+        }
 
         Map<String, BexValue> loadedConstants = new LinkedHashMap<>();
-        loadConstants(loadedConstants, prop(definition, "constants"));
-        loadConstants(loadedConstants, prop(step, "constants"));
+        loadConstants(loadedConstants, explicitProp(definition, "constants"));
+        loadConstants(loadedConstants, explicitProp(step, "constants"));
         constants = Collections.unmodifiableMap(new LinkedHashMap<>(loadedConstants));
 
         Map<String, FrozenNode> functionNodes = new LinkedHashMap<>();
-        loadFunctions(functionNodes, prop(definition, "functions"));
-        loadFunctions(functionNodes, prop(step, "functions"));
+        loadFunctions(functionNodes, explicitProp(definition, "functions"));
+        loadFunctions(functionNodes, explicitProp(step, "functions"));
         rejectRecursion(functionNodes);
         functionSignatures = compileFunctionSignatures(functionNodes);
 
         Map<String, BexCompiledProgram.CompiledFunction> compiledFunctions = new LinkedHashMap<>();
-        for (String name : functionNodes.keySet()) {
+        for (String name : BexUnicodeOrder.sortedCopy(functionNodes.keySet())) {
             compiledFunctions.put(name, compileFunction(name, functionNodes.get(name), functionSignatures.get(name)));
         }
 
-        FrozenNode stepExpr = meaningful(prop(step, "expr"));
-        String entryName = source.entry().orElse(text(meaningful(prop(step, "entry"))));
+        boolean hasStepEntry = hasExplicitProperty(step, "entry");
+        boolean hasStepExpr = hasExplicitProperty(step, "expr");
+        boolean hasStepDo = hasExplicitProperty(step, "do");
+        String entryName = source.entry().isPresent()
+                ? requiredNonEmptyText(scalarNode(source.entry().get()), "entry")
+                : hasStepEntry
+                ? requiredNonEmptyText(explicitProp(step, "entry"), "entry")
+                : null;
         BexCompiledProgram.CompiledFunction root;
         int rootFrameSize = 0;
-        if (entryName != null && !entryName.isEmpty()) {
+        if (entryName != null) {
             BexCompiledProgram.CompiledFunction entry = compiledFunctions.get(entryName);
             if (entry == null) {
                 throw new BexException("Unknown entry function: " + entryName);
@@ -99,19 +116,25 @@ public final class BexCompiler {
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(),
                     Collections.singletonList(sourceStatement("$root", "/entry", "$return",
                             new ReturnStatement(sourceExpr("$root", "/entry/$call", "$call",
-                                    new CallExpr(entryName, new int[0], new CompiledExpression[0]))))),
+                            new CallExpr(entryName, new int[0], new CompiledExpression[0]))))),
                     null, 0);
-        } else if (stepExpr != null) {
+            validateUnselectedRoot(step, hasStepExpr, hasStepDo);
+        } else if (hasStepExpr) {
             currentFunction = "$root";
             CompileScope scope = new CompileScope();
-            CompiledExpression expression = compileExpr(stepExpr, scope, "/expr");
+            CompiledExpression expression = compileExpr(explicitProp(step, "expr"), scope, "/expr");
             rootFrameSize = scope.frameSize();
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(),
                     Collections.<CompiledStatement>emptyList(), expression, rootFrameSize);
+            if (hasStepDo) {
+                validateRootStatements(explicitProp(step, "do"));
+            }
         } else {
             CompileScope scope = new CompileScope();
             currentFunction = "$root";
-            List<CompiledStatement> statements = compileStatements(meaningful(prop(step, "do")), scope, "/do");
+            List<CompiledStatement> statements = hasStepDo
+                    ? compileStatements(explicitProp(step, "do"), scope, "/do")
+                    : Collections.<CompiledStatement>emptyList();
             rootFrameSize = scope.frameSize();
             root = new BexCompiledProgram.CompiledFunction("$root", Collections.<BexCompiledProgram.ArgSpec>emptyList(), statements, null, rootFrameSize);
         }
@@ -123,6 +146,29 @@ public final class BexCompiler {
     private BexCompiledProgram.CompiledFunction compileFunction(String name, FrozenNode functionNode, FunctionSignature signature) {
         String previousFunction = currentFunction;
         currentFunction = name;
+        try {
+            CompileScope scope = functionScope(name, signature);
+            String basePointer = "/functions/" + escape(name);
+            boolean hasExpression = hasExplicitProperty(functionNode, "expr");
+            boolean hasStatements = hasExplicitProperty(functionNode, "do");
+            CompiledExpression expression = hasExpression
+                    ? compileExpr(explicitProp(functionNode, "expr"), scope, basePointer + "/expr")
+                    : null;
+            List<CompiledStatement> statements = !hasExpression && hasStatements
+                    ? compileStatements(explicitProp(functionNode, "do"), scope, basePointer + "/do")
+                    : Collections.<CompiledStatement>emptyList();
+            if (hasExpression && hasStatements) {
+                CompileScope validationScope = functionScope(name, signature);
+                compileStatements(explicitProp(functionNode, "do"), validationScope, basePointer + "/do");
+            }
+            return new BexCompiledProgram.CompiledFunction(name, signature.args(),
+                    statements, expression, scope.frameSize());
+        } finally {
+            currentFunction = previousFunction;
+        }
+    }
+
+    private CompileScope functionScope(String name, FunctionSignature signature) {
         CompileScope scope = new CompileScope();
         for (BexCompiledProgram.ArgSpec arg : signature.args()) {
             int slot = scope.declareOrGetSlot(arg.name());
@@ -130,25 +176,34 @@ public final class BexCompiler {
                 throw new BexException("Internal function arg slot mismatch for " + name + "." + arg.name());
             }
         }
-        FrozenNode functionExpr = meaningful(prop(functionNode, "expr"));
-        CompiledExpression expression = functionExpr != null ? compileExpr(functionExpr, scope, "/functions/" + escape(name) + "/expr") : null;
-        List<CompiledStatement> statements = expression == null
-                ? compileStatements(meaningful(prop(functionNode, "do")), scope, "/functions/" + escape(name) + "/do")
-                : Collections.<CompiledStatement>emptyList();
-        currentFunction = previousFunction;
-        return new BexCompiledProgram.CompiledFunction(name, signature.args(),
-                statements, expression, scope.frameSize());
+        return scope;
+    }
+
+    private void validateUnselectedRoot(FrozenNode step, boolean hasExpression, boolean hasStatements) {
+        if (hasExpression) {
+            currentFunction = "$root";
+            compileExpr(explicitProp(step, "expr"), new CompileScope(), "/expr");
+        }
+        if (hasStatements) {
+            validateRootStatements(explicitProp(step, "do"));
+        }
+    }
+
+    private void validateRootStatements(FrozenNode statements) {
+        currentFunction = "$root";
+        compileStatements(statements, new CompileScope(), "/do");
     }
 
     private Map<String, FunctionSignature> compileFunctionSignatures(Map<String, FrozenNode> functionNodes) {
         Map<String, FunctionSignature> signatures = new LinkedHashMap<>();
-        for (Map.Entry<String, FrozenNode> entry : functionNodes.entrySet()) {
-            signatures.put(entry.getKey(), compileFunctionSignature(entry.getKey(), entry.getValue()));
+        for (String name : BexUnicodeOrder.sortedCopy(functionNodes.keySet())) {
+            signatures.put(name, compileFunctionSignature(name, functionNodes.get(name)));
         }
         return signatures;
     }
 
     private FunctionSignature compileFunctionSignature(String name, FrozenNode functionNode) {
+        requireObjectBody(functionNode, "Function " + name, "args", "expr", "do");
         List<String> names = new ArrayList<>();
         FrozenNode argsNode = prop(functionNode, "args");
         if (argsNode != null) {
@@ -159,7 +214,7 @@ public final class BexCompiler {
                 }
             } else {
                 names.addAll(argsNode.getProperties().keySet());
-                Collections.sort(names);
+                Collections.sort(names, BexUnicodeOrder.CODE_POINT_COMPARATOR);
             }
         }
         List<BexCompiledProgram.ArgSpec> args = new ArrayList<>();
@@ -180,8 +235,10 @@ public final class BexCompiler {
         if (node == null || node.getProperties() == null) {
             return;
         }
-        for (Map.Entry<String, FrozenNode> entry : node.getProperties().entrySet()) {
-            constants.put(entry.getKey(), BexValues.frozen(entry.getValue()));
+        for (String name : BexUnicodeOrder.sortedCopy(node.getProperties().keySet())) {
+            FrozenNode value = node.getProperties().get(name);
+            rejectBexInStaticBlueDefinitionFields(value, "/constants/" + escape(name));
+            constants.put(name, BexValues.frozen(value));
         }
     }
 
@@ -190,40 +247,84 @@ public final class BexCompiler {
         if (node == null || node.getProperties() == null) {
             return;
         }
-        functions.putAll(node.getProperties());
+        for (String name : BexUnicodeOrder.sortedCopy(node.getProperties().keySet())) {
+            functions.put(name, node.getProperties().get(name));
+        }
     }
 
     private void rejectRecursion(Map<String, FrozenNode> functions) {
-        Map<String, Set<String>> calls = new LinkedHashMap<>();
-        for (String name : functions.keySet()) {
-            Set<String> targets = new LinkedHashSet<>();
+        Map<String, List<CallSite>> calls = new LinkedHashMap<>();
+        for (String name : BexUnicodeOrder.sortedCopy(functions.keySet())) {
+            List<CallSite> targets = new ArrayList<>();
             FrozenNode function = functions.get(name);
-            collectCalls(meaningful(prop(function, "expr")), targets);
-            collectCalls(meaningful(prop(function, "do")), targets);
+            String base = "/functions/" + escape(name);
+            if (hasExplicitProperty(function, "expr")) {
+                collectCalls(explicitProp(function, "expr"), name, base + "/expr", targets);
+            }
+            if (hasExplicitProperty(function, "do")) {
+                collectCalls(explicitProp(function, "do"), name, base + "/do", targets);
+            }
             calls.put(name, targets);
         }
+        Map<String, VisitState> states = new LinkedHashMap<>();
         for (String name : calls.keySet()) {
-            detectCycle(name, name, calls, new ArrayDeque<String>());
+            states.put(name, VisitState.UNVISITED);
+        }
+        ArrayDeque<String> stack = new ArrayDeque<>();
+        for (String name : calls.keySet()) {
+            if (states.get(name) == VisitState.UNVISITED) {
+                detectCycle(name, calls, states, stack);
+            }
         }
     }
 
-    private void detectCycle(String root, String current, Map<String, Set<String>> calls, ArrayDeque<String> stack) {
-        if (stack.contains(current)) {
-            throw new BexException("Recursive BEX function call rejected: " + current);
-        }
-        stack.push(current);
-        for (String next : calls.get(current)) {
-            if (root.equals(next)) {
-                throw new BexException("Recursive BEX function call rejected: " + root);
+    private void detectCycle(String current,
+                             Map<String, List<CallSite>> calls,
+                             Map<String, VisitState> states,
+                             ArrayDeque<String> stack) {
+        states.put(current, VisitState.VISITING);
+        stack.addLast(current);
+        List<CallSite> edges = new ArrayList<>(calls.get(current));
+        Collections.sort(edges, (left, right) -> {
+            int byTarget = BexUnicodeOrder.compareCodePoints(left.target, right.target);
+            return byTarget != 0
+                    ? byTarget
+                    : BexUnicodeOrder.compareCodePoints(left.sourcePath.pointer(), right.sourcePath.pointer());
+        });
+        for (CallSite edge : edges) {
+            if (!calls.containsKey(edge.target)) {
+                continue;
             }
-            if (calls.containsKey(next)) {
-                detectCycle(root, next, calls, stack);
+            VisitState state = states.get(edge.target);
+            if (state == VisitState.VISITING) {
+                throw BexException.at(edge.sourcePath,
+                        "Compile error reason=recursive-call-graph: recursive BEX function cycle "
+                                + cycleText(stack, edge.target));
+            }
+            if (state == VisitState.UNVISITED) {
+                detectCycle(edge.target, calls, states, stack);
             }
         }
-        stack.pop();
+        stack.removeLast();
+        states.put(current, VisitState.VISITED);
     }
 
-    private void collectCalls(FrozenNode node, Set<String> calls) {
+    private String cycleText(ArrayDeque<String> stack, String target) {
+        List<String> cycle = new ArrayList<>();
+        boolean append = false;
+        for (String name : stack) {
+            if (name.equals(target)) {
+                append = true;
+            }
+            if (append) {
+                cycle.add(name);
+            }
+        }
+        cycle.add(target);
+        return String.join(" -> ", cycle);
+    }
+
+    private void collectCalls(FrozenNode node, String functionName, String pointer, List<CallSite> calls) {
         if (node == null) {
             return;
         }
@@ -231,24 +332,39 @@ public final class BexCompiler {
             return;
         }
         if (isOperator(node, "$is")) {
-            collectCalls(prop(onlyValue(node), "node"), calls);
+            collectCalls(prop(onlyValue(node), "node"), functionName,
+                    pointer + "/$is/node", calls);
+            return;
+        }
+        if (isOperator(node, "$fail")) {
+            FrozenNode body = onlyValue(node);
+            boolean messageWrapper = body != null
+                    && body.getProperties() != null
+                    && hasExplicitProperty(body, "message");
+            collectCalls(messageWrapper ? explicitProp(body, "message") : body,
+                    functionName,
+                    messageWrapper ? pointer + "/$fail/message" : pointer + "/$fail",
+                    calls);
             return;
         }
         if (isOperator(node, "$call")) {
             FrozenNode body = onlyValue(node);
             String function = text(prop(body, "function"));
             if (function != null) {
-                calls.add(function);
+                calls.add(new CallSite(function,
+                        BexSourcePath.of(functionName, pointer + "/$call", "$call")));
             }
         }
         if (node.getProperties() != null) {
-            for (FrozenNode child : node.getProperties().values()) {
-                collectCalls(child, calls);
+            for (String key : BexUnicodeOrder.sortedCopy(node.getProperties().keySet())) {
+                collectCalls(node.getProperties().get(key), functionName,
+                        pointer + "/" + escape(key), calls);
             }
         }
         if (node.getItems() != null) {
-            for (FrozenNode child : node.getItems()) {
-                collectCalls(child, calls);
+            for (int i = 0; i < node.getItems().size(); i++) {
+                collectCalls(node.getItems().get(i), functionName,
+                        pointer + "/" + i, calls);
             }
         }
     }
@@ -258,7 +374,8 @@ public final class BexCompiler {
             return Collections.emptyList();
         }
         if (node.getItems() == null) {
-            throw new BexException("Statement body must be a list");
+            throw BexException.at(BexSourcePath.of(currentFunction, pointer, null),
+                    "Compile error: statement body must be a list");
         }
         List<CompiledStatement> statements = new ArrayList<>();
         for (int i = 0; i < node.getItems().size(); i++) {
@@ -270,10 +387,12 @@ public final class BexCompiler {
 
     private CompiledStatement compileStatement(FrozenNode statement, CompileScope scope, String pointer) {
         if (isEmptyStatement(statement, pointer)) {
-            return sourceStatement(currentFunction, pointer, "$return", new ReturnStatement(null));
+            throw BexException.at(BexSourcePath.of(currentFunction, pointer, null),
+                    "Compile error: null or empty statement item");
         }
         if (statement.getProperties() == null) {
-            throw new BexException("Statement must be an operator object at " + pointer);
+            throw BexException.at(BexSourcePath.of(currentFunction, pointer, null),
+                    "Compile error: statement must be an operator object");
         }
         int count = 0;
         String op = null;
@@ -285,12 +404,21 @@ public final class BexCompiler {
                 body = entry.getValue();
             }
         }
-        if (count != 1 || statement.getProperties().size() != 1) {
-            throw new BexException("Statement must have exactly one $ operator at " + pointer);
+        if (count != 1
+                || statement.getProperties().size() != 1
+                || authoredFieldNames(statement).size() != 1) {
+            throw BexException.at(BexSourcePath.of(currentFunction, pointer, null),
+                    "Compile error: statement must have exactly one $ operator");
         }
         String bodyPointer = pointer + "/" + escape(op);
-        CompiledStatement compiled;
-        if ("$let".equals(op)) {
+        BexSourcePath sourcePath = BexSourcePath.of(currentFunction, bodyPointer, op);
+        try {
+            if ("$empty".equals(op)) {
+                throw new BexException("Compile error: $empty placeholder is not a BEX statement");
+            }
+            validateStatementBody(op, body);
+            CompiledStatement compiled;
+            if ("$let".equals(op)) {
             if (prop(body, "vars") != null) {
                 compiled = compileMultiLet(body, scope, bodyPointer);
             } else {
@@ -311,10 +439,12 @@ public final class BexCompiler {
             String keyName = prop(body, "key") != null ? requiredText(prop(body, "key"), "$forEach.key") : null;
             String indexName = prop(body, "index") != null ? requiredText(prop(body, "index"), "$forEach.index") : null;
             validateDistinctForEachBindings(itemName, keyName, indexName);
+            CompiledExpression input = compileExpr(required(prop(body, "in"), "$forEach.in"),
+                    scope, bodyPointer + "/in");
             int slot = scope.declareOrGetSlot(itemName);
             int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
             int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
-            compiled = new ForEachStatement(compileExpr(required(prop(body, "in"), "$forEach.in"), scope, bodyPointer + "/in"),
+            compiled = new ForEachStatement(input,
                     slot, keySlot, indexSlot, compileStatements(prop(body, "do"), scope, bodyPointer + "/do"));
         } else if ("$appendChange".equals(op)) {
             compiled = new AppendChangeStatement(textOrExpr(required(prop(body, "op"), "$appendChange.op"), scope, null, bodyPointer + "/op"),
@@ -340,10 +470,11 @@ public final class BexCompiler {
             }
             compiled = new ReturnIfStatement(
                     compileExpr(required(prop(body, "cond"), "$returnIf.cond"), scope, bodyPointer + "/cond"),
-                    prop(body, "expr") != null ? compileExpr(prop(body, "expr"), scope, bodyPointer + "/expr") : null);
+                    hasExplicitProperty(body, "expr")
+                            ? compileExpr(explicitProp(body, "expr"), scope, bodyPointer + "/expr")
+                            : null);
         } else if ("$fail".equals(op)) {
-            FrozenNode message = body != null && body.getProperties() != null ? prop(body, "message") : body;
-            compiled = new FailStatement(compileExpr(message, scope, bodyPointer + "/message"));
+            compiled = new FailStatement(failMessageExpr(body, scope, bodyPointer));
         } else if ("$failIf".equals(op)) {
             compiled = new FailIfStatement(
                     compileExpr(required(prop(body, "cond"), "$failIf.cond"), scope, bodyPointer + "/cond"),
@@ -351,7 +482,10 @@ public final class BexCompiler {
         } else {
             throw new BexException("Unknown statement operator: " + op);
         }
-        return sourceStatement(currentFunction, bodyPointer, op, compiled);
+            return new SourceStatement(sourcePath, compiled);
+        } catch (BexException ex) {
+            throw ex.withSourcePath(sourcePath);
+        }
     }
 
     private CompiledStatement compileMultiLet(FrozenNode body, CompileScope scope, String pointer) {
@@ -368,7 +502,7 @@ public final class BexCompiler {
         if (sequential) {
             names = orderedLetNames(prop(body, "order"), varsNode, pointer + "/order");
         } else {
-            Collections.sort(names);
+            Collections.sort(names, BexUnicodeOrder.CODE_POINT_COMPARATOR);
         }
 
         int[] slots = new int[names.size()];
@@ -381,12 +515,12 @@ public final class BexCompiler {
                 slots[i] = scope.declareOrGetSlot(name);
             }
         } else {
+            for (int i = 0; i < names.size(); i++) {
+                slots[i] = scope.declareOrGetSlot(names.get(i));
+            }
             for (String name : names) {
                 expressions.add(compileExpr(varsNode.getProperties().get(name), scope,
                         pointer + "/vars/" + escape(name)));
-            }
-            for (int i = 0; i < names.size(); i++) {
-                slots[i] = scope.declareOrGetSlot(names.get(i));
             }
         }
         return new MultiLetStatement(slots, expressions.toArray(new CompiledExpression[0]), sequential);
@@ -419,35 +553,7 @@ public final class BexCompiler {
     }
 
     private boolean isEmptyStatement(FrozenNode statement, String pointer) {
-        if (statement == null || statement.isEmptyNode()) {
-            return true;
-        }
-        if (statement.getProperties() == null || !statement.getProperties().containsKey("$empty")) {
-            return false;
-        }
-        if (statement.getProperties().size() == 1
-                && !hasLanguageFields(statement)
-                && statement.getItems() == null
-                && (statement.getValue() == null || Boolean.TRUE.equals(statement.getValue()))
-                && statement.getPreviousBlueId() == null
-                && statement.getPosition() == null
-                && isEmptyMarkerValue(statement.getProperties().get("$empty"))) {
-            return true;
-        }
-        throw new BexException("Statement $empty placeholder must be exactly $empty: true at " + pointer);
-    }
-
-    private boolean isEmptyMarkerValue(FrozenNode node) {
-        return node != null && (node.isEmptyNode() || isTrueScalar(node));
-    }
-
-    private boolean isTrueScalar(FrozenNode node) {
-        return node != null
-                && Boolean.TRUE.equals(node.getValue())
-                && node.getProperties() == null
-                && node.getItems() == null
-                && node.getPreviousBlueId() == null
-                && node.getPosition() == null;
+        return statement == null || statement.isEmptyNode();
     }
 
     private CompiledExpression compileExpr(FrozenNode node, CompileScope scope, String pointer) {
@@ -455,20 +561,22 @@ public final class BexCompiler {
             return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.nullValue()));
         }
         rejectBexInStaticBlueDefinitionFields(node, pointer);
-        if (!containsCache.containsBex(node, metrics)) {
-            return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.frozen(node)));
-        }
-        if (node.getProperties() != null && node.getProperties().size() == 1) {
+        if (isExpressionOperatorShape(node)) {
             String op = node.getProperties().keySet().iterator().next();
             FrozenNode body = node.getProperties().values().iterator().next();
-            if (op.startsWith("$")) {
-                BexSourcePath sourcePath = BexSourcePath.of(currentFunction, pointer + "/" + escape(op), op);
-                try {
-                    return new SourceExpr(sourcePath, compileOperator(op, body, scope, pointer + "/" + escape(op)));
-                } catch (BexException ex) {
-                    throw ex.withSourcePath(sourcePath);
-                }
+            BexSourcePath sourcePath = BexSourcePath.of(currentFunction, pointer + "/" + escape(op), op);
+            try {
+                return new SourceExpr(sourcePath, compileOperator(op, body, scope, pointer + "/" + escape(op)));
+            } catch (BexException ex) {
+                throw ex.withSourcePath(sourcePath);
             }
+        }
+        if (node.isEmptyNode()) {
+            return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.nullValue()));
+        }
+        if (isScalarNode(node)) {
+            return sourceExpr(currentFunction, pointer, null,
+                    new TransientLiteralExpr(node.getValue()));
         }
         if (node.getItems() != null && !hasLanguageFields(node)) {
             List<CompiledExpression> items = new ArrayList<>();
@@ -488,16 +596,19 @@ public final class BexCompiler {
                 fields.put("items", new ListExpr(items));
             }
             if (node.getProperties() != null) {
-                for (Map.Entry<String, FrozenNode> entry : node.getProperties().entrySet()) {
-                    fields.put(entry.getKey(), compileExpr(entry.getValue(), scope, pointer + "/" + escape(entry.getKey())));
+                for (String key : BexUnicodeOrder.sortedCopy(node.getProperties().keySet())) {
+                    fields.put(key, compileExpr(node.getProperties().get(key), scope,
+                            pointer + "/" + escape(key)));
                 }
             }
             return sourceExpr(currentFunction, pointer, null, new ObjectExpr(fields));
         }
-        return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.frozen(node)));
+        return sourceExpr(currentFunction, pointer, null,
+                new TransientLiteralExpr(node.getValue()));
     }
 
     private CompiledExpression compileOperator(String op, FrozenNode body, CompileScope scope, String pointer) {
+        validateExpressionBody(op, body);
         if ("$literal".equals(op)) return new LiteralExpr(BexValues.frozen(body));
         if ("$null".equals(op)) return new LiteralExpr(BexValues.nullValue());
         if ("$emptyObject".equals(op)) return new LiteralExpr(BexValues.map(Collections.<String, BexValue>emptyMap()));
@@ -505,6 +616,7 @@ public final class BexCompiler {
         if ("$document".equals(op)) return documentExpr(body, scope, pointer);
         if ("$binding".equals(op)) return bindingExpr(body, scope, pointer);
         if ("$event".equals(op)) return contextPointerExpr(body, scope, ContextKind.EVENT, pointer);
+        if ("$processingEvent".equals(op)) return contextPointerExpr(body, scope, ContextKind.PROCESSING_EVENT, pointer);
         if ("$steps".equals(op)) return stepsExpr(body, scope, pointer);
         if ("$currentContract".equals(op)) return contextPointerExpr(body, scope, ContextKind.CURRENT_CONTRACT, pointer);
         if ("$var".equals(op)) return varExpr(body, scope, pointer);
@@ -547,6 +659,7 @@ public final class BexCompiler {
         if ("$exists".equals(op)) return new UnaryExpr(compileExpr(body, scope, pointer), UnaryOp.EXISTS);
         if ("$kind".equals(op)) return new KindExpr(compileExpr(body, scope, pointer));
         if ("$isKind".equals(op)) return new IsKindExpr(compileExpr(required(prop(body, "val"), "$isKind.val"), scope, pointer + "/val"), kindSet(required(prop(body, "kind"), "$isKind.kind")));
+        if ("$nodeBlueId".equals(op)) return new NodeBlueIdExpr(compileExpr(body, scope, pointer));
         if ("$coalesce".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$default".equals(op)) return new CoalesceExpr(compileExprList(body, scope, pointer));
         if ("$add".equals(op)) return new NumericExpr(compileExprList(body, scope, pointer), NumericOp.ADD);
@@ -575,9 +688,256 @@ public final class BexCompiler {
                 textOrExpr(required(prop(body, "key"), "$hasKey.key"), scope, null, pointer + "/key"));
         if ("$objectFromEntries".equals(op)) return new ObjectFromEntriesExpr(compileExpr(body, scope, pointer));
         if ("$intrinsic".equals(op)) return intrinsicExpr(body, scope, pointer);
+        if ("$fail".equals(op)) return new FailExpr(failMessageExpr(body, scope, pointer));
         if ("$choose".equals(op)) return new ChooseExpr(compileExpr(required(prop(body, "cond"), "$choose.cond"), scope, pointer + "/cond"), compileExpr(required(prop(body, "then"), "$choose.then"), scope, pointer + "/then"), prop(body, "else") != null ? compileExpr(prop(body, "else"), scope, pointer + "/else") : new LiteralExpr(BexValues.undefined()));
         if ("$call".equals(op)) return compileCall(body, scope, pointer);
         throw new BexException("Unknown expression operator: " + op);
+    }
+
+    private CompiledExpression failMessageExpr(FrozenNode body,
+                                               CompileScope scope,
+                                               String pointer) {
+        boolean messageWrapper = body != null
+                && body.getProperties() != null
+                && hasExplicitProperty(body, "message");
+        return compileExpr(messageWrapper ? explicitProp(body, "message") : body,
+                scope,
+                messageWrapper ? pointer + "/message" : pointer);
+    }
+
+    private void validateExpressionBody(String op, FrozenNode body) {
+        if ("$concat".equals(op)
+                || "$pointerJoin".equals(op)
+                || "$listConcat".equals(op)
+                || "$merge".equals(op)
+                || "$and".equals(op)
+                || "$or".equals(op)
+                || "$coalesce".equals(op)
+                || "$default".equals(op)) {
+            requireListBody(body, op);
+            return;
+        }
+        if ("$eq".equals(op)
+                || "$ne".equals(op)
+                || "$gt".equals(op)
+                || "$gte".equals(op)
+                || "$lt".equals(op)
+                || "$lte".equals(op)
+                || "$startsWith".equals(op)
+                || "$sliceAfter".equals(op)) {
+            requireListArity(body, op, 2);
+            return;
+        }
+        if ("$add".equals(op)
+                || "$subtract".equals(op)
+                || "$multiply".equals(op)
+                || "$divide".equals(op)) {
+            requireListBody(body, op);
+            if (body.getItems().isEmpty()) {
+                throw new BexException(op + " requires at least one operand");
+            }
+            return;
+        }
+        if ("$get".equals(op)) {
+            requireObjectBody(body, op, "object", "key");
+        } else if ("$is".equals(op)) {
+            requireObjectBody(body, op, "node", "pattern");
+        } else if ("$isKind".equals(op)) {
+            requireObjectBody(body, op, "val", "kind");
+        } else if ("$join".equals(op)) {
+            requireObjectBody(body, op, "list", "separator");
+        } else if ("$split".equals(op)) {
+            requireObjectBody(body, op, "text", "separator", "limit");
+        } else if ("$listGet".equals(op)) {
+            requireObjectBody(body, op, "list", "index", "default");
+        } else if ("$objectSet".equals(op)) {
+            requireObjectBody(body, op, "object", "key", "val");
+        } else if ("$pointerGet".equals(op)) {
+            requireObjectBody(body, op, "object", "path", "default");
+        } else if ("$pointerSet".equals(op)) {
+            requireObjectBody(body, op, "object", "path", "op", "val");
+        } else if ("$map".equals(op) || "$flatMap".equals(op)) {
+            requireObjectBody(body, op, "in", "item", "key", "index", "expr");
+        } else if ("$filter".equals(op)
+                || "$some".equals(op)
+                || "$find".equals(op)
+                || "$findEntry".equals(op)) {
+            requireObjectBody(body, op, "in", "item", "key", "index", "where");
+        } else if ("$reduce".equals(op)) {
+            requireObjectBody(body, op, "in", "acc", "init", "item", "key", "index", "expr");
+        } else if ("$includes".equals(op)) {
+            requireObjectBody(body, op, "list", "val");
+        } else if ("$hasKey".equals(op)) {
+            requireObjectBody(body, op, "object", "key");
+        } else if ("$choose".equals(op)) {
+            requireObjectBody(body, op, "cond", "then", "else");
+        } else if ("$call".equals(op)) {
+            requireObjectBody(body, op, "function", "args");
+        } else if ("$intrinsic".equals(op)) {
+            requireObjectNode(body, op);
+        } else if ("$binding".equals(op)) {
+            if (!isScalarBody(body)) {
+                requireObjectBody(body, op, "name", "path");
+            }
+        } else if ("$steps".equals(op)) {
+            if (!isScalarBody(body)) {
+                requireObjectBody(body, op, "step", "path");
+            }
+        } else if ("$var".equals(op) || "$const".equals(op)) {
+            if (!isScalarBody(body)) {
+                requireObjectBody(body, op, "name", "path");
+            }
+        } else if ("$document".equals(op)
+                && body != null
+                && hasAuthoredField(body, "path")
+                && !isExpressionOperatorShape(body)) {
+            requireObjectBody(body, op, "path", "view");
+        }
+    }
+
+    private void validateStatementBody(String op, FrozenNode body) {
+        if ("$let".equals(op)) {
+            requireObjectBody(body, op, "name", "expr", "vars", "order");
+            boolean multi = hasAuthoredField(body, "vars");
+            if (multi && (hasAuthoredField(body, "name") || hasAuthoredField(body, "expr"))) {
+                throw new BexException("$let must use either name/expr or vars/order form");
+            }
+            if (!multi && (!hasAuthoredField(body, "name") || !hasAuthoredField(body, "expr"))) {
+                throw new BexException("$let single-binding form requires name and expr");
+            }
+        } else if ("$set".equals(op)) {
+            requireObjectBody(body, op, "name", "expr");
+        } else if ("$if".equals(op)) {
+            requireObjectBody(body, op, "cond", "then", "else");
+        } else if ("$forEach".equals(op)) {
+            requireObjectBody(body, op, "in", "item", "key", "index", "do");
+            if (!hasAuthoredField(body, "do")) {
+                throw new BexException("$forEach.do is required");
+            }
+        } else if ("$appendChange".equals(op)) {
+            requireObjectBody(body, op, "op", "path", "val");
+        } else if ("$call".equals(op)) {
+            requireObjectBody(body, op, "function", "args");
+        } else if ("$returnIf".equals(op)) {
+            requireObjectBody(body, op, "cond", "expr");
+        } else if ("$failIf".equals(op)) {
+            requireObjectBody(body, op, "cond", "message");
+        }
+    }
+
+    private void requireListBody(FrozenNode body, String op) {
+        if (body == null || body.getItems() == null || hasNonListPayload(body)) {
+            throw new BexException(op + " expects a list body");
+        }
+    }
+
+    private void requireListArity(FrozenNode body, String op, int expected) {
+        requireListBody(body, op);
+        if (body.getItems().size() != expected) {
+            throw new BexException(op + " expects exactly " + expected + " operands");
+        }
+    }
+
+    private void requireObjectBody(FrozenNode body, String op, String... allowedFields) {
+        requireObjectNode(body, op);
+        Set<String> allowed = new LinkedHashSet<>();
+        Collections.addAll(allowed, allowedFields);
+        for (String field : authoredFieldNames(body)) {
+            if (!allowed.contains(field)) {
+                throw new BexException(op + " has unknown body field: " + field);
+            }
+        }
+    }
+
+    private void requireObjectNode(FrozenNode body, String op) {
+        if (body == null
+                || body.getItems() != null
+                || body.getValue() != null
+                || body.getReferenceBlueId() != null
+                || body.getPreviousBlueId() != null
+                || body.getPosition() != null) {
+            throw new BexException(op + " expects an object body");
+        }
+    }
+
+    private void requireProgramNode(FrozenNode node, String label) {
+        if (node == null
+                || node.getValue() != null
+                || node.getItems() != null
+                || node.getReferenceBlueId() != null
+                || node.getPreviousBlueId() != null
+                || node.getPosition() != null) {
+            throw new BexException("BEX " + label + " must be an object node");
+        }
+    }
+
+    private boolean hasNonListPayload(FrozenNode node) {
+        return node.getValue() != null
+                || node.getProperties() != null
+                || hasLanguageFields(node)
+                || node.getPreviousBlueId() != null
+                || node.getPosition() != null;
+    }
+
+    private boolean isScalarBody(FrozenNode body) {
+        return isScalarNode(body);
+    }
+
+    /**
+     * Blue preprocessing adds an exact core-type reference to an authored
+     * scalar. That inferred metadata is part of the scalar representation, not
+     * a BEX object literal field. Keep the exception deliberately narrow:
+     * computed or additional Blue metadata must still compile as an object.
+     */
+    private boolean isScalarNode(FrozenNode node) {
+        if (node == null
+                || node.getValue() == null
+                || node.getItems() != null
+                || node.getProperties() != null
+                || node.getName() != null
+                || node.getDescription() != null
+                || node.getItemType() != null
+                || node.getKeyType() != null
+                || node.getValueType() != null
+                || node.getReferenceBlueId() != null
+                || node.getBlue() != null
+                || node.getContracts() != null
+                || node.getSchema() != null
+                || node.getMergePolicy() != null
+                || node.getPreviousBlueId() != null
+                || node.getPosition() != null) {
+            return false;
+        }
+        FrozenNode type = node.getType();
+        if (type == null) {
+            return true;
+        }
+        String expectedTypeBlueId = scalarTypeBlueId(node.getValue());
+        return expectedTypeBlueId != null
+                && type.isReferenceOnly()
+                && expectedTypeBlueId.equals(type.getReferenceBlueId());
+    }
+
+    private String scalarTypeBlueId(Object value) {
+        if (value instanceof String) {
+            return TEXT_TYPE_BLUE_ID;
+        }
+        if (value instanceof Boolean) {
+            return BOOLEAN_TYPE_BLUE_ID;
+        }
+        if (value instanceof java.math.BigDecimal
+                || value instanceof Float
+                || value instanceof Double) {
+            return DOUBLE_TYPE_BLUE_ID;
+        }
+        if (value instanceof java.math.BigInteger
+                || value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long) {
+            return INTEGER_TYPE_BLUE_ID;
+        }
+        return null;
     }
 
     private CompiledExpression intrinsicExpr(FrozenNode body, CompileScope scope, String pointer) {
@@ -598,28 +958,27 @@ public final class BexCompiler {
 
         Map<String, CompiledExpression> fields = new LinkedHashMap<>();
         if (body.getProperties() != null) {
-            for (Map.Entry<String, FrozenNode> entry : body.getProperties().entrySet()) {
-                if ("type".equals(entry.getKey())) {
+            for (String fieldName : BexUnicodeOrder.sortedCopy(body.getProperties().keySet())) {
+                if ("type".equals(fieldName)) {
                     continue;
                 }
-                fields.put(entry.getKey(), compileExpr(entry.getValue(), scope, pointer + "/" + escape(entry.getKey())));
+                fields.put(fieldName, compileExpr(body.getProperties().get(fieldName), scope,
+                        pointer + "/" + escape(fieldName)));
             }
         }
         return new IntrinsicExpr(blueId, typeValue, fields);
     }
 
     private String intrinsicTypeBlueId(FrozenNode typeNode) {
-        String blueId = BexNodeIdentity.safeBlueId(typeNode);
-        if (blueId != null && !blueId.isEmpty()) {
-            return blueId;
+        if (hasExplicitProperty(typeNode, "blueId")) {
+            return text(explicitProp(typeNode, "blueId"));
         }
         if (typeNode.getReferenceBlueId() != null && !typeNode.getReferenceBlueId().isEmpty()) {
             return typeNode.getReferenceBlueId();
         }
-        FrozenNode blueIdProperty = prop(typeNode, "blueId");
-        String text = text(blueIdProperty);
-        if (text != null && !text.isEmpty()) {
-            return text;
+        String blueId = BexNodeIdentity.safeBlueId(typeNode);
+        if (blueId != null && !blueId.isEmpty()) {
+            return blueId;
         }
         return text(typeNode);
     }
@@ -680,12 +1039,17 @@ public final class BexCompiler {
         String keyName = prop(body, "key") != null ? requiredText(prop(body, "key"), operator + ".key") : null;
         String indexName = prop(body, "index") != null ? requiredText(prop(body, "index"), operator + ".index") : null;
         validateDistinctCollectionBindings(operator, itemName, keyName, indexName);
-        int itemSlot = scope.declareOrGetSlot(itemName);
-        int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
-        int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
-        CompiledExpression expr = compileExpr(required(prop(body, bodyField), operator + "." + bodyField),
-                scope, pointer + "/" + bodyField);
-        return new CollectionQueryExpr(input, itemSlot, keySlot, indexSlot, expr, op);
+        CompileScope.Visibility visibility = scope.captureVisibility();
+        try {
+            int itemSlot = scope.declareOrGetSlot(itemName);
+            int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
+            int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
+            CompiledExpression expr = compileExpr(required(prop(body, bodyField), operator + "." + bodyField),
+                    scope, pointer + "/" + bodyField);
+            return new CollectionQueryExpr(input, itemSlot, keySlot, indexSlot, expr, op);
+        } finally {
+            scope.restoreVisibility(visibility);
+        }
     }
 
     private CompiledExpression reduceExpr(FrozenNode body, CompileScope scope, String pointer) {
@@ -699,12 +1063,17 @@ public final class BexCompiler {
             throw new BexException("$reduce.acc must use a different binding name");
         }
         CompiledExpression init = compileExpr(required(prop(body, "init"), "$reduce.init"), scope, pointer + "/init");
-        int accSlot = scope.declareOrGetSlot(accName);
-        int itemSlot = scope.declareOrGetSlot(itemName);
-        int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
-        int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
-        CompiledExpression expr = compileExpr(required(prop(body, "expr"), "$reduce.expr"), scope, pointer + "/expr");
-        return new ReduceExpr(input, accSlot, init, itemSlot, keySlot, indexSlot, expr);
+        CompileScope.Visibility visibility = scope.captureVisibility();
+        try {
+            int accSlot = scope.declareOrGetSlot(accName);
+            int itemSlot = scope.declareOrGetSlot(itemName);
+            int keySlot = keyName != null ? scope.declareOrGetSlot(keyName) : -1;
+            int indexSlot = indexName != null ? scope.declareOrGetSlot(indexName) : -1;
+            CompiledExpression expr = compileExpr(required(prop(body, "expr"), "$reduce.expr"), scope, pointer + "/expr");
+            return new ReduceExpr(input, accSlot, init, itemSlot, keySlot, indexSlot, expr);
+        } finally {
+            scope.restoreVisibility(visibility);
+        }
     }
 
     private String collectionOperatorName(CollectionOp op) {
@@ -788,7 +1157,7 @@ public final class BexCompiler {
             String selector = String.valueOf(body.getValue());
             int dot = selector.indexOf('.');
             String step = dot >= 0 ? selector.substring(0, dot) : selector;
-            String path = dot >= 0 ? "/" + selector.substring(dot + 1).replace('.', '/') : "/";
+            String path = dot >= 0 ? "/" + selector.substring(dot + 1) : "/";
             return new StepsExpr(new StaticTextExpr(step), StaticValuePointerOperand.of(path));
         }
         return new StepsExpr(textOrExpr(required(prop(body, "step"), "$steps.step"), scope, null, pointer + "/step"),
@@ -812,15 +1181,15 @@ public final class BexCompiler {
                     throw new BexException("$call.args must be an object at " + pointer + "/args");
                 }
             } else {
-                for (Map.Entry<String, FrozenNode> entry : argsNode.getProperties().entrySet()) {
-                    String argName = entry.getKey();
+                for (String argName : BexUnicodeOrder.sortedCopy(argsNode.getProperties().keySet())) {
                     BexCompiledProgram.ArgSpec arg = signature.arg(argName);
                     if (arg == null) {
                         throw new BexException("Unknown argument " + argName + " for function " + function);
                     }
                     providedArgs.add(argName);
                     targetSlots.add(arg.slot());
-                    argExpressions.add(compileExpr(entry.getValue(), scope, pointer + "/args/" + escape(argName)));
+                    argExpressions.add(compileExpr(argsNode.getProperties().get(argName), scope,
+                            pointer + "/args/" + escape(argName)));
                 }
             }
         }
@@ -919,12 +1288,44 @@ public final class BexCompiler {
         return null;
     }
 
+    private FrozenNode explicitProp(FrozenNode node, String key) {
+        return node != null && node.getProperties() != null
+                ? node.getProperties().get(key)
+                : null;
+    }
+
     private boolean hasExplicitProperty(FrozenNode node, String key) {
         return node != null && node.getProperties() != null && node.getProperties().containsKey(key);
     }
 
-    private FrozenNode meaningful(FrozenNode node) {
-        return node == null || node.isEmptyNode() ? null : node;
+    private boolean hasAuthoredField(FrozenNode node, String key) {
+        return authoredFieldNames(node).contains(key);
+    }
+
+    private Set<String> authoredFieldNames(FrozenNode node) {
+        Set<String> fields = new LinkedHashSet<>();
+        if (node == null) {
+            return fields;
+        }
+        if (node.getProperties() != null) {
+            fields.addAll(node.getProperties().keySet());
+        }
+        if (node.getName() != null) fields.add("name");
+        if (node.getDescription() != null) fields.add("description");
+        if (node.getType() != null) fields.add("type");
+        if (node.getItemType() != null) fields.add("itemType");
+        if (node.getKeyType() != null) fields.add("keyType");
+        if (node.getValueType() != null) fields.add("valueType");
+        if (node.getValue() != null) fields.add("value");
+        if (node.getItems() != null) fields.add("items");
+        if (node.getReferenceBlueId() != null) fields.add("blueId");
+        if (node.getBlue() != null) fields.add("blue");
+        if (node.getSchema() != null) fields.add("schema");
+        if (node.getMergePolicy() != null) fields.add("mergePolicy");
+        if (node.getContracts() != null) fields.add("contracts");
+        if (node.getPreviousBlueId() != null) fields.add("$previous");
+        if (node.getPosition() != null) fields.add("$pos");
+        return fields;
     }
 
     private FrozenNode required(FrozenNode node, String label) {
@@ -942,15 +1343,33 @@ public final class BexCompiler {
         return value;
     }
 
+    private String requiredNonEmptyText(FrozenNode node, String label) {
+        String value = requiredText(node, label);
+        if (value.isEmpty()) {
+            throw new BexException("Required text field is empty: " + label);
+        }
+        return value;
+    }
+
     private String text(FrozenNode node) {
-        return node != null && node.getValue() != null ? String.valueOf(node.getValue()) : null;
+        return node != null && node.getValue() instanceof String
+                ? (String) node.getValue()
+                : null;
+    }
+
+    private boolean isExpressionOperatorShape(FrozenNode node) {
+        if (node == null
+                || node.getProperties() == null
+                || node.getProperties().size() != 1
+                || authoredFieldNames(node).size() != 1) {
+            return false;
+        }
+        String key = node.getProperties().keySet().iterator().next();
+        return key.startsWith("$");
     }
 
     private boolean isOperator(FrozenNode node, String op) {
-        return node != null
-                && node.getProperties() != null
-                && node.getProperties().size() == 1
-                && node.getProperties().containsKey(op);
+        return isExpressionOperatorShape(node) && node.getProperties().containsKey(op);
     }
 
     private FrozenNode onlyValue(FrozenNode node) {
@@ -959,10 +1378,10 @@ public final class BexCompiler {
 
     private void addMetadataFields(Map<String, CompiledExpression> fields, FrozenNode node, CompileScope scope, String pointer) {
         if (node.getName() != null) {
-            fields.put("name", new LiteralExpr(BexValues.scalar(node.getName())));
+            fields.put("name", new TransientLiteralExpr(node.getName()));
         }
         if (node.getDescription() != null) {
-            fields.put("description", new LiteralExpr(BexValues.scalar(node.getDescription())));
+            fields.put("description", new TransientLiteralExpr(node.getDescription()));
         }
         if (node.getType() != null) {
             fields.put("type", compileExpr(node.getType(), scope, pointer + "/type"));
@@ -977,10 +1396,10 @@ public final class BexCompiler {
             fields.put("valueType", compileExpr(node.getValueType(), scope, pointer + "/valueType"));
         }
         if (node.getValue() != null) {
-            fields.put("value", new LiteralExpr(BexValues.scalar(node.getValue())));
+            fields.put("value", new TransientLiteralExpr(node.getValue()));
         }
         if (node.getReferenceBlueId() != null) {
-            fields.put("blueId", new LiteralExpr(BexValues.scalar(node.getReferenceBlueId())));
+            fields.put("blueId", new TransientLiteralExpr(node.getReferenceBlueId()));
         }
         if (node.getBlue() != null) {
             fields.put("blue", compileExpr(node.getBlue(), scope, pointer + "/blue"));
@@ -992,7 +1411,7 @@ public final class BexCompiler {
             fields.put("schema", new LiteralExpr(BexValues.nodeSnapshot(new blue.language.model.Node().schema(node.getSchema()))));
         }
         if (node.getMergePolicy() != null) {
-            fields.put("mergePolicy", new LiteralExpr(BexValues.scalar(node.getMergePolicy())));
+            fields.put("mergePolicy", new TransientLiteralExpr(node.getMergePolicy()));
         }
     }
 
@@ -1162,7 +1581,9 @@ public final class BexCompiler {
                 "properties",
                 "contracts",
                 "$previous",
-                "$pos");
+                "$pos",
+                "$replace",
+                "$empty");
         return Collections.unmodifiableSet(keys);
     }
 
@@ -1185,6 +1606,22 @@ public final class BexCompiler {
 
         private BexCompiledProgram.ArgSpec arg(String name) {
             return argsByName.get(name);
+        }
+    }
+
+    private enum VisitState {
+        UNVISITED,
+        VISITING,
+        VISITED
+    }
+
+    private static final class CallSite {
+        private final String target;
+        private final BexSourcePath sourcePath;
+
+        private CallSite(String target, BexSourcePath sourcePath) {
+            this.target = target;
+            this.sourcePath = sourcePath;
         }
     }
 

@@ -769,7 +769,7 @@ class BexLazyBindingTest {
                 new BexMetrics(), new BexPointerCache());
 
         assertThrows(IllegalStateException.class, () -> runtime.readBinding("broken", Collections.<String>emptyList()));
-        assertEquals(schedule.varRead, runtime.gas().used());
+        assertEquals(schedule.bindingRead, runtime.gas().used());
     }
 
     private static BexExecutionContext.Builder contextBuilder() {

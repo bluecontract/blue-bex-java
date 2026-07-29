@@ -42,12 +42,12 @@ public final class FrozenBexDocumentView implements BexDocumentView {
 
     @Override
     public BexValue canonicalAt(String absolutePointer) {
-        return read(canonicalRoot, absolutePointer);
+        return readExact(absolutePointer);
     }
 
     @Override
     public BexValue resolvedAt(String absolutePointer) {
-        return read(resolvedRoot, absolutePointer);
+        return readExact(absolutePointer);
     }
 
     @Override
@@ -55,12 +55,14 @@ public final class FrozenBexDocumentView implements BexDocumentView {
         return currentScopePath;
     }
 
-    private BexValue read(FrozenNode root, String pointer) {
+    private BexValue readExact(String pointer) {
         List<String> segments = JsonPointer.split(pointer);
-        FrozenNode selected = root.at(JsonPointer.toPointer(segments));
-        if (selected != null) {
-            return BexValues.frozen(selected);
+        String canonicalPointer = JsonPointer.toPointer(segments);
+        FrozenNode canonical = canonicalRoot.at(canonicalPointer);
+        FrozenNode resolved = resolvedRoot.at(canonicalPointer);
+        if (canonical != null || resolved != null) {
+            return BexValues.exact(canonical, resolved);
         }
-        return BexValues.frozen(root).at(segments);
+        return BexValues.exact(canonicalRoot, resolvedRoot).at(segments);
     }
 }

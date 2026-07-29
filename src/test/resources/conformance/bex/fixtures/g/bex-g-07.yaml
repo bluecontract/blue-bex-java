@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-07
+vectors:
+- BEX-G-07
+category: g
+description: Collection visits and produced items are charged exactly once per semantic occurrence.
+program:
+  expr:
+    $map:
+      in:
+      - 1
+      - 2
+      item: x
+      expr:
+        $var: x
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.collectionItemVisited
+    op: equals
+    expected: 2
+  - actual: gas.collectionItemProduced
+    op: equals
+    expected: 2

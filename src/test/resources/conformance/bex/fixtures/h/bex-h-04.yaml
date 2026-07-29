@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-04
+vectors:
+- BEX-H-04
+category: h
+description: Sparse overlay lists cannot cross as ordinary Blue lists.
+program:
+  do:
+  - $appendChange:
+      op: remove
+      path: /items/0
+  - $return:
+      $resultValue: /items
+context:
+  rootDocument:
+    items:
+    - 1
+    - 2
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: output-conversion-error

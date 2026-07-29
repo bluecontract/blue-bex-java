@@ -208,8 +208,10 @@ class BexTranslatedCorpusTest {
                 l(p("add", "/spec/nodeSelector/kubernetes.io~1os", "linux"))));
         cases.add(changes("add-toleration",
                 pod(container("app", "corp/app:1.0")),
-                list(patch("add", "/spec/tolerations/0", obj("key", "dedicated", "operator", "Equal", "value", "apps", "effect", "NoSchedule"))),
-                l(p("add", "/spec/tolerations/0", m("effect", "NoSchedule", "key", "dedicated", "operator", "Equal", "value", "apps")))));
+                list(patch("add", "/spec/tolerations/0",
+                        obj("key", "dedicated", "operator", "Exists", "effect", "NoSchedule"))),
+                l(p("add", "/spec/tolerations/0",
+                        m("effect", "NoSchedule", "key", "dedicated", "operator", "Exists")))));
         cases.add(changes("add-priority-class",
                 pod(container("app", "corp/app:1.0")),
                 list(patch("add", "/spec/priorityClassName", "standard")),

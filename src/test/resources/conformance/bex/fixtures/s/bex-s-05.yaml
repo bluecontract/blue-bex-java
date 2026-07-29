@@ -1,0 +1,33 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-05
+vectors:
+- BEX-S-05
+category: s
+description: '`$resultValue` applies accumulated patches in order, including parent/child replacement and sparse non-shifting list removal.'
+program:
+  do:
+  - $appendChange:
+      op: replace
+      path: /a
+      val:
+        b: 1
+  - $appendChange:
+      op: replace
+      path: /a/b
+      val: 2
+  - $return:
+      $resultValue: /a
+context:
+  rootDocument:
+    a:
+      b: 0
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    b: 2

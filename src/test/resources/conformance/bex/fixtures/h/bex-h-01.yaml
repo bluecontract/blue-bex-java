@@ -1,0 +1,67 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-01
+vectors:
+- BEX-H-01
+category: h
+description: Root `undefined`, list `undefined`, mixed `blueId`, mixed payload kinds, `properties`, invalid schema keys, computed `blue`, and unsupported list controls fail conversion.
+program:
+  expr:
+    blueId: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+    a: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: output-conversion-error
+  cases:
+  - name: root-undefined
+    program:
+      expr:
+        $document: /missing
+    errorClass: output-conversion-error
+  - name: list-undefined
+    program:
+      expr:
+      - $document: /missing
+    errorClass: output-conversion-error
+  - name: mixed-blueid
+    program:
+      expr:
+        blueId: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+        a: 1
+    errorClass: output-conversion-error
+  - name: mixed-payload
+    program:
+      expr:
+        value: 1
+        child: 2
+    errorClass: output-conversion-error
+  - name: properties
+    program:
+      expr:
+        properties:
+          a: 1
+    errorClass: output-conversion-error
+  - name: bad-schema
+    program:
+      expr:
+        schema:
+          unsupported: true
+    errorClass: output-conversion-error
+  - name: blue
+    program:
+      expr:
+        blue: forbidden
+    errorClass: output-conversion-error
+  - name: list-control
+    program:
+      expr:
+      - $pos: 0
+        value: 1
+    errorClass: output-conversion-error
