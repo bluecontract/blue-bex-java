@@ -17,6 +17,8 @@ readonly BEX_RELEASE_TEMP_ROOT="$(
 readonly LANGUAGE_CHECKOUT="$BEX_RELEASE_TEMP_ROOT/blue-language-java"
 readonly FIRST_BEX_CHECKOUT="$BEX_RELEASE_TEMP_ROOT/blue-bex-clean-one"
 readonly SECOND_BEX_CHECKOUT="$BEX_RELEASE_TEMP_ROOT/blue-bex-clean-two"
+readonly LOCAL_FIRST_BEX_CHECKOUT="$BEX_RELEASE_TEMP_ROOT/blue-bex-local-clean-one"
+readonly LOCAL_SECOND_BEX_CHECKOUT="$BEX_RELEASE_TEMP_ROOT/blue-bex-local-clean-two"
 readonly RECEIPT_ROOT="$BEX_RELEASE_TEMP_ROOT/receipts"
 readonly STANDALONE_FIRST_RECEIPT="$RECEIPT_ROOT/standalone-first.properties"
 readonly STANDALONE_SECOND_RECEIPT="$RECEIPT_ROOT/standalone-second.properties"
@@ -80,12 +82,17 @@ fi
 
 cd "$BEX_REPOSITORY"
 
-# Assemble the publication artifacts twice from separate clean checkouts of
-# this exact BEX commit, using the standalone published dependency in both.
+# Assemble each dependency mode twice from its own pair of clean checkouts of
+# this exact BEX commit. Keeping four roots preserves the receipt-owned
+# Language JAR and BEX artifacts until every later report has re-hashed them.
 git clone --no-hardlinks "$BEX_REPOSITORY" "$FIRST_BEX_CHECKOUT"
 git clone --no-hardlinks "$BEX_REPOSITORY" "$SECOND_BEX_CHECKOUT"
+git clone --no-hardlinks "$BEX_REPOSITORY" "$LOCAL_FIRST_BEX_CHECKOUT"
+git clone --no-hardlinks "$BEX_REPOSITORY" "$LOCAL_SECOND_BEX_CHECKOUT"
 git -C "$FIRST_BEX_CHECKOUT" checkout --detach "$BEX_COMMIT"
 git -C "$SECOND_BEX_CHECKOUT" checkout --detach "$BEX_COMMIT"
+git -C "$LOCAL_FIRST_BEX_CHECKOUT" checkout --detach "$BEX_COMMIT"
+git -C "$LOCAL_SECOND_BEX_CHECKOUT" checkout --detach "$BEX_COMMIT"
 mkdir -p "$RECEIPT_ROOT"
 
 GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-clean-one" \
@@ -116,26 +123,27 @@ GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-evidence-verifier" \
 # provenance explicit and prevent one mode from borrowing resolution state
 # from the other.
 GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-standalone-mode" \
-  ./gradlew --no-daemon clean test
+  ./gradlew --no-daemon clean test \
+  -PblueLanguageRequireFreshModuleCache=true
 
 GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-local-clean-one" \
-  "$FIRST_BEX_CHECKOUT/gradlew" \
+  "$LOCAL_FIRST_BEX_CHECKOUT/gradlew" \
   --no-daemon \
-  -p "$FIRST_BEX_CHECKOUT" \
+  -p "$LOCAL_FIRST_BEX_CHECKOUT" \
   clean test writeCleanBuildArtifactHashes \
   -PblueLanguageCompositePath="$LANGUAGE_CHECKOUT"
 GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-local-clean-two" \
-  "$SECOND_BEX_CHECKOUT/gradlew" \
+  "$LOCAL_SECOND_BEX_CHECKOUT/gradlew" \
   --no-daemon \
-  -p "$SECOND_BEX_CHECKOUT" \
+  -p "$LOCAL_SECOND_BEX_CHECKOUT" \
   clean test writeCleanBuildArtifactHashes \
   -PblueLanguageCompositePath="$LANGUAGE_CHECKOUT"
 
 cp \
-  "$FIRST_BEX_CHECKOUT/build/reports/bex-release/clean-build-artifacts.properties" \
+  "$LOCAL_FIRST_BEX_CHECKOUT/build/reports/bex-release/clean-build-artifacts.properties" \
   "$LOCAL_FIRST_RECEIPT"
 cp \
-  "$SECOND_BEX_CHECKOUT/build/reports/bex-release/clean-build-artifacts.properties" \
+  "$LOCAL_SECOND_BEX_CHECKOUT/build/reports/bex-release/clean-build-artifacts.properties" \
   "$LOCAL_SECOND_RECEIPT"
 
 GRADLE_USER_HOME="$BEX_RELEASE_TEMP_ROOT/gradle-local-evidence-verifier" \

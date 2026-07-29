@@ -7,6 +7,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Properties
 import java.util.zip.ZipFile
+import org.apache.commons.compress.archivers.zip.ZipFile as CommonsZipFile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.api.tasks.bundling.Jar
@@ -58,6 +59,10 @@ val blueLanguageModuleVersionCache =
     )
 val blueLanguageModuleVersionCacheInitiallyAbsent =
     !blueLanguageModuleVersionCache.exists()
+val blueLanguageRequireFreshModuleCache =
+    providers.gradleProperty("blueLanguageRequireFreshModuleCache")
+        .map(String::toBoolean)
+        .orElse(false)
 
 base {
     archivesName.set("blue-bex-java")
@@ -440,11 +445,20 @@ val sourceReleaseArchive by tasks.registering(Zip::class) {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
     from(sourceReleaseInputs) {
-        exclude("gradlew")
+        exclude(
+            "gradlew",
+            ".github/scripts/run-final-publication-gates.sh"
+        )
         into(sourceReleaseRoot)
     }
     from("gradlew") {
         into(sourceReleaseRoot)
+        filePermissions {
+            unix("rwxr-xr-x")
+        }
+    }
+    from(".github/scripts/run-final-publication-gates.sh") {
+        into("$sourceReleaseRoot/.github/scripts")
         filePermissions {
             unix("rwxr-xr-x")
         }
@@ -461,11 +475,20 @@ val rebuiltSourceReleaseArchive by tasks.registering(Zip::class) {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
     from(sourceReleaseInputs) {
-        exclude("gradlew")
+        exclude(
+            "gradlew",
+            ".github/scripts/run-final-publication-gates.sh"
+        )
         into(sourceReleaseRoot)
     }
     from("gradlew") {
         into(sourceReleaseRoot)
+        filePermissions {
+            unix("rwxr-xr-x")
+        }
+    }
+    from(".github/scripts/run-final-publication-gates.sh") {
+        into("$sourceReleaseRoot/.github/scripts")
         filePermissions {
             unix("rwxr-xr-x")
         }
@@ -577,6 +600,16 @@ val verifyDeterministicArchives by tasks.registering {
         val rebuiltSourceReleaseHash = sha256(rebuiltSourceRelease)
         val sourceReleaseByteIdentity =
             byteIdentical(originalSourceRelease, rebuiltSourceRelease)
+        val originalExecutableModes =
+            sourceReleaseExecutableModes(
+                originalSourceRelease,
+                sourceReleaseRoot
+            )
+        val rebuiltExecutableModes =
+            sourceReleaseExecutableModes(
+                rebuiltSourceRelease,
+                sourceReleaseRoot
+            )
         check(originalMainHash == rebuiltMainHash) {
             "Main JAR rebuild differs: $originalMainHash != $rebuiltMainHash"
         }
@@ -593,6 +626,9 @@ val verifyDeterministicArchives by tasks.registering {
         check(originalSourceReleaseHash == rebuiltSourceReleaseHash) {
             "Source-release ZIP replica differs: " +
                 "$originalSourceReleaseHash != $rebuiltSourceReleaseHash"
+        }
+        check(originalExecutableModes == rebuiltExecutableModes) {
+            "Source-release executable modes differ between assemblies"
         }
         sourceReleaseChecksum.get().writeText(
             "$originalSourceReleaseHash  ${originalSourceRelease.name}\n"
@@ -624,6 +660,12 @@ val verifyDeterministicArchives by tasks.registering {
                 "included.patterns" to
                     sourceReleaseIncludes.joinToString(","),
                 "independentCleanCheckout" to "false",
+                "executable.gradlew.mode" to
+                    originalExecutableModes.getValue("gradlew"),
+                "executable.publicationGate.mode" to
+                    originalExecutableModes.getValue(
+                        ".github/scripts/run-final-publication-gates.sh"
+                    ),
                 "replica.bytes" to
                     rebuiltSourceRelease.length().toString(),
                 "replica.path" to
@@ -693,6 +735,11 @@ val cleanBuildArtifactEvidence =
     layout.buildDirectory.file(
         "reports/bex-release/clean-build-artifacts.properties"
     )
+val cleanBuildDependencyArtifact =
+    layout.buildDirectory.file(
+        "reports/bex-release/clean-build-inputs/" +
+            "blue-language-java.jar"
+    )
 val invalidateCleanBuildArtifactEvidence by tasks.registering {
     group = "verification"
     description =
@@ -700,6 +747,7 @@ val invalidateCleanBuildArtifactEvidence by tasks.registering {
     outputs.upToDateWhen { false }
     doLast {
         cleanBuildArtifactEvidence.get().asFile.delete()
+        cleanBuildDependencyArtifact.get().asFile.delete()
     }
 }
 listOf(
@@ -724,9 +772,11 @@ val writeCleanBuildArtifactHashes by tasks.registering {
         sourceReleaseArchive
     )
     outputs.file(cleanBuildArtifactEvidence)
+    outputs.file(cleanBuildDependencyArtifact)
     outputs.upToDateWhen { false }
     doFirst {
         cleanBuildArtifactEvidence.get().asFile.delete()
+        cleanBuildDependencyArtifact.get().asFile.delete()
     }
     doLast {
         val checkout =
@@ -760,6 +810,23 @@ val writeCleanBuildArtifactHashes by tasks.registering {
             "Expected exactly one Blue Language dependency artifact"
         }
         val languageArtifact = languageArtifacts.single()
+        val languageArtifactCopy =
+            cleanBuildDependencyArtifact.get().asFile
+        languageArtifactCopy.parentFile.mkdirs()
+        languageArtifact.file.copyTo(
+            languageArtifactCopy,
+            overwrite = true
+        )
+        check(
+            languageArtifactCopy.isFile &&
+                languageArtifactCopy.length() ==
+                languageArtifact.file.length() &&
+                sha256(languageArtifactCopy) ==
+                sha256(languageArtifact.file)
+        ) {
+            "Failed to preserve the exact Blue Language dependency " +
+                "artifact with the clean-build receipt"
+        }
         val compositeDirectory =
             blueLanguageCompositePath
                 ?.let { file(it).canonicalFile }
@@ -791,7 +858,7 @@ val writeCleanBuildArtifactHashes by tasks.registering {
         val values =
             linkedMapOf(
                 "schema" to
-                    "blue-bex-clean-build-artifacts/1.0",
+                    "blue-bex-clean-build-artifacts/1.1",
                 "status" to "passed",
                 "commit" to checkout.commit,
                 "checkout.clean" to "true",
@@ -817,9 +884,12 @@ val writeCleanBuildArtifactHashes by tasks.registering {
                             languageArtifact.moduleVersion.id.version
                     ),
                 "dependency.artifact.bytes" to
-                    languageArtifact.file.length().toString(),
+                    languageArtifactCopy.length().toString(),
+                "dependency.artifact.path" to
+                    languageArtifactCopy.relativeTo(projectDir)
+                        .invariantSeparatorsPath,
                 "dependency.artifact.sha256" to
-                    sha256(languageArtifact.file),
+                    sha256(languageArtifactCopy),
                 "composite.path" to
                     (compositeDirectory?.path ?: ""),
                 "composite.commit" to
@@ -922,13 +992,44 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
                 "HEAD"
             ).trim().lowercase()
         val expectedSchema =
-            "blue-bex-clean-build-artifacts/1.0"
+            "blue-bex-clean-build-artifacts/1.1"
+        val artifactNames =
+            listOf(
+                "main",
+                "sources",
+                "javadoc",
+                "sourceRelease"
+            )
+        val artifactPrefix =
+            "blue-bex-java-${project.version}"
+        val expectedArtifactPaths =
+            mapOf(
+                "main" to
+                    "build/libs/$artifactPrefix.jar",
+                "sources" to
+                    "build/libs/$artifactPrefix-sources.jar",
+                "javadoc" to
+                    "build/libs/$artifactPrefix-javadoc.jar",
+                "sourceRelease" to
+                    "build/distributions/" +
+                    "$artifactPrefix-source-release.zip"
+            )
+        val expectedDependencyArtifactPath =
+            "build/reports/bex-release/clean-build-inputs/" +
+                "blue-language-java.jar"
         val authenticatedRoots =
             linkedMapOf<String, File>()
         val authenticatedGitDirectories =
             linkedMapOf<String, File>()
         val authenticatedFingerprints =
             linkedMapOf<String, GitWorkspaceFingerprint>()
+        val authenticatedArtifacts =
+            linkedMapOf<
+                String,
+                Map<String, Map<String, String>>
+            >()
+        val authenticatedDependencyArtifacts =
+            linkedMapOf<String, Map<String, String>>()
         for ((label, evidence) in
             listOf("first" to first, "second" to second)) {
             check(evidence["schema"] == expectedSchema) {
@@ -1032,11 +1133,134 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
             ) {
                 "$label build has no effective dependency coordinate"
             }
+            val buildArtifacts =
+                linkedMapOf<String, Map<String, String>>()
+            for (artifactName in artifactNames) {
+                val pathKey =
+                    "artifact.$artifactName.path"
+                val bytesKey =
+                    "artifact.$artifactName.bytes"
+                val hashKey =
+                    "artifact.$artifactName.sha256"
+                val relativePath =
+                    evidence[pathKey]
+                        ?: throw GradleException(
+                            "$label $artifactName path is unavailable"
+                        )
+                check(
+                    relativePath ==
+                        expectedArtifactPaths.getValue(
+                            artifactName
+                        )
+                ) {
+                    "$label $artifactName path is not the expected " +
+                        "release output: $relativePath"
+                }
+                check(!File(relativePath).isAbsolute) {
+                    "$label $artifactName path must be relative"
+                }
+                val artifact =
+                    File(recordedRoot, relativePath)
+                        .canonicalFile
+                check(
+                    artifact.toPath().startsWith(
+                        recordedRoot.toPath()
+                    ) &&
+                        artifact.isFile
+                ) {
+                    "$label $artifactName artifact is unavailable " +
+                        "under its authenticated checkout"
+                }
+                val recordedBytes =
+                    evidence[bytesKey]?.toLongOrNull()
+                check(
+                    recordedBytes != null &&
+                        recordedBytes == artifact.length()
+                ) {
+                    "$label $artifactName byte length differs from " +
+                        "its receipt"
+                }
+                val recordedHash = evidence[hashKey]
+                val actualHash = sha256(artifact)
+                check(
+                    recordedHash?.matches(
+                        Regex("[0-9a-f]{64}")
+                    ) == true &&
+                        recordedHash == actualHash
+                ) {
+                    "$label $artifactName artifact hash differs from " +
+                        "its receipt"
+                }
+                buildArtifacts[artifactName] =
+                    mapOf(
+                        "path" to relativePath,
+                        "bytes" to recordedBytes.toString(),
+                        "sha256" to actualHash
+                    )
+            }
+            val dependencyPath =
+                evidence["dependency.artifact.path"]
+                    ?: throw GradleException(
+                        "$label Blue Language artifact path is unavailable"
+                    )
+            check(
+                dependencyPath ==
+                    expectedDependencyArtifactPath &&
+                    !File(dependencyPath).isAbsolute
+            ) {
+                "$label Blue Language artifact path is not the " +
+                    "expected receipt-owned copy"
+            }
+            val dependencyArtifact =
+                File(recordedRoot, dependencyPath)
+                    .canonicalFile
+            check(
+                dependencyArtifact.toPath().startsWith(
+                    recordedRoot.toPath()
+                ) &&
+                    dependencyArtifact.isFile
+            ) {
+                "$label Blue Language artifact copy is unavailable " +
+                    "under its authenticated checkout"
+            }
+            val dependencyBytes =
+                evidence["dependency.artifact.bytes"]
+                    ?.toLongOrNull()
+            check(
+                dependencyBytes != null &&
+                    dependencyBytes ==
+                    dependencyArtifact.length()
+            ) {
+                "$label Blue Language artifact byte length differs " +
+                    "from its receipt"
+            }
+            val dependencyHash =
+                evidence["dependency.artifact.sha256"]
+            val actualDependencyHash =
+                sha256(dependencyArtifact)
+            check(
+                dependencyHash?.matches(
+                    Regex("[0-9a-f]{64}")
+                ) == true &&
+                    dependencyHash ==
+                    actualDependencyHash
+            ) {
+                "$label Blue Language artifact hash differs from " +
+                    "its receipt"
+            }
             authenticatedRoots[label] = recordedRoot
             authenticatedGitDirectories[label] =
                 actualGitDirectory
             authenticatedFingerprints[label] =
                 fingerprint
+            authenticatedArtifacts[label] =
+                buildArtifacts
+            authenticatedDependencyArtifacts[label] =
+                mapOf(
+                    "path" to dependencyPath,
+                    "bytes" to dependencyBytes.toString(),
+                    "sha256" to actualDependencyHash
+                )
         }
         check(
             authenticatedRoots.getValue("first") !=
@@ -1066,17 +1290,10 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
         ) {
             "Independent builds used different source path sets"
         }
-        val artifactNames =
-            listOf(
-                "main",
-                "sources",
-                "javadoc",
-                "sourceRelease"
-            )
         val values =
             linkedMapOf(
                 "schema" to
-                    "blue-bex-independent-clean-builds/1.0",
+                    "blue-bex-independent-clean-builds/1.2",
                 "status" to "passed",
                 "commit" to currentCommit,
                 "first.checkout.clean" to "true",
@@ -1135,9 +1352,17 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
                         "dependency.effectiveCoordinate"
                     ),
                 "dependency.artifact.sha256" to
-                    first.getValue(
-                        "dependency.artifact.sha256"
-                    ),
+                    authenticatedDependencyArtifacts
+                        .getValue("first")
+                        .getValue("sha256"),
+                "dependency.artifact.path" to
+                    authenticatedDependencyArtifacts
+                        .getValue("first")
+                        .getValue("path"),
+                "dependency.artifact.bytes" to
+                    authenticatedDependencyArtifacts
+                        .getValue("first")
+                        .getValue("bytes"),
                 "composite.path" to
                     first.getValue("composite.path"),
                 "composite.commit" to
@@ -1155,6 +1380,23 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
                 "composite.pathCount" to
                     first.getValue("composite.pathCount")
             )
+        for ((label, artifacts) in authenticatedArtifacts) {
+            for ((artifactName, artifact) in artifacts) {
+                for ((field, value) in artifact) {
+                    values[
+                        "$label.artifact.$artifactName.$field"
+                    ] = value
+                }
+            }
+        }
+        for ((label, artifact) in
+            authenticatedDependencyArtifacts) {
+            for ((field, value) in artifact) {
+                values[
+                    "$label.dependency.artifact.$field"
+                ] = value
+            }
+        }
         check(
             first["dependency.mode"] ==
                 second["dependency.mode"]
@@ -1173,18 +1415,62 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
         ) {
             "Clean builds resolved different effective dependency coordinates"
         }
+        val firstDependencyHash =
+            authenticatedDependencyArtifacts
+                .getValue("first")
+                .getValue("sha256")
+        val secondDependencyHash =
+            authenticatedDependencyArtifacts
+                .getValue("second")
+                .getValue("sha256")
         check(
-            first["dependency.artifact.sha256"]
-                ?.matches(Regex("[0-9a-f]{64}")) ==
-                true
+            firstDependencyHash.matches(
+                Regex("[0-9a-f]{64}")
+            )
         ) {
             "First build has no exact Language artifact hash"
         }
         check(
-            first["dependency.artifact.sha256"] ==
-                second["dependency.artifact.sha256"]
+            firstDependencyHash ==
+                secondDependencyHash
         ) {
             "Clean builds resolved different Language artifacts"
+        }
+        val verifierLanguageArtifacts =
+            configurations.compileClasspath.get()
+                .resolvedConfiguration
+                .resolvedArtifacts
+                .filter {
+                    it.moduleVersion.id.group == "blue.language" &&
+                        it.name == "blue-language-java" &&
+                        it.extension == "jar"
+                }
+        check(verifierLanguageArtifacts.size == 1) {
+            "Verifier did not resolve exactly one Blue Language artifact"
+        }
+        val verifierLanguageArtifact =
+            verifierLanguageArtifacts.single()
+        val verifierLanguageCoordinate =
+            (
+                verifierLanguageArtifact.moduleVersion.id.group +
+                    ":" +
+                    verifierLanguageArtifact.name +
+                    ":" +
+                    verifierLanguageArtifact.moduleVersion.id.version
+            )
+        check(
+            verifierLanguageCoordinate ==
+                first["dependency.effectiveCoordinate"]
+        ) {
+            "Clean builds did not resolve the verifier's exact Blue " +
+                "Language coordinate"
+        }
+        check(
+            sha256(verifierLanguageArtifact.file) ==
+                firstDependencyHash
+        ) {
+            "Clean builds did not use the verifier's exact Blue " +
+                "Language artifact"
         }
         val compositeKeys =
             listOf(
@@ -1261,12 +1547,18 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
             }
         }
         for (artifactName in artifactNames) {
-            val key = "artifact.$artifactName.sha256"
-            val firstHash = first[key]
-            val secondHash = second[key]
+            val firstHash =
+                authenticatedArtifacts
+                    .getValue("first")
+                    .getValue(artifactName)
+                    .getValue("sha256")
+            val secondHash =
+                authenticatedArtifacts
+                    .getValue("second")
+                    .getValue(artifactName)
+                    .getValue("sha256")
             check(
-                firstHash != null &&
-                    firstHash.matches(Regex("[0-9a-f]{64}"))
+                firstHash.matches(Regex("[0-9a-f]{64}"))
             ) {
                 "First $artifactName hash is unavailable"
             }
@@ -1616,10 +1908,12 @@ val writeDependencyResolutionEvidence by tasks.registering {
             // resolution above then verifies the resulting JAR against the
             // source-controlled Maven Central hash.
             moduleVersionCacheAcceptance =
-                if (blueLanguageModuleVersionCacheInitiallyAbsent) {
+                if (!blueLanguageRequireFreshModuleCache.get()) {
+                    "not-required-for-current-run"
+                } else if (blueLanguageModuleVersionCacheInitiallyAbsent) {
                     "passed"
                 } else {
-                    "not-executed"
+                    "failed"
                 }
         } else {
             provenanceStatus = "not-applicable-local-composite"
@@ -1658,6 +1952,8 @@ val writeDependencyResolutionEvidence by tasks.registering {
                     blueLanguageModuleVersionCache.canonicalPath,
                 "cache.blueLanguageModuleVersionInitiallyAbsent" to
                     blueLanguageModuleVersionCacheInitiallyAbsent.toString(),
+                "cache.freshProofRequired" to
+                    blueLanguageRequireFreshModuleCache.get().toString(),
                 "cache.acceptance" to moduleVersionCacheAcceptance,
                 "cache.acceptanceScope" to
                     "standalone-published-blue-language-module-version-cache"
@@ -1907,4 +2203,31 @@ fun determineProjectVersion(): String {
         "1.0.0"
     }
     return baseVersion + if (System.getenv("CI") == null) "-SNAPSHOT" else ""
+}
+
+fun sourceReleaseExecutableModes(
+    archive: File,
+    rootDirectory: String
+): Map<String, String> {
+    val executablePaths =
+        listOf(
+            "gradlew",
+            ".github/scripts/run-final-publication-gates.sh"
+        )
+    CommonsZipFile.builder().setFile(archive).get().use { zip ->
+        return executablePaths.associateWith { relativePath ->
+            val entry =
+                zip.getEntry("$rootDirectory/$relativePath")
+                    ?: throw GradleException(
+                        "Source release is missing executable $relativePath"
+                    )
+            val permissionBits = entry.unixMode and 0x1ff
+            check(permissionBits == 0x1ed) {
+                "Source-release executable $relativePath has mode " +
+                    permissionBits.toString(8) +
+                    ", expected 755"
+            }
+            permissionBits.toString(8).padStart(4, '0')
+        }
+    }
 }

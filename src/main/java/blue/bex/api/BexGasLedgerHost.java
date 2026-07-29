@@ -3,6 +3,7 @@ package blue.bex.api;
 import blue.bex.gas.BexGasLimitExceededException;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasLimitExceededException;
+import blue.language.processor.RuntimeWorkBudget;
 
 import java.util.Map;
 import java.util.Objects;
@@ -17,6 +18,52 @@ import java.util.Objects;
  */
 public interface BexGasLedgerHost {
     GasMeter.ChildGasLedger open(String namespace, Map<String, Long> counterWeights);
+
+    /**
+     * Opens an invocation-owned local budget shared by all physical ledgers
+     * used by one BEX execution.
+     *
+     * <p>Session-backed hosts override this method and return the exact
+     * capability created by their owning runtime work session. Detached
+     * compatibility hosts return {@code null}; BEX then retains its
+     * deterministic wrapper precheck.</p>
+     *
+     * @param maximumGas non-negative BEX-local maximum
+     * @return shared host budget, or {@code null} when this host has no
+     *         canonical shared-budget capability
+     */
+    default RuntimeWorkBudget openSharedBudget(long maximumGas) {
+        if (maximumGas < 0L) {
+            throw new IllegalArgumentException(
+                    "Shared BEX gas budget must be non-negative");
+        }
+        return null;
+    }
+
+    /**
+     * Opens a physical ledger attached to a previously opened shared budget.
+     *
+     * <p>The default preserves detached-host compatibility when no budget was
+     * supplied and fails closed if a host claims a shared budget without
+     * implementing attachment.</p>
+     *
+     * @param namespace logical BEX or intrinsic namespace
+     * @param counterWeights exact counter catalog
+     * @param sharedBudget invocation-owned shared local budget
+     * @return live host ledger
+     * @throws UnsupportedOperationException if a non-null budget is supplied
+     *         to a compatibility host which cannot attach it
+     */
+    default GasMeter.ChildGasLedger open(
+            String namespace,
+            Map<String, Long> counterWeights,
+            RuntimeWorkBudget sharedBudget) {
+        if (sharedBudget != null) {
+            throw new UnsupportedOperationException(
+                    "This gas host cannot attach a shared runtime work budget");
+        }
+        return open(namespace, counterWeights);
+    }
 
     void submit(GasMeter.ChildGasLedger ledger);
 

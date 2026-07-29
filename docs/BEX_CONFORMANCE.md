@@ -105,9 +105,14 @@ export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
 
 Both evidence producers must use the same dependency mode. The publication
 pair uses standalone-published mode. To prove local-composite packaging
-separately, run another two-clean-checkout pair with the same explicit
+separately, run another two-clean-checkout pair in two additional BEX roots
+with the same explicit
 `-PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java`
-argument on both builds; never compare one build from each mode.
+argument on both builds. Keep all four roots until the final report has
+re-hashed their outputs and receipt-owned Language JAR copies; never compare
+one build from each mode. The local-composite receipt is accepted only when
+its live source checkout is the exact published Language commit and carries
+the recorded `v<coordinate-version>` tag.
 
 The combined evidence is commit-bound and stale evidence fails closed. The
 conformance report also requires its own four artifacts to match the hashes
@@ -119,7 +124,8 @@ export CI=true
 export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
 
 GRADLE_USER_HOME=/tmp/blue-bex-standalone-mode \
-  ./gradlew --no-daemon clean test
+  ./gradlew --no-daemon clean test \
+  -PblueLanguageRequireFreshModuleCache=true
 GRADLE_USER_HOME=/tmp/blue-bex-local-mode \
   ./gradlew --no-daemon clean test \
   -PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java
@@ -144,6 +150,9 @@ A module-specific cache acceptance is reported separately for the exact
 `blue.language:blue-language-java:3.1.0-rc.19` Gradle module-version path.
 Standalone acceptance passes only when that exact path was absent at project
 configuration and the subsequently resolved JAR matches the recorded Maven
-Central hash. It does not claim that the entire Gradle cache was empty or that
-a network fetch was directly observed. Cached local-composite runs remain
-`not-executed` for this acceptance.
+Central hash in the dedicated run that explicitly requires fresh-cache proof.
+That authenticated mode receipt is reused by later publication invocations;
+they do not overwrite it or require a populated cache to become absent again.
+It does not claim that the entire Gradle cache was empty or that a network
+fetch was directly observed. Local-composite runs remain `not-executed` for
+this acceptance.

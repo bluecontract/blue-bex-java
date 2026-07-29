@@ -26,6 +26,7 @@ import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorFailureException;
+import blue.language.processor.RuntimeWorkBudget;
 import blue.language.utils.JsonPointer;
 
 import java.util.LinkedHashMap;
@@ -279,34 +280,71 @@ public final class BexRuntime {
         }
         LinkedHashMap<String, GasMeter.ChildGasLedger> children =
                 new LinkedHashMap<>();
+        RuntimeWorkBudget sharedBudget = null;
         try {
+            if (context.gasLimit() != BexGasMeter.NO_LOCAL_LIMIT) {
+                sharedBudget =
+                        host.openSharedBudget(context.gasLimit());
+                if (sharedBudget != null
+                        && sharedBudget.maximumGas()
+                        != context.gasLimit()) {
+                    throw new IllegalStateException(
+                            "Gas host returned a shared budget with maximum "
+                                    + sharedBudget.maximumGas()
+                                    + " instead of "
+                                    + context.gasLimit());
+                }
+            }
             children.put(
                     BexGasCounter.NAMESPACE,
                     requireOpenedLedger(
-                            host.open(
+                            openHostLedger(
+                                    host,
                                     BexGasCounter.NAMESPACE,
-                                    gasSchedule.counterWeights()),
+                                    gasSchedule.counterWeights(),
+                                    sharedBudget),
                             BexGasCounter.NAMESPACE));
             for (Map.Entry<String, Map<String, Long>> intrinsic
                     : namespaceWeights.entrySet()) {
                 children.put(
                         intrinsic.getKey(),
                         requireOpenedLedger(
-                                host.open(
+                                openHostLedger(
+                                        host,
                                         intrinsic.getKey(),
-                                        intrinsic.getValue()),
+                                        intrinsic.getValue(),
+                                        sharedBudget),
                                 intrinsic.getKey()));
             }
-            return new BexGasMeter(
-                    gasSchedule,
-                    children,
-                    context.gasLimit(),
-                    registered);
+            return sharedBudget == null
+                    ? new BexGasMeter(
+                            gasSchedule,
+                            children,
+                            context.gasLimit(),
+                            registered)
+                    : BexGasMeter.hostedWithSharedLocalLimit(
+                            gasSchedule,
+                            children,
+                            context.gasLimit(),
+                            registered);
         } catch (RuntimeException | Error openingFailure) {
             finishOpenedLedgersAfterConstructionFailure(
                     host, children, openingFailure);
             throw openingFailure;
         }
+    }
+
+    private static GasMeter.ChildGasLedger openHostLedger(
+            BexGasLedgerHost host,
+            String namespace,
+            Map<String, Long> counterWeights,
+            RuntimeWorkBudget sharedBudget) {
+        return sharedBudget == null
+                ? host.open(namespace, counterWeights)
+                : host.open(
+                        namespace,
+                        counterWeights,
+                        sharedBudget);
     }
 
     private static GasMeter.ChildGasLedger requireOpenedLedger(

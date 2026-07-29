@@ -889,7 +889,8 @@ export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
   -PcleanBuildEvidenceTwo=/second/clean/blue-bex-java/build/reports/bex-release/clean-build-artifacts.properties
 
 GRADLE_USER_HOME=/tmp/blue-bex-standalone-mode \
-  ./gradlew --no-daemon clean test
+  ./gradlew --no-daemon clean test \
+  -PblueLanguageRequireFreshModuleCache=true
 GRADLE_USER_HOME=/tmp/blue-bex-local-mode \
   ./gradlew --no-daemon clean test \
   -PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java
@@ -899,20 +900,26 @@ GRADLE_USER_HOME=/tmp/blue-bex-final-standalone \
 
 For an additional local-composite reproducibility pair, add the same explicit
 `-PblueLanguageCompositePath=/absolute/path/to/clean/blue-language-java`
-argument to both clean-checkout builds. Never use one standalone build and one
+argument to both builds in a second pair of clean BEX checkouts. Keep all four
+checkout roots intact until the final report has re-hashed their BEX outputs
+and receipt-owned Language JAR copies. Never use one standalone build and one
 local-composite build as a two-run pair. The verifier rejects dirty checkouts,
 different commits, versions or dependency modes, and any mismatch among the
-four artifact hashes. Its commit-bound evidence is also compared with the
+four artifact hashes. Local-composite mode evidence must also resolve from the
+exact published Language source commit at the recorded
+`v<coordinate-version>` tag; a different clean Language checkout is rejected.
+Its commit-bound evidence is also compared with the
 artifacts from the reporting build. The same-working-tree archive gate remains
 a separate packaging check.
 
 The API gate compares the packaged JAR’s complete generated descriptor
 manifest with the exact source-controlled first-public BEX 2.0 baseline.
 Removals, descriptor changes, reordering, and unexpected public/protected
-additions all fail the gate. A clean dependency-cache run is
-separate evidence and remains
-`not-executed` unless a controlled isolated run records it. At this source
-state, the current
+additions all fail the gate. A clean dependency-cache run is separate
+commit-bound evidence and is recorded only when a controlled isolated run
+uses `-PblueLanguageRequireFreshModuleCache=true`. Later publication
+invocations authenticate and reuse that mode evidence instead of incorrectly
+requiring the same cache path to be absent again. At this source state, the current
 hosted runtime session APIs exist only in the sibling working tree and are not
 present in the published `3.1.0-rc.19` JAR, so standalone release evidence is
 expected to remain blocked until Blue Language publishes that API surface.

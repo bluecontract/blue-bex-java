@@ -14,7 +14,7 @@ import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.provider.CyclicAwareNodeProvider;
-import blue.language.provider.CyclicSetProof;
+import blue.language.provider.CyclicSetProofResult;
 import blue.language.snapshot.FrozenNode;
 import blue.language.snapshot.ResolvedSnapshot;
 import blue.language.utils.CircularBlueIdCalculator;
@@ -109,6 +109,49 @@ class BexExecutionEvidenceLedgerTest {
         }
     }
 
+    @Test
+    void cyclicProofUnavailabilityUsesHostedDiscardLifecycle() {
+        Node placeholder = obj(
+                "label", "cyclic-content",
+                "next", new Node().blueId("this#0"))
+                .name("hosted-unavailable-cyclic-member");
+        List<Node> placeholders =
+                Collections.singletonList(placeholder);
+        String memberBlueId =
+                CircularBlueIdCalculator
+                        .calculateCircularSetBlueIds(
+                                placeholders)
+                        .get(0);
+        Node resolvedMember = placeholder.clone();
+        resolvedMember.getProperties().get("next")
+                .blueId(memberBlueId);
+        UnavailableProofCyclicProvider provider =
+                new UnavailableProofCyclicProvider(
+                        memberBlueId,
+                        resolvedMember);
+
+        try (Blue blue = new Blue(provider)) {
+            RecordingGasHost host = new RecordingGasHost();
+            ExecutionEvidenceUnavailableException failure =
+                    assertThrows(
+                            ExecutionEvidenceUnavailableException.class,
+                            () -> executeKindRead(
+                                    blue, memberBlueId, host));
+
+            assertEquals(
+                    Collections.singletonList(memberBlueId),
+                    failure.requiredExactBlueIds());
+            assertEquals(
+                    "hosted cyclic proof temporarily unavailable",
+                    failure.getMessage());
+            assertEquals(1, provider.proofQueries);
+            assertEquals(1, host.openCount);
+            assertEquals(0, host.mergeCount);
+            assertEquals(1, host.unavailableCount);
+            assertEquals(0L, host.parent.totalGas());
+        }
+    }
+
     private static void executeKindRead(
             Blue blue,
             String blueId,
@@ -164,10 +207,43 @@ class BexExecutionEvidenceLedgerTest {
         }
 
         @Override
-        public CyclicSetProof cyclicSetProofFor(
+        public CyclicSetProofResult cyclicSetProofFor(
                 String requestedBlueId) {
             proofQueries++;
-            return null;
+            return CyclicSetProofResult.notFound();
+        }
+    }
+
+    private static final class UnavailableProofCyclicProvider
+            implements NodeProvider, CyclicAwareNodeProvider {
+        private final String memberBlueId;
+        private final Node resolvedMember;
+        private int proofQueries;
+
+        private UnavailableProofCyclicProvider(
+                String memberBlueId,
+                Node resolvedMember) {
+            this.memberBlueId = memberBlueId;
+            this.resolvedMember = resolvedMember.clone();
+        }
+
+        @Override
+        public List<Node> fetchByBlueId(
+                String requestedBlueId) {
+            return memberBlueId.equals(requestedBlueId)
+                    ? Collections.singletonList(
+                            resolvedMember.clone())
+                    : Collections.<Node>emptyList();
+        }
+
+        @Override
+        public CyclicSetProofResult cyclicSetProofFor(
+                String requestedBlueId) {
+            proofQueries++;
+            return memberBlueId.equals(requestedBlueId)
+                    ? CyclicSetProofResult.unavailable(
+                            "hosted cyclic proof temporarily unavailable")
+                    : CyclicSetProofResult.notFound();
         }
     }
 
@@ -178,6 +254,7 @@ class BexExecutionEvidenceLedgerTest {
         private GasMeter.ChildGasLedger child;
         private int openCount;
         private int mergeCount;
+        private int unavailableCount;
 
         @Override
         public GasMeter.ChildGasLedger open(
@@ -204,6 +281,7 @@ class BexExecutionEvidenceLedgerTest {
         @Override
         public void evidenceUnavailable(
                 GasMeter.ChildGasLedger ledger) {
+            unavailableCount++;
             assertEquals(child, ledger);
         }
     }

@@ -7,6 +7,7 @@ import blue.language.processor.GasMeter;
 import blue.language.processor.ProcessorExecutionContext;
 import blue.language.processor.ProcessorErrorCategory;
 import blue.language.processor.ProcessorFailureException;
+import blue.language.processor.RuntimeWorkBudget;
 import blue.language.processor.RuntimeWorkSession;
 
 import java.util.Map;
@@ -19,7 +20,9 @@ import java.util.Objects;
  * physical runtime namespace.  Callers executing more than one BEX program in
  * a host invocation must provide distinct physical namespaces; all such
  * ledgers remain owned by the same {@link RuntimeWorkSession} and therefore
- * share its live parent budget.</p>
+ * share its live parent budget. When BEX declares a local cap, the adapter
+ * also opens one invocation-owned {@link RuntimeWorkBudget} and attaches the
+ * primary and intrinsic ledgers to that exact shared admission boundary.</p>
  */
 public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLedgerHost {
     private final RuntimeWorkSession session;
@@ -47,11 +50,25 @@ public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLe
     @Override
     public GasMeter.ChildGasLedger open(String namespace,
                                         Map<String, Long> counterWeights) {
+        return open(namespace, counterWeights, null);
+    }
+
+    @Override
+    public RuntimeWorkBudget openSharedBudget(long maximumGas) {
+        return session.openSharedBudget(maximumGas);
+    }
+
+    @Override
+    public GasMeter.ChildGasLedger open(
+            String namespace,
+            Map<String, Long> counterWeights,
+            RuntimeWorkBudget sharedBudget) {
         String logicalNamespace =
                 requireRuntimeNamespace(namespace);
         return session.openLedger(
                 physicalNamespace(logicalNamespace),
-                counterWeights);
+                counterWeights,
+                sharedBudget);
     }
 
     @Override

@@ -13,6 +13,7 @@ import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProof;
+import blue.language.provider.CyclicSetProofResult;
 import blue.language.provider.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
@@ -368,7 +369,40 @@ class BexExactReferenceDocumentTest {
                             member::isObject);
 
             assertTrue(failure.getMessage().contains(
-                    "complete cyclic-set proof"));
+                    "typed proof result"));
+            assertEquals(1, provider.proofQueries);
+        }
+    }
+
+    @Test
+    void cyclicProofUnavailabilityAfterFoundContentRemainsTransient() {
+        CyclicFixture fixture = new CyclicFixture();
+        CyclicEvidenceProvider provider =
+                new CyclicEvidenceProvider(
+                        NodeProviderResult.found(
+                                Collections.singletonList(
+                                        fixture.resolvedMember)),
+                        CyclicSetProofResult.unavailable(
+                                "cyclic proof store temporarily unavailable"));
+
+        try (Blue blue = new Blue(provider)) {
+            BexValue member = exactReference(
+                    blue, fixture.memberBlueId);
+
+            assertEquals(fixture.memberBlueId,
+                    member.exactBlueId());
+            ExecutionEvidenceUnavailableException failure =
+                    assertThrows(
+                            ExecutionEvidenceUnavailableException.class,
+                            member::isObject);
+
+            assertEquals(
+                    Collections.singletonList(
+                            fixture.memberBlueId),
+                    failure.requiredExactBlueIds());
+            assertEquals(
+                    "cyclic proof store temporarily unavailable",
+                    failure.getMessage());
             assertEquals(1, provider.proofQueries);
         }
     }
@@ -388,7 +422,8 @@ class BexExactReferenceDocumentTest {
                         NodeProviderResult.found(
                                 Collections.singletonList(
                                         fixture.resolvedMember)),
-                        wrongProof);
+                        CyclicSetProofResult.found(
+                                wrongProof));
 
         try (Blue blue = new Blue(provider)) {
             BexValue member = exactReference(
@@ -434,12 +469,12 @@ class BexExactReferenceDocumentTest {
         }
 
         @Override
-        public CyclicSetProof cyclicSetProofFor(
+        public CyclicSetProofResult cyclicSetProofFor(
                 String requestedBlueId) {
             proofQueries++;
             return memberBlueId.equals(requestedBlueId)
-                    ? proof
-                    : null;
+                    ? CyclicSetProofResult.found(proof)
+                    : CyclicSetProofResult.notFound();
         }
     }
 
@@ -467,14 +502,14 @@ class BexExactReferenceDocumentTest {
     private static final class CyclicEvidenceProvider
             implements NodeProvider, CyclicAwareNodeProvider {
         private final NodeProviderResult result;
-        private final CyclicSetProof proof;
+        private final CyclicSetProofResult proofResult;
         private int proofQueries;
 
         private CyclicEvidenceProvider(
                 NodeProviderResult result,
-                CyclicSetProof proof) {
+                CyclicSetProofResult proofResult) {
             this.result = result;
-            this.proof = proof;
+            this.proofResult = proofResult;
         }
 
         @Override
@@ -494,10 +529,10 @@ class BexExactReferenceDocumentTest {
         }
 
         @Override
-        public CyclicSetProof cyclicSetProofFor(
+        public CyclicSetProofResult cyclicSetProofFor(
                 String requestedBlueId) {
             proofQueries++;
-            return proof;
+            return proofResult;
         }
     }
 

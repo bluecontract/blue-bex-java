@@ -21,10 +21,13 @@ import blue.bex.value.BexValues;
 import blue.language.Blue;
 import blue.language.NodeProvider;
 import blue.language.model.Node;
+import blue.language.provider.CyclicAwareNodeProvider;
+import blue.language.provider.CyclicSetProofResult;
 import blue.language.provider.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
 import blue.language.utils.BlueIdCalculator;
+import blue.language.utils.CircularBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -38,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static blue.bex.test.BexTestFixtures.frozen;
 import static blue.bex.test.BexTestFixtures.list;
@@ -795,15 +799,15 @@ class BexHostedRuntimeWorkSessionTest {
     }
 
     @Test
-    void localLimitMapsToProcessorGasCategoryWithoutInventingHostRejection() {
+    void localLimitUsesCanonicalSessionRecordedHostRejection() {
         GasMeter parent = parentMeter(100L);
         RuntimeWorkSession session = session(parent);
         RecordingSessionHost host =
                 new RecordingSessionHost(session, "bex:local-limit");
         AtomicInteger identityCalls = new AtomicInteger();
 
-        ProcessorFailureException failure = assertThrows(
-                ProcessorFailureException.class,
+        GasLimitExceededException failure = assertThrows(
+                GasLimitExceededException.class,
                 () -> BexEngine.builder()
                         .build()
                         .compileAndExecute(
@@ -818,28 +822,122 @@ class BexHostedRuntimeWorkSessionTest {
                                                     .establishIdentity(node);
                                         })));
 
+        assertSame(host.propagatedExhaustion, failure);
+        assertEquals("bex:local-limit", failure.namespace());
         assertEquals(
-                ProcessorErrorCategory.GasLimitExceeded,
-                failure.errorCategory());
-        assertTrue(
-                failure.getCause()
-                        instanceof BexGasLimitExceededException);
-        BexGasLimitExceededException local =
-                (BexGasLimitExceededException) failure.getCause();
-        assertNull(local.hostGasLimitExceeded());
-        assertEquals(
-                BexGasCounter.EXPRESSION_EVALUATED,
-                local.counter());
-        assertEquals(2L, local.admittedGas());
-        assertEquals(2L, local.effectiveBudget());
+                BexGasCounter.EXPRESSION_EVALUATED.canonicalName(),
+                failure.counter());
+        assertEquals(2L, failure.admittedGas());
+        assertEquals(2L, failure.effectiveBudget());
         assertEquals(0, identityCalls.get());
         assertEquals(0, host.submitCount);
         assertEquals(1, host.deterministicFailureCount);
-        assertEquals(1, session.stagedTrace().size());
-        assertTrue(session.isOpen());
-
-        session.failDeterministically();
+        assertEquals(1, host.openSharedBudgetCount);
+        assertEquals(2L, host.sharedBudget.maximumGas());
+        assertFalse(session.isOpen());
         assertEquals(2L, parent.totalGas());
+    }
+
+    @Test
+    void hostedLocalLimitIsSharedAcrossBexAndIntrinsicLedgers() {
+        final String intrinsicBlueId =
+                "TestSharedLocalBudgetIntrinsic";
+        final String intrinsicCounter = "work";
+        final long intrinsicWeight = 3L;
+        AtomicLong gasBeforeIntrinsicWork =
+                new AtomicLong(-1L);
+        AtomicInteger workAfterCharge =
+                new AtomicInteger();
+        BexEngine engine = BexEngine.builder()
+                .intrinsic(
+                        intrinsicBlueId,
+                        "test-shared-local-budget/1",
+                        Collections.singletonMap(
+                                intrinsicCounter,
+                                intrinsicWeight),
+                        invocation -> {
+                            gasBeforeIntrinsicWork.set(
+                                    invocation.gasUsed());
+                            invocation.charge(
+                                    intrinsicCounter,
+                                    1L,
+                                    "shared-local-budget-probe");
+                            workAfterCharge.incrementAndGet();
+                            return BexValues.scalar(true);
+                        })
+                .build();
+        BexProgramSource source =
+                BexProgramSource.expression(
+                        frozen(op(
+                                "$intrinsic",
+                                obj(
+                                        "type",
+                                        obj(
+                                                "blueId",
+                                                intrinsicBlueId)))));
+
+        GasMeter baselineParent = parentMeter(1_000L);
+        RuntimeWorkSession baselineSession =
+                session(baselineParent);
+        RecordingSessionHost baselineHost =
+                new RecordingSessionHost(
+                        baselineSession,
+                        "bex:shared-local-baseline");
+        engine.compileAndExecute(
+                source,
+                context(
+                        baselineHost,
+                        -1L,
+                        BexSemanticIdentityBoundary.STANDALONE));
+        baselineSession.complete();
+        long sharedLimit = gasBeforeIntrinsicWork.get();
+        assertTrue(sharedLimit > 0L);
+        assertEquals(1, workAfterCharge.get());
+
+        workAfterCharge.set(0);
+        GasMeter parent = parentMeter(1_000L);
+        RuntimeWorkSession session = session(parent);
+        RecordingSessionHost host =
+                new RecordingSessionHost(
+                        session, "bex:shared-local");
+
+        GasLimitExceededException failure = assertThrows(
+                GasLimitExceededException.class,
+                () -> engine.compileAndExecute(
+                        source,
+                        context(
+                                host,
+                                sharedLimit,
+                                BexSemanticIdentityBoundary
+                                        .STANDALONE)));
+
+        assertSame(host.propagatedExhaustion, failure);
+        assertEquals(
+                "bex:shared-local/intrinsic-"
+                        + intrinsicBlueId,
+                failure.namespace());
+        assertEquals(intrinsicCounter, failure.counter());
+        assertEquals(1L, failure.quantity());
+        assertEquals(intrinsicWeight, failure.weight());
+        assertEquals(sharedLimit, failure.admittedGas());
+        assertEquals(sharedLimit, failure.effectiveBudget());
+        assertEquals(0, workAfterCharge.get(),
+                "rejected intrinsic work must not run");
+        assertEquals(1, host.openSharedBudgetCount);
+        assertEquals(sharedLimit,
+                host.sharedBudget.maximumGas());
+        assertEquals(sharedLimit,
+                host.sharedBudget.admittedGas());
+        assertEquals(
+                java.util.Arrays.asList(
+                        BexGasCounter.NAMESPACE,
+                        "intrinsic-" + intrinsicBlueId),
+                host.openLogicalNamespaces);
+        assertEquals(0, host.submitCount);
+        assertEquals(2, host.deterministicFailureCount);
+        assertEquals(0, host.unavailableCount);
+        assertFalse(session.isOpen());
+        assertEquals(sharedLimit, parent.totalGas());
     }
 
     @Test
@@ -1095,6 +1193,84 @@ class BexHostedRuntimeWorkSessionTest {
                         && BexGasCounter.NODE_IDENTITY_REQUESTED
                         .canonicalName().equals(
                                 entry.counter())));
+    }
+
+    @Test
+    void hostedCyclicProofUnavailabilityUsesSessionDiscardLifecycle() {
+        Node placeholder = obj(
+                "label", "hosted-proof-unavailable",
+                "next", new Node().blueId("this#0"))
+                .name("hosted-proof-unavailable-member");
+        List<Node> placeholders =
+                Collections.singletonList(placeholder);
+        String memberBlueId =
+                CircularBlueIdCalculator
+                        .calculateCircularSetBlueIds(
+                                placeholders)
+                        .get(0);
+        Node resolvedMember = placeholder.clone();
+        resolvedMember.getProperties().get("next")
+                .blueId(memberBlueId);
+        CyclicProofUnavailableProvider provider =
+                new CyclicProofUnavailableProvider(
+                        memberBlueId,
+                        resolvedMember);
+        GasMeter parent = parentMeter(1_000L);
+        RuntimeWorkSession session = session(parent);
+        RecordingSessionHost host =
+                new RecordingSessionHost(
+                        session,
+                        "bex:cyclic-proof-unavailable");
+
+        try (Blue blue = new Blue(provider)) {
+            BexExecutionContext context =
+                    BexExecutionContext.builder()
+                            .document(
+                                    new FrozenBexDocumentView(
+                                            FrozenNode.fromResolvedNode(
+                                                    obj(
+                                                            "member",
+                                                            new Node().blueId(
+                                                                    memberBlueId)))))
+                            .gasLedgerHost(host)
+                            .semanticIdentityBoundary(
+                                    BexSemanticIdentityBoundary
+                                            .STANDALONE)
+                            .build();
+
+            ExecutionEvidenceUnavailableException failure =
+                    assertThrows(
+                            ExecutionEvidenceUnavailableException.class,
+                            () -> BexEngine.builder()
+                                    .blue(blue)
+                                    .build()
+                                    .compileAndExecute(
+                                            BexProgramSource.expression(
+                                                    frozen(op(
+                                                            "$kind",
+                                                            op(
+                                                                    "$document",
+                                                                    "/member")))),
+                                            context));
+
+            assertEquals(
+                    Collections.singletonList(memberBlueId),
+                    failure.requiredExactBlueIds());
+            assertEquals(
+                    "hosted cyclic proof store temporarily unavailable",
+                    failure.getMessage());
+            assertEquals(1, provider.proofQueries);
+            assertEquals(0, host.submitCount);
+            assertEquals(0,
+                    host.deterministicFailureCount);
+            assertEquals(1, host.unavailableCount);
+            assertTrue(session.isOpen());
+            assertFalse(session.stagedTrace().isEmpty());
+        }
+
+        session.suspend();
+        assertEquals(0L, parent.totalGas());
+        assertEquals(1_000L, parent.remainingGas());
     }
 
     @Test
@@ -1380,6 +1556,39 @@ class BexHostedRuntimeWorkSessionTest {
         return builder.build();
     }
 
+    private static final class CyclicProofUnavailableProvider
+            implements NodeProvider, CyclicAwareNodeProvider {
+        private final String memberBlueId;
+        private final Node resolvedMember;
+        private int proofQueries;
+
+        private CyclicProofUnavailableProvider(
+                String memberBlueId,
+                Node resolvedMember) {
+            this.memberBlueId = memberBlueId;
+            this.resolvedMember = resolvedMember.clone();
+        }
+
+        @Override
+        public List<Node> fetchByBlueId(
+                String requestedBlueId) {
+            return memberBlueId.equals(requestedBlueId)
+                    ? Collections.singletonList(
+                            resolvedMember.clone())
+                    : Collections.<Node>emptyList();
+        }
+
+        @Override
+        public CyclicSetProofResult cyclicSetProofFor(
+                String requestedBlueId) {
+            proofQueries++;
+            return memberBlueId.equals(requestedBlueId)
+                    ? CyclicSetProofResult.unavailable(
+                            "hosted cyclic proof store temporarily unavailable")
+                    : CyclicSetProofResult.notFound();
+        }
+    }
+
     private static final class RecordingSessionHost
             implements BexGasLedgerHost {
         private final ProcessorExecutionContextBexGasLedgerHost delegate;
@@ -1390,6 +1599,8 @@ class BexHostedRuntimeWorkSessionTest {
         private int submitCount;
         private int deterministicFailureCount;
         private int unavailableCount;
+        private int openSharedBudgetCount;
+        private RuntimeWorkBudget sharedBudget;
         private GasLimitExceededException propagatedExhaustion;
 
         private RecordingSessionHost(
@@ -1401,12 +1612,35 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
+        public RuntimeWorkBudget openSharedBudget(
+                long maximumGas) {
+            openSharedBudgetCount++;
+            sharedBudget =
+                    delegate.openSharedBudget(maximumGas);
+            return sharedBudget;
+        }
+
+        @Override
         public GasMeter.ChildGasLedger open(
                 String namespace,
                 Map<String, Long> counterWeights) {
+            return open(
+                    namespace,
+                    counterWeights,
+                    null);
+        }
+
+        @Override
+        public GasMeter.ChildGasLedger open(
+                String namespace,
+                Map<String, Long> counterWeights,
+                RuntimeWorkBudget sharedBudget) {
             openLogicalNamespaces.add(namespace);
             GasMeter.ChildGasLedger ledger =
-                    delegate.open(namespace, counterWeights);
+                    delegate.open(
+                            namespace,
+                            counterWeights,
+                            sharedBudget);
             openedLedgers.add(ledger);
             return ledger;
         }

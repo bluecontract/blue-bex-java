@@ -33,6 +33,7 @@ public final class BexGasMeter {
     private final long effectiveBudget;
     private final Map<String, GasMeter.ChildGasLedger> hostLedgers;
     private final boolean qualifiedHostCounters;
+    private final boolean hostEnforcesLocalLimit;
     private final Map<String, Long> registeredNamedWeights;
     private final List<BexGasCharge> trace = new ArrayList<>();
     private long totalGas;
@@ -55,6 +56,7 @@ public final class BexGasMeter {
                 NO_LOCAL_LIMIT,
                 Collections.<String, GasMeter.ChildGasLedger>emptyMap(),
                 false,
+                false,
                 Collections.<String, Long>emptyMap());
     }
 
@@ -70,6 +72,7 @@ public final class BexGasMeter {
                 requireLocalLimit(localLimit),
                 Collections.<String, GasMeter.ChildGasLedger>emptyMap(),
                 false,
+                false,
                 Collections.<String, Long>emptyMap());
     }
 
@@ -84,6 +87,7 @@ public final class BexGasMeter {
                 requireBudget(parentRemainingGas, "parentRemainingGas"),
                 requireLocalLimit(localLimit),
                 Collections.<String, GasMeter.ChildGasLedger>emptyMap(),
+                false,
                 false,
                 registeredNamedWeights);
     }
@@ -108,6 +112,7 @@ public final class BexGasMeter {
                 requireLocalLimit(localLimit),
                 singletonHostLedger(hostLedger),
                 true,
+                false,
                 Collections.<String, Long>emptyMap());
     }
 
@@ -126,6 +131,38 @@ public final class BexGasMeter {
                 requireLocalLimit(localLimit),
                 hostLedgers,
                 false,
+                false,
+                registeredNamedWeights);
+    }
+
+    /**
+     * Creates a hosted meter whose configured local limit is enforced by one
+     * invocation-owned budget shared by every supplied host ledger.
+     *
+     * <p>The meter retains the configured limit for portable diagnostics but
+     * does not race the canonical host admission path with a duplicate local
+     * precheck. The host therefore records the exact rejected charge before
+     * any corresponding BEX or intrinsic work occurs.</p>
+     *
+     * @param schedule exact BEX gas schedule
+     * @param hostLedgers one live physical ledger per logical namespace
+     * @param localLimit non-negative maximum enforced by the shared host
+     *        budget
+     * @param registeredNamedWeights exact intrinsic counter registry
+     * @return live BEX meter using canonical host-side local admission
+     */
+    public static BexGasMeter hostedWithSharedLocalLimit(
+            BexGasSchedule schedule,
+            Map<String, GasMeter.ChildGasLedger> hostLedgers,
+            long localLimit,
+            Map<String, Long> registeredNamedWeights) {
+        return new BexGasMeter(
+                schedule,
+                parentBudget(hostLedgers),
+                requireLocalLimit(localLimit),
+                hostLedgers,
+                false,
+                true,
                 registeredNamedWeights);
     }
 
@@ -134,6 +171,7 @@ public final class BexGasMeter {
                         long localLimit,
                         Map<String, GasMeter.ChildGasLedger> hostLedgers,
                         boolean qualifiedHostCounters,
+                        boolean hostEnforcesLocalLimit,
                         Map<String, Long> registeredNamedWeights) {
         this.schedule = Objects.requireNonNull(schedule, "schedule");
         this.parentRemainingGas = parentRemainingGas;
@@ -143,6 +181,14 @@ public final class BexGasMeter {
                 : Math.min(parentRemainingGas, localLimit);
         this.hostLedgers = immutableHostLedgers(hostLedgers);
         this.qualifiedHostCounters = qualifiedHostCounters;
+        if (hostEnforcesLocalLimit
+                && (this.hostLedgers.isEmpty()
+                || localLimit == NO_LOCAL_LIMIT)) {
+            throw new IllegalArgumentException(
+                    "Host-enforced local limits require hosted ledgers "
+                            + "and a non-negative local limit");
+        }
+        this.hostEnforcesLocalLimit = hostEnforcesLocalLimit;
         this.registeredNamedWeights =
                 immutableRegisteredWeights(registeredNamedWeights);
     }
@@ -441,6 +487,8 @@ public final class BexGasMeter {
          */
         long localAdmissionBudget = hostLedgers.isEmpty()
                 ? effectiveBudget
+                : hostEnforcesLocalLimit
+                ? NO_LOCAL_LIMIT
                 : localLimit;
         if (localAdmissionBudget != NO_LOCAL_LIMIT
                 && gas > localAdmissionBudget - totalGas) {

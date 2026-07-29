@@ -72,6 +72,8 @@ class public abstract interface blue.bex.api.BexGasLedgerHost
   method public abstract open(java.lang.String,java.util.Map):blue.language.processor.GasMeter$ChildGasLedger
   method public abstract submit(blue.language.processor.GasMeter$ChildGasLedger):void
   method public localGasLimitExceeded(blue.bex.gas.BexGasLimitExceededException,java.lang.RuntimeException):java.lang.RuntimeException
+  method public open(java.lang.String,java.util.Map,blue.language.processor.RuntimeWorkBudget):blue.language.processor.GasMeter$ChildGasLedger
+  method public openSharedBudget(long):blue.language.processor.RuntimeWorkBudget
   method public propagateGasExhaustion(blue.language.processor.GasMeter$ChildGasLedger,blue.language.processor.GasLimitExceededException):void
   method public separatesRuntimeNamespaces():boolean
 class public final blue.bex.api.BexIntrinsicInvocation
@@ -154,6 +156,8 @@ class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implem
   method public failedDeterministically(blue.language.processor.GasMeter$ChildGasLedger):void
   method public localGasLimitExceeded(blue.bex.gas.BexGasLimitExceededException,java.lang.RuntimeException):java.lang.RuntimeException
   method public open(java.lang.String,java.util.Map):blue.language.processor.GasMeter$ChildGasLedger
+  method public open(java.lang.String,java.util.Map,blue.language.processor.RuntimeWorkBudget):blue.language.processor.GasMeter$ChildGasLedger
+  method public openSharedBudget(long):blue.language.processor.RuntimeWorkBudget
   method public physicalNamespace(java.lang.String):java.lang.String
   method public propagateGasExhaustion(blue.language.processor.GasMeter$ChildGasLedger,blue.language.processor.GasLimitExceededException):void
   method public runtimeNamespace():java.lang.String
@@ -343,6 +347,7 @@ class public final blue.bex.gas.BexGasMeter
   method public remainingGas():long
   method public schedule():blue.bex.gas.BexGasSchedule
   method public static childLedgerWeights(blue.bex.gas.BexGasSchedule,java.util.Map):java.util.Map
+  method public static hostedWithSharedLocalLimit(blue.bex.gas.BexGasSchedule,java.util.Map,long,java.util.Map):blue.bex.gas.BexGasMeter
   method public static qualifiedCounterName(java.lang.String,java.lang.String):java.lang.String
   method public submitHostLedger(java.util.function.Consumer):void
   method public totalGas():long

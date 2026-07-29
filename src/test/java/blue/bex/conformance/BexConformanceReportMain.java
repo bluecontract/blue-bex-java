@@ -1,8 +1,9 @@
 package blue.bex.conformance;
 
 import blue.language.processor.RuntimeWorkSession;
+import blue.language.processor.RuntimeWorkBudget;
 import blue.language.provider.CyclicAwareNodeProvider;
-import blue.language.provider.CyclicSetProof;
+import blue.language.provider.CyclicSetProofResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -95,7 +96,8 @@ public final class BexConformanceReportMain {
         Map<String, Object> specification =
                 specificationEvidence(projectDir, baseline);
         Map<String, Object> versionAutomation =
-                versionAutomationEvidence(projectDir, baseline);
+                versionAutomationEvidence(
+                        projectDir, projectVersion, baseline);
         Map<String, Object> namedEvidence =
                 namedReleaseEvidence(tests);
         Map<String, Object> gasExhaustionTraceExamples =
@@ -104,7 +106,7 @@ public final class BexConformanceReportMain {
                 "gasExhaustionTraceExamples",
                 gasExhaustionTraceExamples);
         Map<String, Object> hostedLocalLimitCapability =
-                hostedLocalLimitCapability();
+                hostedLocalLimitCapability(tests);
         Map<String, Object> cyclicProofUnavailabilityCapability =
                 cyclicProofUnavailabilityCapability(tests);
         Map<String, Object> hostLongTrace =
@@ -148,7 +150,9 @@ public final class BexConformanceReportMain {
                         languageReleaseIdentity,
                         representationMatrixResult);
 
-        if (currentModeFailures.isEmpty()) {
+        if (currentModeFailures.isEmpty()
+                && modeRunCanPersistEvidence(
+                        dependencyMode, dependencyResolution)) {
             persistModeEvidence(
                     persistentEvidenceRoot,
                     dependencyMode,
@@ -157,12 +161,13 @@ public final class BexConformanceReportMain {
                     sourceState,
                     compositePath,
                     dependencyResolution,
-                        tests,
-                        normativeVectorCoverage,
-                        artifacts,
+                    tests,
+                    normativeVectorCoverage,
+                    artifacts,
                     projectDir,
                     specification,
-                    namedEvidence);
+                    namedEvidence,
+                    publishedApiInspection);
         }
         Map<String, Object> buildModes = buildModeMatrix(
                 persistentEvidenceRoot,
@@ -171,13 +176,19 @@ public final class BexConformanceReportMain {
                 sourceState,
                 compositePath,
                 publishedApiInspection);
+        boolean exactFinalArtifactProven =
+                bindLanguageReleaseIdentityToModes(
+                        languageReleaseIdentity,
+                        buildModes);
         releaseGates.put(
                 "cleanDependencyCacheAcceptance",
                 cleanDependencyCacheAcceptance(buildModes));
         boolean bothModesPassed =
                 Boolean.TRUE.equals(buildModes.get("allRequiredModesPassed"));
         boolean releaseReady =
-                currentModeFailures.isEmpty() && bothModesPassed;
+                currentModeFailures.isEmpty()
+                        && bothModesPassed
+                        && exactFinalArtifactProven;
 
         Map<String, Object> report = new LinkedHashMap<String, Object>();
         report.put("schema", "blue-bex-hosted-release-report/2.0");
@@ -557,6 +568,9 @@ public final class BexConformanceReportMain {
                                 "provenance.networkFetchObservation")),
                 "cleanDependencyCacheAcceptance", map(
                         "status", evidence.get("cache.acceptance"),
+                        "freshProofRequired",
+                        Boolean.parseBoolean(evidence.get(
+                                "cache.freshProofRequired")),
                         "scope",
                         evidence.get("cache.acceptanceScope"),
                         "moduleVersionPath",
@@ -569,8 +583,24 @@ public final class BexConformanceReportMain {
                         "passed".equals(
                                 evidence.get("cache.acceptance"))
                                 ? "exact-blue-language-module-version-cache-was-absent-before-resolution"
-                                : "exact-blue-language-module-version-cache-was-not-proven-absent-before-resolution"),
+                                : Boolean.parseBoolean(evidence.get(
+                                        "cache.freshProofRequired"))
+                                ? "exact-blue-language-module-version-cache-was-not-proven-absent-before-resolution"
+                                : "fresh-module-cache-proof-not-required-for-current-run"),
                 "compositePath", evidence.get("composite.path"));
+    }
+
+    static boolean modeRunCanPersistEvidence(
+            String dependencyMode,
+            Map<String, Object> dependencyResolution) {
+        if (!"standalone-published".equals(dependencyMode)) {
+            return true;
+        }
+        Map<String, Object> cache = castMap(
+                dependencyResolution.get(
+                        "cleanDependencyCacheAcceptance"));
+        return Boolean.TRUE.equals(cache.get("freshProofRequired"))
+                && "passed".equals(cache.get("status"));
     }
 
     private static String joinCoordinate(
@@ -601,19 +631,56 @@ public final class BexConformanceReportMain {
                 actual.equals(expected));
     }
 
-    private static Map<String, Object> versionAutomationEvidence(
+    static Map<String, Object> versionAutomationEvidence(
             Path projectDir,
+            String projectVersion,
             Map<String, String> baseline) throws IOException {
         Path czToml = projectDir.resolve(".cz.toml");
         String actual = Files.isRegularFile(czToml)
                 ? sha256(czToml)
                 : "unavailable";
         String expected = baseline.get("czTomlSha256");
+        String configuredVersion = readCommitizenVersion(czToml);
+        String expectedVersion = projectVersion.endsWith("-SNAPSHOT")
+                ? projectVersion.substring(
+                        0,
+                        projectVersion.length()
+                                - "-SNAPSHOT".length())
+                : projectVersion;
         return map(
                 "path", ".cz.toml",
                 "sha256", actual,
-                "baselineSha256", expected,
-                "unchanged", actual.equals(expected));
+                "historicalBaselineSha256", expected,
+                "matchesHistoricalBaseline", actual.equals(expected),
+                "configuredVersion", configuredVersion,
+                "projectVersion", projectVersion,
+                "matchesProjectVersion",
+                configuredVersion.equals(expectedVersion));
+    }
+
+    private static String readCommitizenVersion(Path czToml)
+            throws IOException {
+        if (!Files.isRegularFile(czToml)) {
+            return "unavailable";
+        }
+        for (String line : Files.readAllLines(
+                czToml, StandardCharsets.UTF_8)) {
+            String trimmed = line.trim();
+            int equals = trimmed.indexOf('=');
+            if (equals < 0
+                    || !"version".equals(
+                            trimmed.substring(0, equals).trim())) {
+                continue;
+            }
+            int firstQuote = trimmed.indexOf('"', equals + 1);
+            int lastQuote = trimmed.lastIndexOf('"');
+            if (equals >= 0
+                    && firstQuote > equals
+                    && lastQuote > firstQuote) {
+                return trimmed.substring(firstQuote + 1, lastQuote);
+            }
+        }
+        return "unavailable";
     }
 
     private static Map<String, Object> namedReleaseEvidence(
@@ -982,7 +1049,11 @@ public final class BexConformanceReportMain {
                 "passed".equals(dependencyResolution.get("status")),
                 "dependency-resolution-evidence-not-passing");
         if ("standalone-published".equals(
-                dependencyResolution.get("mode"))) {
+                dependencyResolution.get("mode"))
+                && Boolean.TRUE.equals(castMap(
+                        dependencyResolution.get(
+                                "cleanDependencyCacheAcceptance"))
+                        .get("freshProofRequired"))) {
             require(
                     failures,
                     "passed".equals(castMap(
@@ -1019,8 +1090,10 @@ public final class BexConformanceReportMain {
                 "specification-identity-differs-from-baseline");
         require(
                 failures,
-                Boolean.TRUE.equals(versionAutomation.get("unchanged")),
-                "cz-toml-differs-from-baseline");
+                Boolean.TRUE.equals(
+                        versionAutomation.get(
+                                "matchesProjectVersion")),
+                "cz-toml-version-differs-from-project-version");
         require(
                 failures,
                 "1.8".equals(System.getProperty(
@@ -1208,13 +1281,22 @@ public final class BexConformanceReportMain {
         if (compositePath != null
                 && Files.isDirectory(compositePath)) {
             SourceState state = sourceState(compositePath);
+            List<String> tagsAtHead =
+                    gitTagsAtHead(compositePath);
             localMatchesPublished =
-                    commitIdentified
-                            && !state.worktreeDirty
+                    !state.worktreeDirty
                             && state.completeWorkspace()
-                            && publishedCommit.equalsIgnoreCase(
-                            state.commit);
-            localSource = state.report();
+                            && publishedSourceIdentityMatches(
+                            declaredDependency,
+                            publishedApiInspection,
+                            state.commit,
+                            tagsAtHead);
+            localSource = new LinkedHashMap<String, Object>(
+                    state.report());
+            localSource.put("tagsAtHead", tagsAtHead);
+            localSource.put(
+                    "matchesPublishedIdentity",
+                    localMatchesPublished);
         }
         Map<String, Object> resolvedArtifact =
                 castMap(dependencyResolution.get("artifact"));
@@ -1224,11 +1306,14 @@ public final class BexConformanceReportMain {
         boolean standalone =
                 "standalone-published".equals(
                         dependencyResolution.get("mode"));
-        boolean resolvedArtifactExact =
-                !standalone
-                        || publishedHash != null
+        boolean resolvedArtifactHashMatchesPublished =
+                standalone
+                        && publishedHash != null
                         && publishedHash.equals(
                         resolvedArtifact.get("sha256"));
+        boolean resolvedArtifactIdentitySatisfied =
+                !standalone
+                        || resolvedArtifactHashMatchesPublished;
         boolean exactFinalArtifactProven =
                 commitIdentified
                         && hashIdentified
@@ -1236,11 +1321,13 @@ public final class BexConformanceReportMain {
                         && coordinateMatches
                         && localMatchesPublished
                         && dependencyResolved
-                        && resolvedArtifactExact;
+                        && resolvedArtifactIdentitySatisfied;
         return map(
                 "schema",
-                "blue-bex-language-release-identity/1.0",
+                "blue-bex-language-release-identity/1.1",
                 "exactFinalArtifactProven",
+                exactFinalArtifactProven,
+                "currentDependencyExactFinalArtifactProven",
                 exactFinalArtifactProven,
                 "declaredCoordinate", declaredDependency,
                 "publishedCoordinate",
@@ -1254,11 +1341,17 @@ public final class BexConformanceReportMain {
                 publishedApiInspection.get("status"),
                 "dependencyResolutionPassed",
                 dependencyResolved,
+                "resolvedArtifactHashComparisonApplicable",
+                standalone,
                 "resolvedArtifactMatchesPublishedHash",
-                resolvedArtifactExact,
+                resolvedArtifactHashMatchesPublished,
+                "resolvedArtifactIdentitySatisfied",
+                resolvedArtifactIdentitySatisfied,
                 "resolvedArtifact", resolvedArtifact,
                 "localCompositeSource", localSource,
                 "localCompositeMatchesPublishedCommit",
+                localMatchesPublished,
+                "localCompositeMatchesPublishedIdentity",
                 localMatchesPublished,
                 "failures",
                 exactFinalArtifactProven
@@ -1279,12 +1372,12 @@ public final class BexConformanceReportMain {
                         dependencyResolved
                                 ? null
                                 : "dependency-resolution-not-passing",
-                        resolvedArtifactExact
+                        resolvedArtifactIdentitySatisfied
                                 ? null
                                 : "resolved-artifact-hash-mismatch",
                         localMatchesPublished
                                 ? null
-                                : "local-composite-not-clean-exact-published-commit")
+                                : "local-composite-not-clean-exact-published-commit-and-version-tag")
                         .stream()
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()));
@@ -1363,7 +1456,9 @@ public final class BexConformanceReportMain {
             List<Object> artifacts,
             Path projectDir,
             Map<String, Object> specification,
-            Map<String, Object> namedEvidence) throws Exception {
+            Map<String, Object> namedEvidence,
+            Map<String, String> publishedApiInspection)
+            throws Exception {
         Path modeRoot = root.resolve("modes").resolve(mode);
         Path artifactRoot = modeRoot.resolve("artifacts");
         Files.createDirectories(artifactRoot);
@@ -1371,7 +1466,7 @@ public final class BexConformanceReportMain {
                 new LinkedHashMap<String, String>();
         values.put(
                 "schema",
-                "blue-bex-build-mode-evidence/2.0");
+                "blue-bex-build-mode-evidence/2.2");
         values.put("status", "passed");
         values.put("mode", mode);
         values.put("declared.coordinate", declaredDependency);
@@ -1449,6 +1544,12 @@ public final class BexConformanceReportMain {
                                 "cleanDependencyCacheAcceptance"))
                         .get("status")));
         values.put(
+                "dependency.cache.freshProofRequired",
+                String.valueOf(castMap(
+                        dependencyResolution.get(
+                                "cleanDependencyCacheAcceptance"))
+                        .get("freshProofRequired")));
+        values.put(
                 "dependency.cache.acceptanceScope",
                 String.valueOf(castMap(
                         dependencyResolution.get(
@@ -1519,6 +1620,8 @@ public final class BexConformanceReportMain {
             }
             SourceState dependencySource =
                     sourceState(compositePath);
+            List<String> tagsAtHead =
+                    gitTagsAtHead(compositePath);
             values.put(
                     "composite.path",
                     compositePath.toString());
@@ -1538,6 +1641,24 @@ public final class BexConformanceReportMain {
                             !dependencySource.worktreeDirty
                                     && dependencySource
                                     .completeWorkspace()));
+            values.put(
+                    "composite.publishedSourceCommit",
+                    String.valueOf(
+                            publishedApiInspection.get(
+                                    "source.commit")));
+            values.put(
+                    "composite.publishedSourceTag",
+                    String.valueOf(
+                            publishedApiInspection.get(
+                                    "source.tag")));
+            values.put(
+                    "composite.matchesPublishedIdentity",
+                    String.valueOf(
+                            publishedSourceIdentityMatches(
+                                    declaredDependency,
+                                    publishedApiInspection,
+                                    dependencySource.commit,
+                                    tagsAtHead)));
         }
         writeEvidence(modeRoot.resolve("mode.properties"), values);
     }
@@ -1641,7 +1762,7 @@ public final class BexConformanceReportMain {
         List<String> failures = new ArrayList<String>();
         require(
                 failures,
-                "blue-bex-build-mode-evidence/2.0".equals(
+                "blue-bex-build-mode-evidence/2.2".equals(
                         evidence.get("schema")),
                 "unknown-evidence-schema");
         require(
@@ -1738,6 +1859,11 @@ public final class BexConformanceReportMain {
                     "standalone-blue-language-module-version-cache-not-accepted");
             require(
                     failures,
+                    Boolean.parseBoolean(evidence.get(
+                            "dependency.cache.freshProofRequired")),
+                    "standalone-fresh-module-cache-proof-was-not-required");
+            require(
+                    failures,
                     "standalone-published-blue-language-module-version-cache"
                             .equals(evidence.get(
                                     "dependency.cache.acceptanceScope")),
@@ -1805,6 +1931,8 @@ public final class BexConformanceReportMain {
             if (samePath && Files.isDirectory(composite)) {
                 SourceState dependencySource =
                         sourceState(composite);
+                List<String> tagsAtHead =
+                        gitTagsAtHead(composite);
                 boolean sourceMatches =
                         dependencySource.fingerprint.sha256.equals(
                                 evidence.get(
@@ -1818,10 +1946,33 @@ public final class BexConformanceReportMain {
                                 && Boolean.parseBoolean(
                                 evidence.get(
                                         "composite.releaseInputsCommitted"));
+                boolean publishedIdentityMatches =
+                        publishedSourceIdentityMatches(
+                                declaredDependency,
+                                publishedApiInspection,
+                                dependencySource.commit,
+                                tagsAtHead)
+                                && Objects.equals(
+                                publishedApiInspection.get(
+                                        "source.commit"),
+                                evidence.get(
+                                        "composite.publishedSourceCommit"))
+                                && Objects.equals(
+                                publishedApiInspection.get(
+                                        "source.tag"),
+                                evidence.get(
+                                        "composite.publishedSourceTag"))
+                                && Boolean.parseBoolean(
+                                evidence.get(
+                                        "composite.matchesPublishedIdentity"));
                 require(
                         failures,
                         sourceMatches,
                         "local-composite-source-state-changed");
+                require(
+                        failures,
+                        publishedIdentityMatches,
+                        "local-composite-not-bound-to-published-language-identity");
                 compositeSource = map(
                         "path", composite.toString(),
                         "recordedCommit",
@@ -1832,6 +1983,15 @@ public final class BexConformanceReportMain {
                         "recordedReleaseSourceSha256",
                         evidence.get(
                                 "composite.releaseSourceSha256"),
+                        "recordedPublishedSourceCommit",
+                        evidence.get(
+                                "composite.publishedSourceCommit"),
+                        "recordedPublishedSourceTag",
+                        evidence.get(
+                                "composite.publishedSourceTag"),
+                        "tagsAtHead", tagsAtHead,
+                        "matchesPublishedIdentity",
+                        publishedIdentityMatches,
                         "current", dependencySource.report(),
                         "matchesRecordedEvidence", sourceMatches);
             }
@@ -1875,6 +2035,9 @@ public final class BexConformanceReportMain {
                         "status",
                         evidence.get(
                                 "dependency.cache.acceptance"),
+                        "freshProofRequired",
+                        Boolean.parseBoolean(evidence.get(
+                                "dependency.cache.freshProofRequired")),
                         "scope",
                         evidence.get(
                                 "dependency.cache.acceptanceScope"),
@@ -1891,6 +2054,117 @@ public final class BexConformanceReportMain {
                                 : "validated-exact-module-version-cache-absence-not-recorded"),
                 "compositeSource", compositeSource,
                 "failures", failures);
+    }
+
+    static boolean publishedSourceIdentityMatches(
+            String declaredDependency,
+            Map<String, String> publishedApiInspection,
+            String sourceCommit,
+            Collection<String> tagsAtHead) {
+        String publishedCoordinate =
+                publishedApiInspection.get("coordinate");
+        String publishedCommit =
+                publishedApiInspection.get("source.commit");
+        String publishedTag =
+                publishedApiInspection.get("source.tag");
+        int firstSeparator = declaredDependency.indexOf(':');
+        int lastSeparator = declaredDependency.lastIndexOf(':');
+        boolean coordinateShapeValid =
+                firstSeparator > 0
+                        && lastSeparator > firstSeparator + 1
+                        && lastSeparator
+                        == declaredDependency.indexOf(
+                        ':', firstSeparator + 1)
+                        && lastSeparator + 1
+                        < declaredDependency.length();
+        String version = coordinateShapeValid
+                && lastSeparator + 1 < declaredDependency.length()
+                ? declaredDependency.substring(lastSeparator + 1)
+                : "";
+        return coordinateShapeValid
+                && declaredDependency.equals(publishedCoordinate)
+                && publishedCommit != null
+                && publishedCommit.matches("[0-9a-fA-F]{40}")
+                && publishedCommit.equalsIgnoreCase(sourceCommit)
+                && publishedTag != null
+                && publishedTag.equals("v" + version)
+                && tagsAtHead != null
+                && tagsAtHead.contains(publishedTag);
+    }
+
+    private static boolean localModeMatchesPublishedIdentity(
+            Map<String, Object> buildModes) {
+        Map<String, Object> local =
+                castMap(buildModes.get("localComposite"));
+        Map<String, Object> compositeSource =
+                castMap(local.get("compositeSource"));
+        return "passed".equals(local.get("status"))
+                && Boolean.TRUE.equals(
+                compositeSource.get(
+                        "matchesPublishedIdentity"));
+    }
+
+    static boolean bindLanguageReleaseIdentityToModes(
+            Map<String, Object> identity,
+            Map<String, Object> buildModes) {
+        boolean localMatches =
+                localModeMatchesPublishedIdentity(buildModes);
+        boolean currentDependencyExact =
+                Boolean.TRUE.equals(
+                        identity.get(
+                                "currentDependencyExactFinalArtifactProven"));
+        boolean exact = currentDependencyExact && localMatches;
+        identity.put(
+                "localCompositeMatchesPublishedCommit",
+                localMatches);
+        identity.put(
+                "localCompositeMatchesPublishedIdentity",
+                localMatches);
+        identity.put(
+                "validatedLocalCompositeModeMatchesPublishedIdentity",
+                localMatches);
+        identity.put(
+                "validatedLocalCompositeModeFailure",
+                localMatches
+                        ? null
+                        : "validated-local-composite-mode-not-bound-to-published-language-identity");
+        Set<String> failures = new LinkedHashSet<String>();
+        Object existingFailures = identity.get("failures");
+        if (existingFailures instanceof Collection<?>) {
+            for (Object failure
+                    : (Collection<?>) existingFailures) {
+                if (failure != null) {
+                    failures.add(String.valueOf(failure));
+                }
+            }
+        }
+        if (!localMatches) {
+            failures.add(
+                    "validated-local-composite-mode-not-bound-to-published-language-identity");
+        }
+        identity.put(
+                "failures",
+                new ArrayList<String>(failures));
+        identity.put("exactFinalArtifactProven", exact);
+        return exact;
+    }
+
+    private static List<String> gitTagsAtHead(Path repository)
+            throws Exception {
+        String output = git(
+                repository,
+                "tag",
+                "--points-at",
+                "HEAD");
+        List<String> tags = new ArrayList<String>();
+        for (String line : output.split("\\R")) {
+            String tag = line.trim();
+            if (!tag.isEmpty()) {
+                tags.add(tag);
+            }
+        }
+        Collections.sort(tags);
+        return Collections.unmodifiableList(tags);
     }
 
     private static Map<String, Object> cleanDependencyCacheAcceptance(
@@ -1993,17 +2267,22 @@ public final class BexConformanceReportMain {
                 : value.substring(0, separator);
     }
 
-    private static Map<String, Object> hostedLocalLimitCapability() {
+    private static Map<String, Object> hostedLocalLimitCapability(
+            TestEvidence tests) {
         List<String> observedOpenLedgerSignatures =
                 new ArrayList<String>();
-        boolean openLedgerAcceptsMaximumBudget = false;
+        List<String> observedOpenSharedBudgetSignatures =
+                new ArrayList<String>();
+        boolean openLedgerAcceptsSharedBudget = false;
         for (Method method : RuntimeWorkSession.class.getMethods()) {
-            if (!"openLedger".equals(method.getName())) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if (!"openLedger".equals(method.getName())
+                    && !"openSharedBudget".equals(
+                    method.getName())) {
                 continue;
             }
-            Class<?>[] parameters = method.getParameterTypes();
-            StringBuilder signature =
-                    new StringBuilder("openLedger(");
+            StringBuilder signature = new StringBuilder(
+                    method.getName()).append('(');
             for (int index = 0; index < parameters.length; index++) {
                 if (index > 0) {
                     signature.append(',');
@@ -2011,30 +2290,46 @@ public final class BexConformanceReportMain {
                 signature.append(parameters[index].getName());
             }
             signature.append(')');
-            observedOpenLedgerSignatures.add(
-                    signature.toString());
-            if (parameters.length == 3
+            if ("openLedger".equals(method.getName())) {
+                observedOpenLedgerSignatures.add(
+                        signature.toString());
+            } else {
+                observedOpenSharedBudgetSignatures.add(
+                        signature.toString());
+            }
+            if ("openLedger".equals(method.getName())
+                    && parameters.length == 3
                     && String.class.equals(parameters[0])
                     && Map.class.isAssignableFrom(parameters[1])
-                    && (Long.TYPE.equals(parameters[2])
-                    || Long.class.equals(parameters[2]))) {
-                openLedgerAcceptsMaximumBudget = true;
+                    && RuntimeWorkBudget.class.equals(
+                    parameters[2])) {
+                openLedgerAcceptsSharedBudget = true;
             }
         }
         Collections.sort(observedOpenLedgerSignatures);
+        Collections.sort(observedOpenSharedBudgetSignatures);
 
-        /*
-         * The current host publishes no invocation-owned capped scope which
-         * can be shared by independently named physical ledgers.  In
-         * particular, openLedger only accepts a namespace and counter
-         * catalog, so BEX cannot make its physical ledger and a later
-         * intrinsic ledger consume one BEX-local cap through the canonical
-         * session admission path.
-         */
         boolean invocationOwnedSharedCappedBudgetScope = false;
+        for (Method method : RuntimeWorkSession.class.getMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if ("openSharedBudget".equals(method.getName())
+                    && parameters.length == 1
+                    && Long.TYPE.equals(parameters[0])
+                    && RuntimeWorkBudget.class.equals(
+                    method.getReturnType())) {
+                invocationOwnedSharedCappedBudgetScope = true;
+            }
+        }
+        Map<String, Object> sharedBudgetEvidence =
+                tests.namedEvidence(
+                        "hostedLocalLimitIsSharedAcrossBexAndIntrinsicLedgers");
+        boolean sharedBudgetTestPassed =
+                "passed".equals(
+                        sharedBudgetEvidence.get("status"));
         boolean capabilityAvailable =
-                openLedgerAcceptsMaximumBudget
-                        && invocationOwnedSharedCappedBudgetScope;
+                openLedgerAcceptsSharedBudget
+                        && invocationOwnedSharedCappedBudgetScope
+                        && sharedBudgetTestPassed;
         return map(
                 "schema",
                 "blue-bex-hosted-local-limit-capability/1.0",
@@ -2044,22 +2339,35 @@ public final class BexConformanceReportMain {
                 "workstream-2-property-1",
                 "observedRuntimeWorkSessionOpenLedgerSignatures",
                 observedOpenLedgerSignatures,
+                "observedRuntimeWorkSessionOpenSharedBudgetSignatures",
+                observedOpenSharedBudgetSignatures,
                 "runtimeWorkSessionOpenLedgerAcceptsMaximumBudget",
-                openLedgerAcceptsMaximumBudget,
+                false,
+                "runtimeWorkSessionOpenLedgerAcceptsSharedBudget",
+                openLedgerAcceptsSharedBudget,
                 "invocationOwnedSharedCappedBudgetScope",
                 invocationOwnedSharedCappedBudgetScope,
+                "sharedHostBudgetActive",
+                capabilityAvailable,
                 "bexWrapperPrecheckOccursBeforeWork",
-                true,
+                false,
+                "canonicalHostPrecheckOccursBeforeWork",
+                sharedBudgetTestPassed,
                 "bexPhysicalLedgerAndIntrinsicLedgerShareLocalCap",
-                false,
+                sharedBudgetTestPassed,
                 "canonicalSessionRecordedLocalRejection",
-                false,
+                sharedBudgetTestPassed,
+                "sharedBudgetHostedExecutionEvidence",
+                sharedBudgetEvidence,
                 "assessment",
-                "The wrapper precheck is exact and occurs before work, "
-                        + "but the current RuntimeWorkSession cannot enforce "
-                        + "one BEX-local cap across BEX and intrinsic "
-                        + "physical ledgers or record the local rejection "
-                        + "through its canonical rejection path.");
+                capabilityAvailable
+                        ? "RuntimeWorkSession supplies an invocation-owned "
+                        + "shared budget, BEX attaches both its portable and "
+                        + "intrinsic physical ledgers, and the focused hosted "
+                        + "execution proves that rejection is session-recorded "
+                        + "before intrinsic work."
+                        : "The shared-budget API shape or its focused hosted "
+                        + "execution evidence is incomplete.");
     }
 
     private static Map<String, Object>
@@ -2075,7 +2383,7 @@ public final class BexConformanceReportMain {
             }
             returnType = method.getReturnType().getName();
             typedOutcome =
-                    !CyclicSetProof.class.equals(
+                    CyclicSetProofResult.class.equals(
                             method.getReturnType());
         }
 
@@ -2085,9 +2393,22 @@ public final class BexConformanceReportMain {
         Map<String, Object> nullProofEvidence =
                 tests.namedEvidence(
                         "nullCyclicProofAfterFoundContentIsInvalidNotUnavailable");
-        boolean proofLayerTransientUnavailableExpressible = false;
+        Map<String, Object> proofUnavailableEvidence =
+                tests.namedEvidence(
+                        "cyclicProofUnavailabilityAfterFoundContentRemainsTransient");
+        Map<String, Object> hostedUnavailableEvidence =
+                tests.namedEvidence(
+                        "hostedCyclicProofUnavailabilityUsesSessionDiscardLifecycle");
+        boolean proofLayerTransientUnavailableExpressible =
+                typedOutcome
+                        && "passed".equals(
+                        proofUnavailableEvidence.get("status"));
+        boolean hostedUnavailableLifecyclePassed =
+                "passed".equals(
+                        hostedUnavailableEvidence.get("status"));
         boolean capabilityAvailable = typedOutcome
-                && proofLayerTransientUnavailableExpressible;
+                && proofLayerTransientUnavailableExpressible
+                && hostedUnavailableLifecyclePassed;
 
         return map(
                 "schema",
@@ -2108,6 +2429,8 @@ public final class BexConformanceReportMain {
                 contentFetchEvidence,
                 "nullProofAfterFoundEvidence",
                 nullProofEvidence,
+                "proofLayerUnavailableEvidence",
+                proofUnavailableEvidence,
                 "contentFetchEvidenceIsProofLayerEvidence",
                 false,
                 "directInvalidProofCoverage",
@@ -2115,20 +2438,20 @@ public final class BexConformanceReportMain {
                         ? "passed"
                         : nullProofEvidence.get("status"),
                 "hostedUnavailableProofLifecyclePathAvailable",
-                false,
+                hostedUnavailableLifecyclePassed,
                 "hostedUnavailableProofStructuralReadCoverage",
-                "absent",
+                hostedUnavailableEvidence.get("status"),
+                "hostedUnavailableProofStructuralReadEvidence",
+                hostedUnavailableEvidence,
                 "assessment",
-                "CyclicAwareNodeProvider.cyclicSetProofFor returns a proof "
-                        + "or null. After content is FOUND, null is converted "
-                        + "to INVALID_EVIDENCE, so the current host cannot "
-                        + "express transient proof-layer unavailability. "
-                        + "Direct invalid-proof classification is covered, "
-                        + "but no hosted unavailable-proof lifecycle "
-                        + "structural-read path exists to cover. "
-                        + "The content-fetch unavailable test stops before "
-                        + "the proof query and is not proof-unavailability "
-                        + "coverage.");
+                capabilityAvailable
+                        ? "CyclicSetProofResult distinguishes FOUND, "
+                        + "NOT_FOUND, UNAVAILABLE, and INVALID_EVIDENCE. "
+                        + "Focused structural-read evidence proves that "
+                        + "proof-layer UNAVAILABLE remains transient and "
+                        + "uses the hosted discard lifecycle."
+                        : "The typed cyclic-proof outcome or focused "
+                        + "UNAVAILABLE lifecycle evidence is incomplete.");
     }
 
     private static List<Object> knownLimitations(
@@ -2540,9 +2863,10 @@ public final class BexConformanceReportMain {
         output.append("\nSpecification SHA-256: `")
                 .append(castMap(report.get("specification"))
                         .get("sha256"))
-                .append("`. `.cz.toml` unchanged: `")
+                .append("`. `.cz.toml` matches the project version: `")
                 .append(castMap(report.get(
-                        "versionAutomation")).get("unchanged"))
+                        "versionAutomation")).get(
+                                "matchesProjectVersion"))
                 .append("`.\n\n");
 
         Map<String, Object> hostedLocalLimit =
@@ -2553,17 +2877,21 @@ public final class BexConformanceReportMain {
                 .append(hostedLocalLimit.get("status"))
                 .append("`\n");
         output.append("- `RuntimeWorkSession.openLedger` accepts a "
-                        + "maximum budget: `")
+                        + "shared budget: `")
                 .append(hostedLocalLimit.get(
-                        "runtimeWorkSessionOpenLedgerAcceptsMaximumBudget"))
+                        "runtimeWorkSessionOpenLedgerAcceptsSharedBudget"))
                 .append("`\n");
         output.append("- Invocation-owned shared capped scope: `")
                 .append(hostedLocalLimit.get(
                         "invocationOwnedSharedCappedBudgetScope"))
                 .append("`\n");
-        output.append("- Exact wrapper precheck before work: `")
+        output.append("- Duplicate BEX wrapper precheck active: `")
                 .append(hostedLocalLimit.get(
                         "bexWrapperPrecheckOccursBeforeWork"))
+                .append("`\n");
+        output.append("- Canonical host precheck before work: `")
+                .append(hostedLocalLimit.get(
+                        "canonicalHostPrecheckOccursBeforeWork"))
                 .append("`\n");
         output.append("- BEX and intrinsic physical ledgers share the "
                         + "BEX-local cap: `")
@@ -2642,34 +2970,16 @@ public final class BexConformanceReportMain {
         }
         if (localLimitBlocked) {
             output.append(
-                    "The current `RuntimeWorkSession` exposes no "
-                            + "invocation-owned capped scope and no "
-                            + "`openLedger` maximum-budget parameter. "
-                            + "Consequently, BEX and intrinsic physical "
-                            + "ledgers cannot share or report one BEX-local "
-                            + "cap, and a local rejection cannot be "
-                            + "registered through the canonical session "
-                            + "path. The exact wrapper precheck still occurs "
-                            + "before work, but workstream-2 property 1 is "
-                            + "not fully satisfiable in BEX alone.\n");
+                    String.valueOf(
+                            hostedLocalLimit.get("assessment")))
+                    .append("\n");
         }
         if (cyclicProofUnavailableBlocked) {
-            output.append(
-                    "\nThe current `CyclicAwareNodeProvider` proof contract "
-                            + "returns `CyclicSetProof` or `null`; after "
-                            + "content is found, `VerifyingNodeProvider` "
-                            + "classifies a null proof as invalid evidence. "
-                            + "It cannot preserve transient proof-layer "
-                            + "unavailability. Direct invalid-proof "
-                            + "classification is covered, but no hosted "
-                            + "unavailable-proof lifecycle structural-read "
-                            + "path exists to cover. The passing content-fetch "
-                            + "unavailable test stops before any proof query "
-                            + "and is not claimed as unavailable-proof "
-                            + "coverage. Release readiness remains "
-                            + "fail-closed until the host exposes and "
-                            + "preserves a typed unavailable proof "
-                            + "outcome.\n");
+            output.append("\n")
+                    .append(String.valueOf(
+                            cyclicProofUnavailability.get(
+                                    "assessment")))
+                    .append("\n");
         }
         if (publishedApiBlocked) {
             output.append(
@@ -3269,6 +3579,7 @@ public final class BexConformanceReportMain {
                         "second.checkout.gitDirectory"));
         boolean distinctCheckouts = false;
         boolean liveCheckoutStateMatches = false;
+        boolean receiptArtifactsMatch = false;
         if (firstRoot != null
                 && secondRoot != null
                 && firstGitDirectory != null
@@ -3298,9 +3609,27 @@ public final class BexConformanceReportMain {
                                 "second",
                                 evidence,
                                 sourceCommit);
+                receiptArtifactsMatch =
+                        cleanBuildReceiptArtifactsMatch(
+                                firstRealRoot,
+                                firstReceiptValues,
+                                artifactPaths.keySet(),
+                                projectVersion)
+                                && cleanBuildReceiptArtifactsMatch(
+                                secondRealRoot,
+                                secondReceiptValues,
+                                artifactPaths.keySet(),
+                                projectVersion)
+                                && cleanBuildReceiptDependencyMatches(
+                                firstRealRoot,
+                                firstReceiptValues)
+                                && cleanBuildReceiptDependencyMatches(
+                                secondRealRoot,
+                                secondReceiptValues);
             } catch (Exception invalid) {
                 distinctCheckouts = false;
                 liveCheckoutStateMatches = false;
+                receiptArtifactsMatch = false;
             }
         }
         Map<String, Object> resolvedArtifact =
@@ -3387,7 +3716,7 @@ public final class BexConformanceReportMain {
                             "composite.pathCount"));
         }
         boolean passed =
-                "blue-bex-independent-clean-builds/1.0"
+                "blue-bex-independent-clean-builds/1.2"
                         .equals(evidence.get("schema"))
                         && "passed".equals(
                         evidence.get("status"))
@@ -3401,6 +3730,7 @@ public final class BexConformanceReportMain {
                         "second.checkout.clean"))
                         && receiptsValid
                         && receiptContentsMatch
+                        && receiptArtifactsMatch
                         && distinctCheckouts
                         && liveCheckoutStateMatches
                         && dependencyInputMatches
@@ -3425,6 +3755,8 @@ public final class BexConformanceReportMain {
                 "receiptsValid", receiptsValid,
                 "receiptContentsMatchAggregate",
                 receiptContentsMatch,
+                "receiptArtifactsMatch",
+                receiptArtifactsMatch,
                 "distinctCheckouts", distinctCheckouts,
                 "liveCheckoutStateMatches",
                 liveCheckoutStateMatches,
@@ -3448,7 +3780,7 @@ public final class BexConformanceReportMain {
             String prefix,
             Map<String, String> receipt,
             Collection<String> artifactNames) {
-        if (!"blue-bex-clean-build-artifacts/1.0".equals(
+        if (!"blue-bex-clean-build-artifacts/1.1".equals(
                 receipt.get("schema"))
                 || !"passed".equals(receipt.get("status"))
                 || !"true".equals(receipt.get("checkout.clean"))
@@ -3478,6 +3810,8 @@ public final class BexConformanceReportMain {
                 "dependency.mode",
                 "dependency.coordinate",
                 "dependency.effectiveCoordinate",
+                "dependency.artifact.path",
+                "dependency.artifact.bytes",
                 "dependency.artifact.sha256",
                 "composite.path",
                 "composite.commit",
@@ -3493,12 +3827,35 @@ public final class BexConformanceReportMain {
                 return false;
             }
         }
-        for (String artifactName : artifactNames) {
-            String key =
-                    "artifact." + artifactName + ".sha256";
+        for (String field
+                : new String[] {"path", "bytes", "sha256"}) {
+            String receiptKey =
+                    "dependency.artifact." + field;
             if (!Objects.equals(
-                    receipt.get(key),
-                    aggregate.get(key))
+                    receipt.get(receiptKey),
+                    aggregate.get(
+                            prefix + "." + receiptKey))) {
+                return false;
+            }
+        }
+        for (String artifactName : artifactNames) {
+            String artifactPrefix =
+                    "artifact." + artifactName + ".";
+            for (String field
+                    : new String[] {"path", "bytes", "sha256"}) {
+                String receiptKey = artifactPrefix + field;
+                String aggregateKey =
+                        prefix + "." + receiptKey;
+                if (!Objects.equals(
+                        receipt.get(receiptKey),
+                        aggregate.get(aggregateKey))) {
+                    return false;
+                }
+            }
+            if (!Objects.equals(
+                    receipt.get(artifactPrefix + "sha256"),
+                    aggregate.get(
+                            artifactPrefix + "sha256"))
                     || !"true".equals(aggregate.get(
                     "artifact." + artifactName
                             + ".byteIdentical"))) {
@@ -3506,6 +3863,107 @@ public final class BexConformanceReportMain {
             }
         }
         return true;
+    }
+
+    static boolean cleanBuildReceiptArtifactsMatch(
+            Path checkoutRoot,
+            Map<String, String> receipt,
+            Collection<String> artifactNames,
+            String projectVersion) {
+        try {
+            Path realRoot = checkoutRoot.toRealPath();
+            String artifactPrefix =
+                    "blue-bex-java-" + projectVersion;
+            Map<String, String> expectedPaths =
+                    stringMap(
+                            "main",
+                            "build/libs/" + artifactPrefix + ".jar",
+                            "sources",
+                            "build/libs/" + artifactPrefix
+                                    + "-sources.jar",
+                            "javadoc",
+                            "build/libs/" + artifactPrefix
+                                    + "-javadoc.jar",
+                            "sourceRelease",
+                            "build/distributions/" + artifactPrefix
+                                    + "-source-release.zip");
+            for (String artifactName : artifactNames) {
+                String expected = expectedPaths.get(artifactName);
+                String recorded =
+                        receipt.get(
+                                "artifact." + artifactName + ".path");
+                if (expected == null
+                        || recorded == null
+                        || Paths.get(recorded).isAbsolute()
+                        || !expected.equals(recorded)) {
+                    return false;
+                }
+                Path artifact =
+                        realRoot.resolve(recorded).normalize();
+                if (!artifact.startsWith(realRoot)
+                        || !Files.isRegularFile(artifact)) {
+                    return false;
+                }
+                Path realArtifact = artifact.toRealPath();
+                if (!realArtifact.startsWith(realRoot)) {
+                    return false;
+                }
+                long recordedBytes = parseLong(receipt.get(
+                        "artifact." + artifactName + ".bytes"));
+                String recordedHash = receipt.get(
+                        "artifact." + artifactName + ".sha256");
+                if (recordedBytes < 0
+                        || Files.size(realArtifact)
+                        != recordedBytes
+                        || recordedHash == null
+                        || !recordedHash.matches("[0-9a-f]{64}")
+                        || !recordedHash.equals(
+                        sha256(realArtifact))) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception invalid) {
+            return false;
+        }
+    }
+
+    static boolean cleanBuildReceiptDependencyMatches(
+            Path checkoutRoot,
+            Map<String, String> receipt) {
+        try {
+            Path realRoot = checkoutRoot.toRealPath();
+            String expected =
+                    "build/reports/bex-release/clean-build-inputs/"
+                            + "blue-language-java.jar";
+            String recorded =
+                    receipt.get("dependency.artifact.path");
+            if (!expected.equals(recorded)
+                    || Paths.get(recorded).isAbsolute()) {
+                return false;
+            }
+            Path artifact =
+                    realRoot.resolve(recorded).normalize();
+            if (!artifact.startsWith(realRoot)
+                    || !Files.isRegularFile(artifact)) {
+                return false;
+            }
+            Path realArtifact = artifact.toRealPath();
+            if (!realArtifact.startsWith(realRoot)) {
+                return false;
+            }
+            long recordedBytes = parseLong(
+                    receipt.get("dependency.artifact.bytes"));
+            String recordedHash =
+                    receipt.get("dependency.artifact.sha256");
+            return recordedBytes >= 0
+                    && Files.size(realArtifact) == recordedBytes
+                    && recordedHash != null
+                    && recordedHash.matches("[0-9a-f]{64}")
+                    && recordedHash.equals(sha256(realArtifact));
+        } catch (Exception invalid) {
+            return false;
+        }
     }
 
     static boolean liveCleanCheckoutMatches(
