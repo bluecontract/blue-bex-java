@@ -56,6 +56,12 @@ val blueLanguageFocusedModuleNames =
     )
 val blueLanguageFocusedProjectPaths =
     blueLanguageFocusedModuleNames.associateWith { ":$it" }
+val requiredBexRegistryIdentity =
+    "sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1"
+val requiredBexGasManifestIdentity =
+    "sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d"
+val requiredBexFixturePackageIdentity =
+    "sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e"
 val latestLanguageMigrationLock =
     layout.projectDirectory.file(
         "gradle/verification/latest-language-baseline.json"
@@ -3485,6 +3491,22 @@ val writeBexWorkingVerificationReport by tasks.registering {
             }
         val requiredApiInventory =
             file(apiInventory["path"].toString())
+        val requiredApiTypes =
+            if (requiredApiInventory.isFile) {
+                requiredApiInventory.readLines().mapNotNull { line ->
+                    if (line.startsWith("class public ")) {
+                        line.substringBefore(" extends ")
+                            .substringBefore(" implements ")
+                            .removePrefix("class public ")
+                            .trim()
+                            .substringAfterLast(' ')
+                    } else {
+                        null
+                    }
+                }.toSet()
+            } else {
+                emptySet()
+            }
         requireWorking(
             publicApiClassification["schema"] ==
                 "blue-bex-public-api-classification/1.0" &&
@@ -3495,7 +3517,8 @@ val writeBexWorkingVerificationReport by tasks.registering {
                 (apiInventory["publicTypeCount"] as? Number)
                     ?.toInt() &&
                 classifiedApiTypes.toSet().size ==
-                classifiedApiTypes.size,
+                classifiedApiTypes.size &&
+                classifiedApiTypes.toSet() == requiredApiTypes,
             "public-api-classification-ledger-not-current"
         )
         val productionClasspaths =
@@ -3562,6 +3585,22 @@ val writeBexWorkingVerificationReport by tasks.registering {
             "operator-coverage-not-86-of-86"
         )
 
+        val identities = child(report, "identities")
+        val exactIdentitiesPassed =
+            identities["bexRegistry"] == requiredBexRegistryIdentity &&
+                identities["fixtureBindsRegistry"] ==
+                requiredBexRegistryIdentity &&
+                identities["gasManifest"] ==
+                requiredBexGasManifestIdentity &&
+                identities["fixtureBindsGas"] ==
+                requiredBexGasManifestIdentity &&
+                identities["fixturePackage"] ==
+                requiredBexFixturePackageIdentity
+        requireWorking(
+            exactIdentitiesPassed,
+            "normative-registry-gas-or-fixture-identity-mismatch"
+        )
+
         val releaseGates = child(report, "releaseGates")
         requireWorking(
             passed(releaseGates, "deterministicArchives"),
@@ -3587,8 +3626,11 @@ val writeBexWorkingVerificationReport by tasks.registering {
                 "passed" &&
                 child(report, "intrinsicEvidence")["status"] ==
                 "passed" &&
+                intValue(behavior, "required") == 105 &&
+                intValue(behavior, "executedAndPassing") == 105 &&
                 vectors["allPassing"] == true &&
-                intValue(operators, "executedAndPassing") == 86
+                intValue(operators, "executedAndPassing") == 86 &&
+                exactIdentitiesPassed
         requireWorking(
             semanticParityPassed,
             "semantic-parity-evidence-not-passing"
@@ -3604,7 +3646,8 @@ val writeBexWorkingVerificationReport by tasks.registering {
                 "passed" &&
                 child(report, "finiteLoopEvidence")["status"] ==
                 "passed" &&
-                intValue(gas, "executedAndPassing") == 30
+                intValue(gas, "executedAndPassing") == 30 &&
+                exactIdentitiesPassed
         requireWorking(
             gasParityPassed,
             "gas-parity-evidence-not-passing"
@@ -3684,16 +3727,43 @@ val writeBexWorkingVerificationReport by tasks.registering {
             if (workingReady) "passed" else "failed"
         output["workingReady"] = workingReady
         output["workingFailures"] = failures
+        val workingTests = linkedMapOf<String, Any?>()
+        tests.forEach { (key, value) ->
+            workingTests[key.toString()] = value
+        }
+        workingTests["unclassified"] = testsUnclassified
+        workingTests["zeroUnclassified"] = testsUnclassified == 0
+        val workingFinalTotals = linkedMapOf<String, Any?>()
+        totals.forEach { (key, value) ->
+            workingFinalTotals[key.toString()] = value
+        }
+        workingFinalTotals["tests"] = workingTests
+        output["tests"] = workingTests
+        output["finalTotals"] = workingFinalTotals
+        val hostedStandaloneMatrix =
+            child(report, "hostedStandaloneMatrix")
+        val standalonePublished =
+            child(
+                hostedStandaloneMatrix,
+                "standalonePublished"
+            )
+        val strictReleaseFailures =
+            ((report["currentModeFailures"] as? List<*>)
+                ?.map(Any?::toString)
+                ?: emptyList()).toMutableList()
+        if (hostedStandaloneMatrix["allRequiredModesPassed"] != true) {
+            strictReleaseFailures +=
+                "published-local-mode-matrix-not-passing"
+        }
         output["strictRelease"] =
             linkedMapOf(
                 "releaseReady" to report["releaseReady"],
-                "failures" to report["currentModeFailures"],
-                "evidence" to report["hostedStandaloneMatrix"]
-            )
-        val standalonePublished =
-            child(
-                child(report, "hostedStandaloneMatrix"),
-                "standalonePublished"
+                "failures" to strictReleaseFailures.distinct(),
+                "allRequiredModesPassed" to
+                    hostedStandaloneMatrix["allRequiredModesPassed"],
+                "publishedModeStatus" to
+                    (standalonePublished["status"] ?: "not-executed"),
+                "evidence" to hostedStandaloneMatrix
             )
         output["publishedModeStatus"] =
             standalonePublished["status"] ?: "not-executed"
@@ -3701,7 +3771,11 @@ val writeBexWorkingVerificationReport by tasks.registering {
             "./gradlew bexWorkingVerification " +
                 "-PblueLanguageCompositePath=" +
                 (compositeDirectory?.path ?: "<required>")
-        output["recommendedCommandExecuted"] = false
+        output["recommendedCommandExecuted"] =
+            gradle.startParameter.taskNames.any { requestedTask ->
+                requestedTask.substringAfterLast(':') ==
+                    "bexWorkingVerification"
+            }
         output["reportProducerTask"] =
             ":writeBexWorkingVerificationReport"
         output["migrationBaseline"] = migrationBaseline
@@ -3730,7 +3804,7 @@ val writeBexWorkingVerificationReport by tasks.registering {
                 "status" to
                     if (gasParityPassed) "passed" else "failed",
                 "scope" to
-                    "same-run-local-composite-semantic-and-exact-gas-evidence",
+                    "same-run-local-composite-exact-gas-evidence",
                 "gasMicrofixtures" to gas,
                 "counterCoverage" to report["counterCoverage"],
                 "gasExhaustionEvidence" to
