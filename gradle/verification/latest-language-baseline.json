@@ -1,0 +1,77 @@
+{
+  "schema": "blue-bex-latest-language-baseline/1.0",
+  "bex": {
+    "migrationBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
+    "czTomlSha256": "2dd317fbe362561f0e9827c705ff6260fd6df26c16518e0acce99ecba595a4b1"
+  },
+  "language": {
+    "exactHead": "9a607e584ff5dd973684d35d71eb4022d946b760",
+    "verifiedImplementationCommit": "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453",
+    "verifiedReleaseVersion": "3.1.0-rc.18",
+    "documentationOnlyDiffPaths": [
+      "LICENSE",
+      "docs/collection-paths-and-cohesion-migration-report.md",
+      "reports/modernization/phase-collection-paths-final.json"
+    ],
+    "czTomlSha256": "f6717f9a9e38df0dea4b5eeec5a0264c0490856ef4c261c053a06883ba3e69f2",
+    "focusedModules": [
+      {
+        "coordinate": "blue.language:blue-language-model:3.1.0-rc.19",
+        "projectPath": ":blue-language-model",
+        "verifiedArtifactSha256": "ef55be8331147442b858474add4782489d993568effe30202a9c4a8b014d5bd8"
+      },
+      {
+        "coordinate": "blue.language:blue-language-core:3.1.0-rc.19",
+        "projectPath": ":blue-language-core",
+        "verifiedArtifactSha256": "a7d3c72640ab8ac5832feaad576cd1a56457cb87eaf07323fe04a88ae5730740"
+      },
+      {
+        "coordinate": "blue.language:blue-language-mapping:3.1.0-rc.19",
+        "projectPath": ":blue-language-mapping",
+        "verifiedArtifactSha256": "d9141d5c611bde7eb6a21bce3dc4bc0df7d8167f013eeaef2a365dd0a6af329b"
+      },
+      {
+        "coordinate": "blue.language:blue-contracts-core:3.1.0-rc.19",
+        "projectPath": ":blue-contracts-core",
+        "verifiedArtifactSha256": "ec45224ffee3e0c47246869d89c002657c9d1f348af8c553be3b6c0874bf7bae"
+      }
+    ],
+    "hostingPackageIdentities": {
+      "languageRegistry": "sha256:b705171a6ca62c990792bcb78db9d921caf5b0ed06370648b9a81769d69dd71e",
+      "contractsRegistry": "sha256:46a7744c1cbfa4b00e1d8a99f6ca3f0089ef697de968fee08547894ab02b0ca1",
+      "contractsGas": "sha256:88c7bbe77d531c9e973cae13002c3464a2c14568833adf5d804d13b7b3d26af5"
+    }
+  },
+  "migration": {
+    "legacyUtilsImports": {
+      "production": {
+        "lines": 37,
+        "files": 23
+      },
+      "test": {
+        "lines": 14,
+        "files": 13
+      }
+    },
+    "allForbiddenLegacyImports": {
+      "production": {
+        "lines": 42,
+        "files": 24
+      },
+      "test": {
+        "lines": 26,
+        "files": 15
+      }
+    },
+    "languageImportInventory": {
+      "production": {
+        "lines": 139,
+        "files": 43
+      },
+      "test": {
+        "lines": 150,
+        "files": 34
+      }
+    }
+  }
+}

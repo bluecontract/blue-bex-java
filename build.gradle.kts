@@ -7,7 +7,12 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Properties
 import java.util.zip.ZipFile
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import org.apache.commons.compress.archivers.zip.ZipFile as CommonsZipFile
+import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.api.tasks.bundling.Jar
@@ -25,8 +30,36 @@ group = "blue.bex"
 version = determineProjectVersion()
 
 val blueLanguagePublishedVersion = "3.1.0-rc.19"
+val blueLanguageModelDeclaredCoordinate =
+    "blue.language:blue-language-model:$blueLanguagePublishedVersion"
+val blueLanguageCoreDeclaredCoordinate =
+    "blue.language:blue-language-core:$blueLanguagePublishedVersion"
+val blueLanguageMappingDeclaredCoordinate =
+    "blue.language:blue-language-mapping:$blueLanguagePublishedVersion"
+val blueContractsCoreDeclaredCoordinate =
+    "blue.language:blue-contracts-core:$blueLanguagePublishedVersion"
 val blueLanguageDeclaredCoordinate =
     "blue.language:blue-language-java:$blueLanguagePublishedVersion"
+val blueLanguageFocusedCoordinates =
+    listOf(
+        blueLanguageModelDeclaredCoordinate,
+        blueLanguageCoreDeclaredCoordinate,
+        blueLanguageMappingDeclaredCoordinate,
+        blueContractsCoreDeclaredCoordinate
+    )
+val blueLanguageFocusedModuleNames =
+    linkedSetOf(
+        "blue-language-model",
+        "blue-language-core",
+        "blue-language-mapping",
+        "blue-contracts-core"
+    )
+val blueLanguageFocusedProjectPaths =
+    blueLanguageFocusedModuleNames.associateWith { ":$it" }
+val latestLanguageMigrationLock =
+    layout.projectDirectory.file(
+        "gradle/verification/latest-language-baseline.json"
+    )
 val blueLanguageCompositePath =
     providers.gradleProperty("blueLanguageCompositePath")
         .orNull
@@ -59,6 +92,18 @@ val blueLanguageModuleVersionCache =
     )
 val blueLanguageModuleVersionCacheInitiallyAbsent =
     !blueLanguageModuleVersionCache.exists()
+val blueLanguageFocusedModuleVersionCaches =
+    blueLanguageFocusedModuleNames.associateWith { moduleName ->
+        File(
+            gradle.gradleUserHomeDir,
+            "caches/modules-2/files-2.1/blue.language/" +
+                "$moduleName/$blueLanguagePublishedVersion"
+        )
+    }
+val blueLanguageFocusedModuleVersionCachesInitiallyAbsent =
+    blueLanguageFocusedModuleVersionCaches.mapValues { (_, cache) ->
+        !cache.exists()
+    }
 val blueLanguageRequireFreshModuleCache =
     providers.gradleProperty("blueLanguageRequireFreshModuleCache")
         .map(String::toBoolean)
@@ -353,13 +398,960 @@ fun gitWorkspaceFingerprint(
     )
 }
 
+data class FocusedLanguageArtifactEvidence(
+    val coordinate: String,
+    val component: String,
+    val projectPath: String?,
+    val includedBuildProject: Boolean,
+    val file: File,
+    val bytes: Long,
+    val sha256: String
+)
+
+data class FocusedLanguageResolutionEvidence(
+    val components: List<Map<String, Any?>>,
+    val edges: List<Map<String, String>>,
+    val artifacts: List<FocusedLanguageArtifactEvidence>,
+    val graphSha256: String
+)
+
+fun resolveFocusedLanguageEvidence(
+    configuration: Configuration,
+    requiredProjectPaths: Map<String, String>,
+    requireIncludedBuildProjects: Boolean
+): FocusedLanguageResolutionEvidence {
+    val resolution = configuration.incoming.resolutionResult
+    val components =
+        resolution.allComponents.map { component ->
+            val identifier = component.id
+            val moduleVersion = component.moduleVersion
+            linkedMapOf<String, Any?>(
+                "id" to identifier.displayName,
+                "group" to moduleVersion?.group,
+                "name" to moduleVersion?.name,
+                "version" to moduleVersion?.version,
+                "origin" to
+                    if (identifier is ProjectComponentIdentifier) {
+                        if (identifier.build.buildPath == ":") {
+                            "current-build-project"
+                        } else {
+                            "included-build-project"
+                        }
+                    } else {
+                        "external-module"
+                    },
+                "projectPath" to
+                    (identifier as? ProjectComponentIdentifier)
+                        ?.projectPath
+            )
+        }.sortedBy { it["id"].toString() }
+    val edges =
+        resolution.allDependencies
+            .filterIsInstance<ResolvedDependencyResult>()
+            .map { dependency ->
+                linkedMapOf(
+                    "from" to dependency.from.id.displayName,
+                    "requested" to dependency.requested.displayName,
+                    "selected" to dependency.selected.id.displayName
+                )
+            }
+            .sortedWith(
+                compareBy<Map<String, String>>(
+                    { it.getValue("from") },
+                    { it.getValue("requested") },
+                    { it.getValue("selected") }
+                )
+            )
+    val artifacts =
+        configuration.resolvedConfiguration.resolvedArtifacts
+            .filter { it.extension == "jar" }
+            .map { artifact ->
+                val identifier = artifact.id.componentIdentifier
+                val coordinate =
+                    artifact.moduleVersion.id.group + ":" +
+                        artifact.name + ":" +
+                        artifact.moduleVersion.id.version
+                FocusedLanguageArtifactEvidence(
+                    coordinate = coordinate,
+                    component = identifier.displayName,
+                    projectPath =
+                        (identifier as? ProjectComponentIdentifier)
+                            ?.projectPath,
+                    includedBuildProject =
+                        identifier is ProjectComponentIdentifier &&
+                            identifier.build.buildPath != ":",
+                    file = artifact.file.canonicalFile,
+                    bytes = artifact.file.length(),
+                    sha256 = sha256(artifact.file)
+                )
+            }
+            .sortedWith(
+                compareBy<FocusedLanguageArtifactEvidence>(
+                    { it.coordinate },
+                    { it.file.name }
+                )
+            )
+    check(artifacts.isNotEmpty()) {
+        "Focused Blue Language resolution produced no JAR artifacts"
+    }
+    for ((moduleName, projectPath) in requiredProjectPaths) {
+        val matches =
+            artifacts.filter {
+                it.coordinate.substringBefore(':') == "blue.language" &&
+                    it.coordinate.substringAfter(':')
+                        .substringBefore(':') == moduleName
+            }
+        check(matches.size == 1) {
+            "Expected exactly one focused $moduleName JAR, found " +
+                matches.joinToString { it.file.path }
+        }
+        if (requireIncludedBuildProjects) {
+            val match = matches.single()
+            check(
+                match.includedBuildProject &&
+                    match.projectPath == projectPath
+            ) {
+                "Focused module $moduleName must resolve directly from " +
+                    "included-build project $projectPath, but resolved " +
+                    "${match.component} (projectPath=${match.projectPath})"
+            }
+        }
+    }
+    val canonicalGraph =
+        buildList {
+            components.forEach {
+                add(
+                    "component|${it["id"]}|${it["group"]}|" +
+                        "${it["name"]}|${it["version"]}|" +
+                        "${it["origin"]}|${it["projectPath"]}"
+                )
+            }
+            edges.forEach {
+                add(
+                    "edge|${it.getValue("from")}|" +
+                        "${it.getValue("requested")}|" +
+                        it.getValue("selected")
+                )
+            }
+            artifacts.forEach {
+                add(
+                    "artifact|${it.coordinate}|${it.component}|" +
+                        "${it.projectPath}|${it.bytes}|${it.sha256}"
+                )
+            }
+        }.joinToString("\n", postfix = "\n")
+    return FocusedLanguageResolutionEvidence(
+        components = components,
+        edges = edges,
+        artifacts = artifacts,
+        graphSha256 = sha256(
+            canonicalGraph.toByteArray(StandardCharsets.UTF_8)
+        )
+    )
+}
+
+fun Configuration.containsBlueLanguageAggregate(): Boolean =
+    incoming.resolutionResult.allComponents.any { component ->
+        component.moduleVersion?.let {
+            it.group == "blue.language" &&
+                it.name == "blue-language-java"
+        } == true
+    }
+
+fun focusedEvidenceJson(
+    evidence: FocusedLanguageResolutionEvidence,
+    mode: String,
+    declaredCoordinates: List<String>,
+    compileAggregatePresent: Boolean,
+    runtimeAggregatePresent: Boolean
+): Map<String, Any?> =
+    linkedMapOf(
+        "schema" to "blue-bex-focused-language-resolution/1.0",
+        "status" to "passed",
+        "mode" to mode,
+        "declaredCoordinates" to declaredCoordinates,
+        "graphSha256" to evidence.graphSha256,
+        "componentCount" to evidence.components.size,
+        "edgeCount" to evidence.edges.size,
+        "artifactCount" to evidence.artifacts.size,
+        "components" to evidence.components,
+        "edges" to evidence.edges,
+        "artifacts" to evidence.artifacts.map {
+            linkedMapOf(
+                "coordinate" to it.coordinate,
+                "component" to it.component,
+                "origin" to
+                    if (it.includedBuildProject) {
+                        "included-build-project"
+                    } else {
+                        "external-module"
+                    },
+                "projectPath" to it.projectPath,
+                "path" to it.file.path,
+                "bytes" to it.bytes,
+                "sha256" to it.sha256
+            )
+        },
+        "productionClasspaths" to
+            linkedMapOf(
+                "compile" to
+                    linkedMapOf(
+                        "aggregatePresent" to compileAggregatePresent
+                    ),
+                "runtime" to
+                    linkedMapOf(
+                        "aggregatePresent" to runtimeAggregatePresent
+                    )
+            )
+    )
+
+data class JavaImportInventory(
+    val lineCount: Int,
+    val fileCount: Int,
+    val files: Map<String, Int>,
+    val imports: Map<String, Int>
+)
+
+fun JavaImportInventory.toJson(): Map<String, Any?> =
+    linkedMapOf(
+        "lineCount" to lineCount,
+        "fileCount" to fileCount,
+        "files" to files.toSortedMap(),
+        "imports" to imports.toSortedMap()
+    )
+
+val allBlueLanguageImportPattern =
+    Regex("^import\\s+(?:static\\s+)?blue\\.language\\.")
+val legacyUtilsImportPattern =
+    Regex("^import\\s+(?:static\\s+)?blue\\.language\\.utils\\.")
+val forbiddenLegacyImportPatterns =
+    listOf(
+        legacyUtilsImportPattern,
+        Regex(
+            "^import\\s+blue\\.language\\.snapshot\\." +
+                "ResolvedSnapshot;"
+        ),
+        Regex("^import\\s+blue\\.language\\.NodeProvider;"),
+        Regex(
+            "^import\\s+blue\\.language\\.BlueOperation" +
+                "(?:Limits|Outcome|Result);"
+        )
+    )
+val allBlueLanguageImportGitPattern =
+    "^import (static )?blue\\.language\\."
+val legacyUtilsImportGitPattern =
+    "^import (static )?blue\\.language\\.utils\\."
+val forbiddenLegacyImportGitPattern =
+    "^import (static )?blue\\.language\\." +
+        "(utils\\.|snapshot\\.ResolvedSnapshot;|NodeProvider;|" +
+        "BlueOperation(Limits|Outcome|Result);)"
+
+fun sourceImportInventory(
+    checkout: File,
+    sourceRoot: String,
+    matches: (String) -> Boolean
+): JavaImportInventory {
+    val root = File(checkout, sourceRoot)
+    val lines = mutableListOf<Pair<String, String>>()
+    if (root.isDirectory) {
+        root.walkTopDown()
+            .filter { it.isFile && it.extension == "java" }
+            .forEach { source ->
+                source.useLines { sourceLines ->
+                    sourceLines.forEach { rawLine ->
+                        val line = rawLine.trim()
+                        if (matches(line)) {
+                            lines.add(
+                                source.relativeTo(checkout)
+                                    .invariantSeparatorsPath to line
+                            )
+                        }
+                    }
+                }
+            }
+    }
+    return JavaImportInventory(
+        lineCount = lines.size,
+        fileCount = lines.map { it.first }.toSet().size,
+        files = lines.groupingBy { it.first }.eachCount(),
+        imports = lines.groupingBy { it.second }.eachCount()
+    )
+}
+
+fun gitImportInventory(
+    checkout: File,
+    revision: String,
+    sourceRoot: String,
+    pattern: String
+): JavaImportInventory {
+    val output =
+        commandOutput(
+            checkout,
+            "git",
+            "grep",
+            "-n",
+            "-E",
+            pattern,
+            revision,
+            "--",
+            sourceRoot
+        ).trim()
+    val lines =
+        if (output.isEmpty()) {
+            emptyList()
+        } else {
+            output.lineSequence().map { rawLine ->
+                val withoutRevision =
+                    rawLine.removePrefix("$revision:")
+                val pathSeparator = withoutRevision.indexOf(':')
+                val lineSeparator =
+                    withoutRevision.indexOf(':', pathSeparator + 1)
+                check(pathSeparator > 0 && lineSeparator > pathSeparator) {
+                    "Unexpected git grep evidence line: $rawLine"
+                }
+                val path = withoutRevision.substring(0, pathSeparator)
+                val imported =
+                    withoutRevision.substring(lineSeparator + 1).trim()
+                path to imported
+            }.toList()
+        }
+    return JavaImportInventory(
+        lineCount = lines.size,
+        fileCount = lines.map { it.first }.toSet().size,
+        files = lines.groupingBy { it.first }.eachCount(),
+        imports = lines.groupingBy { it.second }.eachCount()
+    )
+}
+
+val blueLanguageFocusedResolution by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = true
+    description =
+        "Resolves the complete focused Blue Language component graph for " +
+            "provenance, version, and JAR hash evidence."
+}
+
+val blueLanguageAggregateCompatibility by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    description =
+        "Resolves the aggregate Blue Language facade only for compatibility " +
+            "and provenance checks; it is not on a BEX production classpath."
+}
+
 dependencies {
-    api(blueLanguageDeclaredCoordinate)
+    api(blueLanguageModelDeclaredCoordinate)
+    api(blueLanguageCoreDeclaredCoordinate)
+    implementation(blueLanguageMappingDeclaredCoordinate)
+    api(blueContractsCoreDeclaredCoordinate)
+
+    blueLanguageFocusedCoordinates.forEach { coordinate ->
+        add(blueLanguageFocusedResolution.name, coordinate)
+    }
+
+    add(
+        blueLanguageAggregateCompatibility.name,
+        blueLanguageDeclaredCoordinate
+    )
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.yaml:snakeyaml:1.31")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+val blueLanguageAggregateCompatibilityEvidence =
+    layout.buildDirectory.file(
+        "reports/latest-language-migration/" +
+            "aggregate-compatibility.properties"
+    )
+val blueLanguageFocusedResolutionEvidence =
+    layout.buildDirectory.file(
+        "reports/latest-language-migration/" +
+            "focused-language-resolution.json"
+    )
+val writeFocusedLanguageResolutionEvidence by tasks.registering {
+    group = "verification"
+    description =
+        "Records the complete focused Language graph, exact versions, " +
+            "project origins, and JAR SHA-256 values and rejects the " +
+            "aggregate facade on BEX production classpaths."
+    inputs.property("dependency.mode", blueLanguageDependencyMode)
+    inputs.property(
+        "dependency.coordinates",
+        blueLanguageFocusedCoordinates.joinToString(",")
+    )
+    inputs.file(latestLanguageMigrationLock)
+    inputs.files(blueLanguageFocusedResolution)
+    outputs.file(blueLanguageFocusedResolutionEvidence)
+    outputs.upToDateWhen { false }
+    doFirst {
+        blueLanguageFocusedResolutionEvidence.get().asFile.delete()
+    }
+    doLast {
+        val compileClasspath = configurations.compileClasspath.get()
+        val runtimeClasspath = configurations.runtimeClasspath.get()
+        val compileAggregatePresent =
+            compileClasspath.containsBlueLanguageAggregate()
+        val runtimeAggregatePresent =
+            runtimeClasspath.containsBlueLanguageAggregate()
+        check(!compileAggregatePresent && !runtimeAggregatePresent) {
+            "blue-language-java is forbidden on BEX production " +
+                "compile/runtime classpaths"
+        }
+        val evidence =
+            resolveFocusedLanguageEvidence(
+                blueLanguageFocusedResolution,
+                blueLanguageFocusedProjectPaths,
+                blueLanguageDependencyMode == "local-composite"
+            )
+        @Suppress("UNCHECKED_CAST")
+        val lock =
+            JsonSlurper().parse(latestLanguageMigrationLock.asFile)
+                as Map<String, Any?>
+        val languageLock = lock["language"] as? Map<*, *>
+            ?: throw GradleException("Language baseline lock is malformed")
+        val lockedModules =
+            (languageLock["focusedModules"] as? List<*>)
+                ?.map { it as Map<*, *> }
+                ?: throw GradleException(
+                    "Language baseline lock has no focused modules"
+                )
+        check(
+            lockedModules.map { it["coordinate"] }.toSet() ==
+                blueLanguageFocusedCoordinates.toSet()
+        ) {
+            "Focused dependency declarations differ from the BEX-owned lock"
+        }
+        if (blueLanguageDependencyMode == "local-composite") {
+            for (lockedModule in lockedModules) {
+                val coordinate = lockedModule["coordinate"].toString()
+                val moduleName = coordinate.split(':')[1]
+                val artifact =
+                    evidence.artifacts.single {
+                        it.coordinate.substringAfter(':')
+                            .substringBefore(':') == moduleName
+                    }
+                check(
+                    artifact.projectPath == lockedModule["projectPath"]
+                ) {
+                    "$moduleName resolved from ${artifact.projectPath}, " +
+                        "not the locked project path " +
+                        lockedModule["projectPath"]
+                }
+                check(
+                    artifact.sha256 ==
+                        lockedModule["verifiedArtifactSha256"]
+                ) {
+                    "$moduleName JAR differs from the verified Language " +
+                        "implementation artifact: ${artifact.sha256}"
+                }
+            }
+        }
+        val output = LinkedHashMap(
+            focusedEvidenceJson(
+                evidence,
+                blueLanguageDependencyMode,
+                blueLanguageFocusedCoordinates,
+                compileAggregatePresent,
+                runtimeAggregatePresent
+            )
+        )
+        output["lock"] =
+            linkedMapOf(
+                "path" to
+                    latestLanguageMigrationLock.asFile
+                        .relativeTo(projectDir)
+                        .invariantSeparatorsPath,
+                "sha256" to sha256(latestLanguageMigrationLock.asFile),
+                "focusedModulesMatch" to true,
+                "localArtifactsMatchVerifiedImplementation" to
+                    (blueLanguageDependencyMode == "local-composite")
+            )
+        val outputFile =
+            blueLanguageFocusedResolutionEvidence.get().asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.writeText(
+            JsonOutput.prettyPrint(JsonOutput.toJson(output)) + "\n"
+        )
+    }
+}
+val latestLanguageMigrationBaselineEvidence =
+    layout.buildDirectory.file(
+        "reports/latest-language-migration/baseline.json"
+    )
+val writeLatestLanguageMigrationBaseline by tasks.registering {
+    group = "verification"
+    description =
+        "Regenerates the migration baseline from the source-controlled " +
+            "Language/BEX lock and live source inventories."
+    inputs.file(latestLanguageMigrationLock)
+    inputs.files(
+        fileTree("src/main/java") { include("**/*.java") },
+        fileTree("src/test/java") { include("**/*.java") },
+        layout.projectDirectory.file(".cz.toml")
+    )
+    blueLanguageCompositePath?.let { path ->
+        inputs.file(file(path).resolve(".cz.toml"))
+    }
+    outputs.file(latestLanguageMigrationBaselineEvidence)
+    outputs.upToDateWhen { false }
+    doFirst {
+        latestLanguageMigrationBaselineEvidence.get().asFile.delete()
+    }
+    doLast {
+        @Suppress("UNCHECKED_CAST")
+        val lock =
+            JsonSlurper().parse(latestLanguageMigrationLock.asFile)
+                as Map<String, Any?>
+        val bexLock = lock["bex"] as? Map<*, *>
+            ?: throw GradleException("BEX migration lock is malformed")
+        val languageLock = lock["language"] as? Map<*, *>
+            ?: throw GradleException("Language migration lock is malformed")
+        val migrationLock = lock["migration"] as? Map<*, *>
+            ?: throw GradleException("Migration inventory lock is malformed")
+        val baselineCommit =
+            bexLock["migrationBaselineCommit"].toString()
+        val expectedLanguageHead =
+            languageLock["exactHead"].toString()
+        val verifiedImplementationCommit =
+            languageLock["verifiedImplementationCommit"].toString()
+        val allowedLanguageDiffPaths =
+            (languageLock["documentationOnlyDiffPaths"] as? List<*>)
+                ?.map(Any?::toString)
+                ?.sorted()
+                ?: emptyList()
+        val failures = mutableListOf<String>()
+        fun requireBaseline(value: Boolean, failure: String) {
+            if (!value) failures.add(failure)
+        }
+        fun expectedInventory(
+            section: String,
+            scope: String
+        ): Pair<Int, Int> {
+            val sectionMap = migrationLock[section] as? Map<*, *>
+                ?: throw GradleException("Missing migration lock: $section")
+            val scopeMap = sectionMap[scope] as? Map<*, *>
+                ?: throw GradleException(
+                    "Missing migration lock: $section.$scope"
+                )
+            return (
+                (scopeMap["lines"] as Number).toInt() to
+                    (scopeMap["files"] as Number).toInt()
+                )
+        }
+        fun matchesExpected(
+            inventory: JavaImportInventory,
+            expected: Pair<Int, Int>
+        ): Boolean =
+            inventory.lineCount == expected.first &&
+                inventory.fileCount == expected.second
+
+        commandOutput(
+            projectDir,
+            "git",
+            "cat-file",
+            "-e",
+            "$baselineCommit^{commit}"
+        )
+        val bexFingerprint = gitWorkspaceFingerprint(projectDir)
+        val bexCzToml = file(".cz.toml")
+        val actualBexCzTomlSha256 = sha256(bexCzToml)
+        requireBaseline(
+            actualBexCzTomlSha256 == bexLock["czTomlSha256"],
+            "bex-cz-toml-differs-from-lock"
+        )
+
+        val languageDirectory =
+            blueLanguageCompositePath
+                ?.let { file(it).canonicalFile }
+        val languageFingerprint =
+            languageDirectory
+                ?.takeIf(File::isDirectory)
+                ?.let(::gitWorkspaceFingerprint)
+        requireBaseline(
+            languageFingerprint != null,
+            "language-composite-checkout-unavailable"
+        )
+        val actualLanguageCzTomlSha256 =
+            languageDirectory
+                ?.resolve(".cz.toml")
+                ?.takeIf(File::isFile)
+                ?.let(::sha256)
+        requireBaseline(
+            actualLanguageCzTomlSha256 ==
+                languageLock["czTomlSha256"],
+            "language-cz-toml-differs-from-lock"
+        )
+        requireBaseline(
+            languageFingerprint?.commit == expectedLanguageHead,
+            "language-head-differs-from-lock"
+        )
+        requireBaseline(
+            languageFingerprint != null && !languageFingerprint.dirty,
+            "language-git-worktree-dirty"
+        )
+        val changedLanguagePaths =
+            languageDirectory?.let {
+                commandOutput(
+                    it,
+                    "git",
+                    "diff",
+                    "--name-only",
+                    "$verifiedImplementationCommit..$expectedLanguageHead"
+                ).lineSequence()
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .sorted()
+                    .toList()
+            } ?: emptyList()
+        val codeEquivalent =
+            languageFingerprint?.commit == expectedLanguageHead &&
+                changedLanguagePaths == allowedLanguageDiffPaths &&
+                actualLanguageCzTomlSha256 ==
+                languageLock["czTomlSha256"]
+        requireBaseline(
+            codeEquivalent,
+            "language-head-not-code-equivalent-to-verified-implementation"
+        )
+
+        val baselineProductionImports =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/main/java",
+                allBlueLanguageImportGitPattern
+            )
+        val baselineTestImports =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/test/java",
+                allBlueLanguageImportGitPattern
+            )
+        val baselineProductionUtils =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/main/java",
+                legacyUtilsImportGitPattern
+            )
+        val baselineTestUtils =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/test/java",
+                legacyUtilsImportGitPattern
+            )
+        val baselineProductionForbidden =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/main/java",
+                forbiddenLegacyImportGitPattern
+            )
+        val baselineTestForbidden =
+            gitImportInventory(
+                projectDir,
+                baselineCommit,
+                "src/test/java",
+                forbiddenLegacyImportGitPattern
+            )
+        requireBaseline(
+            matchesExpected(
+                baselineProductionImports,
+                expectedInventory(
+                    "languageImportInventory",
+                    "production"
+                )
+            ) && matchesExpected(
+                baselineTestImports,
+                expectedInventory("languageImportInventory", "test")
+            ),
+            "baseline-language-import-inventory-differs-from-lock"
+        )
+        requireBaseline(
+            matchesExpected(
+                baselineProductionUtils,
+                expectedInventory("legacyUtilsImports", "production")
+            ) && matchesExpected(
+                baselineTestUtils,
+                expectedInventory("legacyUtilsImports", "test")
+            ),
+            "baseline-utils-import-ledger-differs-from-lock"
+        )
+        requireBaseline(
+            matchesExpected(
+                baselineProductionForbidden,
+                expectedInventory(
+                    "allForbiddenLegacyImports",
+                    "production"
+                )
+            ) && matchesExpected(
+                baselineTestForbidden,
+                expectedInventory(
+                    "allForbiddenLegacyImports",
+                    "test"
+                )
+            ),
+            "baseline-forbidden-import-ledger-differs-from-lock"
+        )
+
+        val currentProductionImports =
+            sourceImportInventory(
+                projectDir,
+                "src/main/java"
+            ) { allBlueLanguageImportPattern.containsMatchIn(it) }
+        val currentTestImports =
+            sourceImportInventory(
+                projectDir,
+                "src/test/java"
+            ) { allBlueLanguageImportPattern.containsMatchIn(it) }
+        val currentProductionForbidden =
+            sourceImportInventory(
+                projectDir,
+                "src/main/java"
+            ) { line ->
+                forbiddenLegacyImportPatterns.any {
+                    it.containsMatchIn(line)
+                }
+            }
+        val currentTestForbidden =
+            sourceImportInventory(
+                projectDir,
+                "src/test/java"
+            ) { line ->
+                forbiddenLegacyImportPatterns.any {
+                    it.containsMatchIn(line)
+                }
+            }
+
+        val output =
+            linkedMapOf<String, Any?>(
+                "schema" to
+                    "blue-bex-latest-language-migration-baseline/1.0",
+                "status" to
+                    if (failures.isEmpty()) "passed" else "failed",
+                "failures" to failures,
+                "lock" to
+                    linkedMapOf(
+                        "path" to
+                            latestLanguageMigrationLock.asFile
+                                .relativeTo(projectDir)
+                                .invariantSeparatorsPath,
+                        "sha256" to
+                            sha256(latestLanguageMigrationLock.asFile)
+                    ),
+                "toolchain" to
+                    linkedMapOf(
+                        "gradle" to gradle.gradleVersion,
+                        "java" to System.getProperty("java.version"),
+                        "os" to System.getProperty("os.name"),
+                        "architecture" to System.getProperty("os.arch")
+                    ),
+                "bex" to
+                    linkedMapOf(
+                        "baselineCommit" to baselineCommit,
+                        "currentCommit" to bexFingerprint.commit,
+                        "gitWorktreeDirty" to bexFingerprint.dirty,
+                        "workspaceSha256" to
+                            bexFingerprint.workspaceSha256,
+                        "czToml" to
+                            linkedMapOf(
+                                "expectedSha256" to
+                                    bexLock["czTomlSha256"],
+                                "actualSha256" to
+                                    actualBexCzTomlSha256,
+                                "matches" to
+                                    (actualBexCzTomlSha256 ==
+                                        bexLock["czTomlSha256"])
+                            )
+                    ),
+                "language" to
+                    linkedMapOf(
+                        "path" to languageDirectory?.path,
+                        "exactCommit" to languageFingerprint?.commit,
+                        "gitWorktreeDirty" to languageFingerprint?.dirty,
+                        "includedBuildCleanClaim" to "not-made",
+                        "verifiedImplementationCommit" to
+                            verifiedImplementationCommit,
+                        "changedPathsSinceVerifiedImplementation" to
+                            changedLanguagePaths,
+                        "allowedDocumentationOnlyPaths" to
+                            allowedLanguageDiffPaths,
+                        "codeEquivalent" to codeEquivalent,
+                        "czToml" to
+                            linkedMapOf(
+                                "expectedSha256" to
+                                    languageLock["czTomlSha256"],
+                                "actualSha256" to
+                                    actualLanguageCzTomlSha256,
+                                "matches" to
+                                    (actualLanguageCzTomlSha256 ==
+                                        languageLock["czTomlSha256"])
+                            ),
+                        "focusedModules" to
+                            languageLock["focusedModules"],
+                        "hostingPackageIdentities" to
+                            languageLock["hostingPackageIdentities"]
+                    ),
+                "sourceApiInventory" to
+                    linkedMapOf(
+                        "baseline" to
+                            linkedMapOf(
+                                "revision" to baselineCommit,
+                                "production" to
+                                    baselineProductionImports.toJson(),
+                                "test" to baselineTestImports.toJson()
+                            ),
+                        "current" to
+                            linkedMapOf(
+                                "production" to
+                                    currentProductionImports.toJson(),
+                                "test" to currentTestImports.toJson()
+                            )
+                    ),
+                "migrationLedger" to
+                    linkedMapOf(
+                        "legacyUtils" to
+                            linkedMapOf(
+                                "before" to
+                                    linkedMapOf(
+                                        "production" to
+                                            baselineProductionUtils.toJson(),
+                                        "test" to
+                                            baselineTestUtils.toJson()
+                                    ),
+                                "after" to
+                                    linkedMapOf(
+                                        "production" to
+                                            sourceImportInventory(
+                                                projectDir,
+                                                "src/main/java"
+                                            ) {
+                                                legacyUtilsImportPattern
+                                                    .containsMatchIn(it)
+                                            }.toJson(),
+                                        "test" to
+                                            sourceImportInventory(
+                                                projectDir,
+                                                "src/test/java"
+                                            ) {
+                                                legacyUtilsImportPattern
+                                                    .containsMatchIn(it)
+                                            }.toJson()
+                                    )
+                            ),
+                        "allForbiddenLegacyImports" to
+                            linkedMapOf(
+                                "before" to
+                                    linkedMapOf(
+                                        "production" to
+                                            baselineProductionForbidden
+                                                .toJson(),
+                                        "test" to
+                                            baselineTestForbidden.toJson()
+                                    ),
+                                "after" to
+                                    linkedMapOf(
+                                        "production" to
+                                            currentProductionForbidden
+                                                .toJson(),
+                                        "test" to
+                                            currentTestForbidden.toJson()
+                                    )
+                            )
+                    )
+            )
+        val outputFile =
+            latestLanguageMigrationBaselineEvidence.get().asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.writeText(
+            JsonOutput.prettyPrint(JsonOutput.toJson(output)) + "\n"
+        )
+    }
+}
+val verifyBlueLanguageAggregateCompatibility by tasks.registering {
+    group = "verification"
+    description =
+        "Resolves and inspects the aggregate Blue Language facade without " +
+            "adding it to a BEX production classpath."
+    inputs.property("dependency.mode", blueLanguageDependencyMode)
+    inputs.property(
+        "dependency.coordinate",
+        blueLanguageDeclaredCoordinate
+    )
+    inputs.files(blueLanguageAggregateCompatibility)
+    outputs.file(blueLanguageAggregateCompatibilityEvidence)
+    outputs.upToDateWhen { false }
+    doFirst {
+        blueLanguageAggregateCompatibilityEvidence.get().asFile.delete()
+    }
+    doLast {
+        val matches =
+            blueLanguageAggregateCompatibility
+                .resolvedConfiguration
+                .resolvedArtifacts
+                .filter {
+                    it.moduleVersion.id.group == "blue.language" &&
+                        it.name == "blue-language-java" &&
+                        it.extension == "jar"
+                }
+        check(matches.size == 1) {
+            "Expected exactly one aggregate blue-language-java artifact, " +
+                "found " +
+                matches.joinToString { it.file.absolutePath }
+        }
+        val artifact = matches.single()
+        check(artifact.file.isFile && artifact.file.length() > 0L) {
+            "Aggregate Blue Language artifact is missing or empty: " +
+                artifact.file
+        }
+        ZipFile(artifact.file).use { archive ->
+            check(archive.getEntry("blue/language/Blue.class") != null) {
+                "Aggregate Blue Language artifact does not expose the " +
+                    "compatibility facade blue.language.Blue: " +
+                    artifact.file
+            }
+        }
+        val component = artifact.id.componentIdentifier
+        if (blueLanguageDependencyMode == "local-composite") {
+            val projectComponent =
+                component as? ProjectComponentIdentifier
+            check(
+                projectComponent != null &&
+                    projectComponent.build.buildPath != ":" &&
+                    projectComponent.projectPath ==
+                    ":blue-language-java"
+            ) {
+                "Local aggregate compatibility artifact did not resolve " +
+                    "from :blue-language-java: " +
+                    component.displayName
+            }
+        }
+        writeEvidence(
+            blueLanguageAggregateCompatibilityEvidence.get().asFile,
+            mapOf(
+                "schema" to
+                    "blue-bex-language-aggregate-compatibility/1.0",
+                "status" to "passed",
+                "mode" to blueLanguageDependencyMode,
+                "declared.coordinate" to
+                    blueLanguageDeclaredCoordinate,
+                "effective.component" to component.displayName,
+                "effective.coordinate" to
+                    (
+                        artifact.moduleVersion.id.group +
+                            ":" + artifact.name + ":" +
+                            artifact.moduleVersion.id.version
+                    ),
+                "artifact.path" to artifact.file.canonicalPath,
+                "artifact.bytes" to artifact.file.length().toString(),
+                "artifact.sha256" to sha256(artifact.file)
+            )
+        )
+    }
 }
 
 tasks.test {
@@ -740,6 +1732,10 @@ val cleanBuildDependencyArtifact =
         "reports/bex-release/clean-build-inputs/" +
             "blue-language-java.jar"
     )
+val cleanBuildFocusedDependencyDirectory =
+    layout.buildDirectory.dir(
+        "reports/bex-release/clean-build-inputs/focused-language"
+    )
 val invalidateCleanBuildArtifactEvidence by tasks.registering {
     group = "verification"
     description =
@@ -748,6 +1744,7 @@ val invalidateCleanBuildArtifactEvidence by tasks.registering {
     doLast {
         cleanBuildArtifactEvidence.get().asFile.delete()
         cleanBuildDependencyArtifact.get().asFile.delete()
+        project.delete(cleanBuildFocusedDependencyDirectory)
     }
 }
 listOf(
@@ -760,12 +1757,20 @@ listOf(
         mustRunAfter(invalidateCleanBuildArtifactEvidence)
     }
 }
+verifyBlueLanguageAggregateCompatibility {
+    mustRunAfter(invalidateCleanBuildArtifactEvidence)
+}
+writeFocusedLanguageResolutionEvidence {
+    mustRunAfter(invalidateCleanBuildArtifactEvidence)
+}
 val writeCleanBuildArtifactHashes by tasks.registering {
     group = "verification"
     description =
         "Records all four release hashes from one clean committed checkout."
     dependsOn(
         invalidateCleanBuildArtifactEvidence,
+        verifyBlueLanguageAggregateCompatibility,
+        writeFocusedLanguageResolutionEvidence,
         mainJar,
         sourcesJarTask,
         javadocJarTask,
@@ -773,10 +1778,12 @@ val writeCleanBuildArtifactHashes by tasks.registering {
     )
     outputs.file(cleanBuildArtifactEvidence)
     outputs.file(cleanBuildDependencyArtifact)
+    outputs.dir(cleanBuildFocusedDependencyDirectory)
     outputs.upToDateWhen { false }
     doFirst {
         cleanBuildArtifactEvidence.get().asFile.delete()
         cleanBuildDependencyArtifact.get().asFile.delete()
+        project.delete(cleanBuildFocusedDependencyDirectory)
     }
     doLast {
         val checkout =
@@ -798,7 +1805,7 @@ val writeCleanBuildArtifactHashes by tasks.registering {
                 "--absolute-git-dir"
             ).trim()
         val languageArtifacts =
-            configurations.compileClasspath.get()
+            blueLanguageAggregateCompatibility
                 .resolvedConfiguration
                 .resolvedArtifacts
                 .filter {
@@ -827,6 +1834,37 @@ val writeCleanBuildArtifactHashes by tasks.registering {
             "Failed to preserve the exact Blue Language dependency " +
                 "artifact with the clean-build receipt"
         }
+        val focusedResolution =
+            resolveFocusedLanguageEvidence(
+                blueLanguageFocusedResolution,
+                blueLanguageFocusedProjectPaths,
+                blueLanguageDependencyMode == "local-composite"
+            )
+        val focusedCopyDirectory =
+            cleanBuildFocusedDependencyDirectory.get().asFile
+        focusedCopyDirectory.mkdirs()
+        val focusedArtifactCopies =
+            focusedResolution.artifacts.mapIndexed { index, artifact ->
+                val safeCoordinate =
+                    artifact.coordinate.replace(
+                        Regex("[^A-Za-z0-9._-]"),
+                        "_"
+                    )
+                val copy =
+                    File(
+                        focusedCopyDirectory,
+                        "%03d-%s.jar".format(index, safeCoordinate)
+                    )
+                artifact.file.copyTo(copy, overwrite = true)
+                check(
+                    copy.length() == artifact.bytes &&
+                        sha256(copy) == artifact.sha256
+                ) {
+                    "Failed to preserve focused dependency artifact " +
+                        artifact.coordinate
+                }
+                artifact to copy
+            }
         val compositeDirectory =
             blueLanguageCompositePath
                 ?.let { file(it).canonicalFile }
@@ -890,6 +1928,17 @@ val writeCleanBuildArtifactHashes by tasks.registering {
                         .invariantSeparatorsPath,
                 "dependency.artifact.sha256" to
                     sha256(languageArtifactCopy),
+                "dependency.aggregateCompatibilityOnly" to "true",
+                "dependency.focused.declaredCoordinates" to
+                    blueLanguageFocusedCoordinates.joinToString(","),
+                "dependency.focused.graphSha256" to
+                    focusedResolution.graphSha256,
+                "dependency.focused.componentCount" to
+                    focusedResolution.components.size.toString(),
+                "dependency.focused.edgeCount" to
+                    focusedResolution.edges.size.toString(),
+                "dependency.focused.artifactCount" to
+                    focusedArtifactCopies.size.toString(),
                 "composite.path" to
                     (compositeDirectory?.path ?: ""),
                 "composite.commit" to
@@ -918,6 +1967,25 @@ val writeCleanBuildArtifactHashes by tasks.registering {
                             ?: "0"
                     )
             )
+        focusedArtifactCopies.forEachIndexed { index, pair ->
+            val (artifact, copy) = pair
+            val prefix =
+                "dependency.focused.artifact.%03d".format(index)
+            values["$prefix.coordinate"] = artifact.coordinate
+            values["$prefix.component"] = artifact.component
+            values["$prefix.projectPath"] =
+                artifact.projectPath.orEmpty()
+            values["$prefix.origin"] =
+                if (artifact.includedBuildProject) {
+                    "included-build-project"
+                } else {
+                    "external-module"
+                }
+            values["$prefix.path"] =
+                copy.relativeTo(projectDir).invariantSeparatorsPath
+            values["$prefix.bytes"] = copy.length().toString()
+            values["$prefix.sha256"] = sha256(copy)
+        }
         for ((name, artifact) in artifacts) {
             values["artifact.$name.path"] =
                 artifact.relativeTo(projectDir)
@@ -944,6 +2012,10 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
     group = "verification"
     description =
         "Compares main, sources, Javadoc, and source-release hashes from two clean checkouts of the same commit."
+    dependsOn(
+        verifyBlueLanguageAggregateCompatibility,
+        writeFocusedLanguageResolutionEvidence
+    )
     val firstEvidencePath =
         providers.gradleProperty("cleanBuildEvidenceOne")
     val secondEvidencePath =
@@ -1030,6 +2102,10 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
             >()
         val authenticatedDependencyArtifacts =
             linkedMapOf<String, Map<String, String>>()
+        val authenticatedFocusedArtifacts =
+            linkedMapOf<String, List<Map<String, String>>>()
+        val authenticatedFocusedGraphHashes =
+            linkedMapOf<String, String>()
         for ((label, evidence) in
             listOf("first" to first, "second" to second)) {
             check(evidence["schema"] == expectedSchema) {
@@ -1248,6 +2324,120 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
                 "$label Blue Language artifact hash differs from " +
                     "its receipt"
             }
+            check(
+                evidence["dependency.aggregateCompatibilityOnly"] ==
+                    "true"
+            ) {
+                "$label aggregate artifact is not labelled smoke-only"
+            }
+            check(
+                evidence["dependency.focused.declaredCoordinates"] ==
+                    blueLanguageFocusedCoordinates.joinToString(",")
+            ) {
+                "$label focused dependency coordinates differ"
+            }
+            val focusedGraphHash =
+                evidence["dependency.focused.graphSha256"]
+            check(
+                focusedGraphHash?.matches(Regex("[0-9a-f]{64}")) ==
+                    true
+            ) {
+                "$label focused dependency graph hash is unavailable"
+            }
+            val focusedArtifactCount =
+                evidence["dependency.focused.artifactCount"]
+                    ?.toIntOrNull()
+            check(
+                focusedArtifactCount != null &&
+                    focusedArtifactCount > 0
+            ) {
+                "$label focused dependency artifact count is invalid"
+            }
+            val focusedArtifacts =
+                (0 until focusedArtifactCount).map { index ->
+                    val prefix =
+                        "dependency.focused.artifact.%03d".format(index)
+                    val coordinate = evidence["$prefix.coordinate"]
+                    val component = evidence["$prefix.component"]
+                    val projectPath =
+                        evidence["$prefix.projectPath"].orEmpty()
+                    val origin = evidence["$prefix.origin"]
+                    val relativePath = evidence["$prefix.path"]
+                    check(
+                        coordinate?.split(':')?.size == 3 &&
+                            component?.isNotEmpty() == true &&
+                            origin in setOf(
+                                "included-build-project",
+                                "external-module"
+                            ) &&
+                            relativePath?.startsWith(
+                                "build/reports/bex-release/" +
+                                    "clean-build-inputs/focused-language/"
+                            ) == true &&
+                            !File(relativePath).isAbsolute
+                    ) {
+                        "$label focused artifact $index metadata is invalid"
+                    }
+                    val copiedArtifact =
+                        File(recordedRoot, relativePath).canonicalFile
+                    check(
+                        copiedArtifact.toPath().startsWith(
+                            recordedRoot.toPath()
+                        ) && copiedArtifact.isFile
+                    ) {
+                        "$label focused artifact $coordinate is unavailable"
+                    }
+                    val recordedBytes =
+                        evidence["$prefix.bytes"]?.toLongOrNull()
+                    val recordedHash = evidence["$prefix.sha256"]
+                    check(
+                        recordedBytes == copiedArtifact.length() &&
+                            recordedHash?.matches(
+                                Regex("[0-9a-f]{64}")
+                            ) == true &&
+                            recordedHash == sha256(copiedArtifact)
+                    ) {
+                        "$label focused artifact $coordinate differs " +
+                            "from its receipt"
+                    }
+                    val authenticatedCoordinate =
+                        requireNotNull(coordinate)
+                    val authenticatedComponent =
+                        requireNotNull(component)
+                    val authenticatedOrigin = requireNotNull(origin)
+                    val authenticatedHash = requireNotNull(recordedHash)
+                    linkedMapOf<String, String>(
+                        "coordinate" to authenticatedCoordinate,
+                        "component" to authenticatedComponent,
+                        "projectPath" to projectPath,
+                        "origin" to authenticatedOrigin,
+                        "bytes" to recordedBytes.toString(),
+                        "sha256" to authenticatedHash
+                    )
+                }
+            for ((moduleName, expectedPath) in
+                blueLanguageFocusedProjectPaths) {
+                val matches = focusedArtifacts.filter {
+                    it.getValue("coordinate")
+                        .substringAfter(':')
+                        .substringBefore(':') == moduleName
+                }
+                check(matches.size == 1) {
+                    "$label receipt does not contain exactly one " +
+                        "$moduleName artifact"
+                }
+                if (blueLanguageDependencyMode == "local-composite") {
+                    check(
+                        matches.single().getValue("origin") ==
+                            "included-build-project" &&
+                            matches.single().getValue("projectPath") ==
+                            expectedPath
+                    ) {
+                        "$label $moduleName did not originate from " +
+                            "$expectedPath"
+                    }
+                }
+            }
             authenticatedRoots[label] = recordedRoot
             authenticatedGitDirectories[label] =
                 actualGitDirectory
@@ -1261,6 +2451,8 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
                     "bytes" to dependencyBytes.toString(),
                     "sha256" to actualDependencyHash
                 )
+            authenticatedFocusedArtifacts[label] = focusedArtifacts
+            authenticatedFocusedGraphHashes[label] = focusedGraphHash
         }
         check(
             authenticatedRoots.getValue("first") !=
@@ -1436,8 +2628,49 @@ val verifyIndependentCleanBuildReproducibility by tasks.registering {
         ) {
             "Clean builds resolved different Language artifacts"
         }
+        val firstFocusedGraphHash =
+            authenticatedFocusedGraphHashes.getValue("first")
+        val secondFocusedGraphHash =
+            authenticatedFocusedGraphHashes.getValue("second")
+        check(firstFocusedGraphHash == secondFocusedGraphHash) {
+            "Clean builds resolved different focused Language graphs"
+        }
+        check(
+            authenticatedFocusedArtifacts.getValue("first") ==
+                authenticatedFocusedArtifacts.getValue("second")
+        ) {
+            "Clean builds resolved different focused Language JAR sets"
+        }
+        val verifierFocusedResolution =
+            resolveFocusedLanguageEvidence(
+                blueLanguageFocusedResolution,
+                blueLanguageFocusedProjectPaths,
+                blueLanguageDependencyMode == "local-composite"
+            )
+        check(
+            verifierFocusedResolution.graphSha256 ==
+                firstFocusedGraphHash
+        ) {
+            "Clean builds did not use the verifier's exact focused " +
+                "Language component graph"
+        }
+        values["dependency.focused.declaredCoordinates"] =
+            blueLanguageFocusedCoordinates.joinToString(",")
+        values["dependency.focused.graphSha256"] =
+            firstFocusedGraphHash
+        values["dependency.focused.artifactCount"] =
+            authenticatedFocusedArtifacts.getValue("first")
+                .size.toString()
+        authenticatedFocusedArtifacts.getValue("first")
+            .forEachIndexed { index, artifact ->
+                val prefix =
+                    "dependency.focused.artifact.%03d".format(index)
+                artifact.forEach { (field, value) ->
+                    values["$prefix.$field"] = value
+                }
+            }
         val verifierLanguageArtifacts =
-            configurations.compileClasspath.get()
+            blueLanguageAggregateCompatibility
                 .resolvedConfiguration
                 .resolvedArtifacts
                 .filter {
@@ -1852,7 +3085,12 @@ val dependencyResolutionEvidence =
 val writeDependencyResolutionEvidence by tasks.registering {
     group = "verification"
     description =
-        "Resolves blue-language-java and verifies standalone artifacts against recorded Maven Central provenance."
+        "Verifies focused Language resolution and the smoke-only aggregate " +
+            "facade against strict standalone provenance evidence."
+    dependsOn(
+        verifyBlueLanguageAggregateCompatibility,
+        writeFocusedLanguageResolutionEvidence
+    )
     outputs.file(dependencyResolutionEvidence)
     outputs.upToDateWhen { false }
     doFirst {
@@ -1860,7 +3098,7 @@ val writeDependencyResolutionEvidence by tasks.registering {
     }
     doLast {
         val matches =
-            configurations.compileClasspath.get()
+            blueLanguageAggregateCompatibility
                 .resolvedConfiguration
                 .resolvedArtifacts
                 .filter {
@@ -1869,7 +3107,7 @@ val writeDependencyResolutionEvidence by tasks.registering {
                         it.extension == "jar"
                 }
         check(matches.size == 1) {
-            "Expected exactly one blue-language-java compile artifact, found " +
+            "Expected exactly one smoke-only blue-language-java artifact, found " +
                 matches.joinToString { it.file.absolutePath }
         }
         val artifact = matches.single()
@@ -1878,6 +3116,12 @@ val writeDependencyResolutionEvidence by tasks.registering {
             blueLanguageCompositePath
                 ?.let { file(it).canonicalFile }
         val artifactHash = sha256(artifact.file)
+        val focusedResolution =
+            resolveFocusedLanguageEvidence(
+                blueLanguageFocusedResolution,
+                blueLanguageFocusedProjectPaths,
+                blueLanguageDependencyMode == "local-composite"
+            )
         val provenanceStatus: String
         val moduleVersionCacheAcceptance: String
         if (blueLanguageDependencyMode == "standalone-published") {
@@ -1907,10 +3151,14 @@ val writeDependencyResolutionEvidence by tasks.registering {
             // this exact Blue Language module/version directory was absent;
             // resolution above then verifies the resulting JAR against the
             // source-controlled Maven Central hash.
+            val allRequiredCachesInitiallyAbsent =
+                blueLanguageModuleVersionCacheInitiallyAbsent &&
+                    blueLanguageFocusedModuleVersionCachesInitiallyAbsent
+                        .values.all { it }
             moduleVersionCacheAcceptance =
                 if (!blueLanguageRequireFreshModuleCache.get()) {
                     "not-required-for-current-run"
-                } else if (blueLanguageModuleVersionCacheInitiallyAbsent) {
+                } else if (allRequiredCachesInitiallyAbsent) {
                     "passed"
                 } else {
                     "failed"
@@ -1919,9 +3167,8 @@ val writeDependencyResolutionEvidence by tasks.registering {
             provenanceStatus = "not-applicable-local-composite"
             moduleVersionCacheAcceptance = "not-executed"
         }
-        writeEvidence(
-            dependencyResolutionEvidence.get().asFile,
-            mapOf(
+        val values =
+            linkedMapOf(
                 "schema" to
                     "blue-bex-dependency-resolution-evidence/1.0",
                 "status" to "resolved",
@@ -1936,6 +3183,17 @@ val writeDependencyResolutionEvidence by tasks.registering {
                 "artifact.path" to artifact.file.canonicalPath,
                 "artifact.bytes" to artifact.file.length().toString(),
                 "artifact.sha256" to artifactHash,
+                "aggregate.compatibilityOnly" to "true",
+                "focused.declaredCoordinates" to
+                    blueLanguageFocusedCoordinates.joinToString(","),
+                "focused.graphSha256" to
+                    focusedResolution.graphSha256,
+                "focused.componentCount" to
+                    focusedResolution.components.size.toString(),
+                "focused.edgeCount" to
+                    focusedResolution.edges.size.toString(),
+                "focused.artifactCount" to
+                    focusedResolution.artifacts.size.toString(),
                 "composite.path" to
                     (compositeDirectory?.path ?: ""),
                 "repository.policy" to "maven-central-only",
@@ -1956,8 +3214,30 @@ val writeDependencyResolutionEvidence by tasks.registering {
                     blueLanguageRequireFreshModuleCache.get().toString(),
                 "cache.acceptance" to moduleVersionCacheAcceptance,
                 "cache.acceptanceScope" to
-                    "standalone-published-blue-language-module-version-cache"
+                    "standalone-published-focused-and-aggregate-language-module-version-caches"
             )
+        blueLanguageFocusedModuleVersionCaches
+            .toSortedMap()
+            .forEach { (moduleName, cache) ->
+                values["cache.focused.$moduleName.path"] =
+                    cache.canonicalPath
+                values["cache.focused.$moduleName.initiallyAbsent"] =
+                    blueLanguageFocusedModuleVersionCachesInitiallyAbsent
+                        .getValue(moduleName)
+                        .toString()
+            }
+        focusedResolution.artifacts.forEachIndexed { index, focused ->
+            val prefix = "focused.artifact.%03d".format(index)
+            values["$prefix.coordinate"] = focused.coordinate
+            values["$prefix.component"] = focused.component
+            values["$prefix.projectPath"] =
+                focused.projectPath.orEmpty()
+            values["$prefix.bytes"] = focused.bytes.toString()
+            values["$prefix.sha256"] = focused.sha256
+        }
+        writeEvidence(
+            dependencyResolutionEvidence.get().asFile,
+            values
         )
     }
 }
@@ -2020,14 +3300,10 @@ writeBexConformanceReport {
     mustRunAfter(tasks.test)
 }
 
-tasks.test {
-    finalizedBy(writeBexConformanceReport)
-}
-
 tasks.register("bexConformanceReport") {
     group = "verification"
     description = "Runs all tests and produces the machine-readable BEX 2.0 conformance report."
-    dependsOn(tasks.test)
+    dependsOn(tasks.test, writeBexConformanceReport)
 }
 
 val bexReleaseEvidence by tasks.registering {
@@ -2057,6 +3333,481 @@ val bexReleaseEvidence by tasks.registering {
                     ?: "see build/reports/bex-conformance/report.md")
         }
     }
+}
+
+val bexWorkingVerificationReport =
+    layout.buildDirectory.file(
+        "reports/latest-language-migration/final.json"
+    )
+val publicApiClassificationLedger =
+    layout.projectDirectory.file("docs/public-api-classification.json")
+val writeProvisionalBexWorkingReceipt = {
+    blueLanguageFocusedResolutionEvidence.get().asFile.delete()
+    blueLanguageAggregateCompatibilityEvidence.get().asFile.delete()
+    latestLanguageMigrationBaselineEvidence.get().asFile.delete()
+    val outputFile = bexWorkingVerificationReport.get().asFile
+    outputFile.parentFile.mkdirs()
+    outputFile.writeText(
+        JsonOutput.prettyPrint(
+            JsonOutput.toJson(
+                linkedMapOf(
+                    "schema" to
+                        "blue-bex-working-verification/2.0",
+                    "status" to "in-progress-or-failed",
+                    "workingReady" to false,
+                    "workingFailures" to
+                        listOf("verification-did-not-complete"),
+                    "recommendedCommand" to
+                        "./gradlew bexWorkingVerification " +
+                            "-PblueLanguageCompositePath=" +
+                            (blueLanguageCompositePath ?: "<required>"),
+                    "recommendedCommandExecuted" to false
+                )
+            )
+        ) + "\n"
+    )
+}
+gradle.taskGraph.whenReady {
+    val workingReportRequested =
+        allTasks.any {
+            it.path == ":bexWorkingVerification" ||
+                it.path == ":writeBexWorkingVerificationReport"
+        }
+    if (workingReportRequested && !gradle.startParameter.isDryRun) {
+        writeProvisionalBexWorkingReceipt()
+    }
+}
+val initializeBexWorkingVerificationReceipt by tasks.registering {
+    group = "verification"
+    description =
+        "Invalidates migration evidence and writes a provisional red " +
+            "receipt before compilation or dependency resolution starts."
+    outputs.upToDateWhen { false }
+    doLast {
+        writeProvisionalBexWorkingReceipt()
+    }
+}
+val writeBexWorkingVerificationReport by tasks.registering {
+    group = "verification"
+    description =
+        "Writes the publication-independent BEX working-verification " +
+            "report for the exact local modular Language checkout."
+    dependsOn(
+        initializeBexWorkingVerificationReceipt,
+        tasks.test,
+        writeBexConformanceReport,
+        sourceReleaseArchive,
+        verifyBlueLanguageAggregateCompatibility,
+        writeFocusedLanguageResolutionEvidence,
+        writeLatestLanguageMigrationBaseline
+    )
+    val conformanceReport =
+        layout.buildDirectory.file(
+            "reports/bex-conformance/report.json"
+        )
+    inputs.file(conformanceReport)
+    inputs.file(blueLanguageAggregateCompatibilityEvidence)
+    inputs.file(blueLanguageFocusedResolutionEvidence)
+    inputs.file(latestLanguageMigrationBaselineEvidence)
+    inputs.file(latestLanguageMigrationLock)
+    inputs.file(publicApiClassificationLedger)
+    inputs.property("dependency.mode", blueLanguageDependencyMode)
+    inputs.property(
+        "focused.coordinates",
+        blueLanguageFocusedCoordinates.joinToString(",")
+    )
+    outputs.file(bexWorkingVerificationReport)
+    outputs.upToDateWhen { false }
+    doLast {
+        val failures = mutableListOf<String>()
+        fun requireWorking(value: Boolean, failure: String) {
+            if (!value) failures.add(failure)
+        }
+        fun mapValue(value: Any?): Map<*, *> =
+            value as? Map<*, *> ?: emptyMap<Any, Any>()
+        fun child(parent: Map<*, *>, name: String): Map<*, *> =
+            mapValue(parent[name])
+        fun intValue(parent: Map<*, *>, name: String): Int =
+            (parent[name] as? Number)?.toInt() ?: -1
+        fun passed(parent: Map<*, *>, name: String): Boolean =
+            child(parent, name)["status"] == "passed"
+
+        val conformanceFile = conformanceReport.get().asFile
+        check(conformanceFile.isFile) {
+            "Conformance report is missing: $conformanceFile"
+        }
+        @Suppress("UNCHECKED_CAST")
+        val report =
+            JsonSlurper().parse(conformanceFile)
+                as Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val focusedResolution =
+            JsonSlurper().parse(
+                blueLanguageFocusedResolutionEvidence.get().asFile
+            ) as Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val migrationBaseline =
+            JsonSlurper().parse(
+                latestLanguageMigrationBaselineEvidence.get().asFile
+            ) as Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val publicApiClassification =
+            JsonSlurper().parse(publicApiClassificationLedger.asFile)
+                as Map<String, Any?>
+        val baselineLanguage = child(migrationBaseline, "language")
+        val baselineBex = child(migrationBaseline, "bex")
+        val languageCzToml = child(baselineLanguage, "czToml")
+        val bexCzToml = child(baselineBex, "czToml")
+        requireWorking(
+            migrationBaseline["status"] == "passed",
+            "migration-baseline-lock-validation-not-passing"
+        )
+        requireWorking(
+            baselineLanguage["codeEquivalent"] == true,
+            "language-not-code-equivalent-to-verified-implementation"
+        )
+        requireWorking(
+            languageCzToml["matches"] == true,
+            "language-cz-toml-differs-from-lock"
+        )
+        requireWorking(
+            bexCzToml["matches"] == true,
+            "bex-cz-toml-differs-from-lock"
+        )
+        val apiInventory =
+            child(publicApiClassification, "inventory")
+        val apiClassifications =
+            child(publicApiClassification, "classifications")
+        val classifiedApiTypes =
+            apiClassifications.values.flatMap { value ->
+                (value as? List<*>)?.map(Any?::toString)
+                    ?: emptyList()
+            }
+        val requiredApiInventory =
+            file(apiInventory["path"].toString())
+        requireWorking(
+            publicApiClassification["schema"] ==
+                "blue-bex-public-api-classification/1.0" &&
+                requiredApiInventory.isFile &&
+                sha256(requiredApiInventory) ==
+                apiInventory["sha256"] &&
+                classifiedApiTypes.size ==
+                (apiInventory["publicTypeCount"] as? Number)
+                    ?.toInt() &&
+                classifiedApiTypes.toSet().size ==
+                classifiedApiTypes.size,
+            "public-api-classification-ledger-not-current"
+        )
+        val productionClasspaths =
+            child(focusedResolution, "productionClasspaths")
+        requireWorking(
+            focusedResolution["status"] == "passed" &&
+                focusedResolution["mode"] == "local-composite" &&
+                focusedResolution["graphSha256"]
+                    ?.toString()
+                    ?.matches(Regex("[0-9a-f]{64}")) == true &&
+                child(productionClasspaths, "compile")
+                    ["aggregatePresent"] == false &&
+                child(productionClasspaths, "runtime")
+                    ["aggregatePresent"] == false,
+            "focused-language-resolution-or-production-classpath-gate-not-passing"
+        )
+        val totals = child(report, "finalTotals")
+        val tests = child(totals, "tests")
+        val behavior = child(totals, "behaviorFixtures")
+        val gas = child(totals, "gasMicrofixtures")
+        val vectors = child(totals, "normativeVectors")
+        val operators = child(totals, "operators")
+
+        val testsExecuted = intValue(tests, "executed")
+        val testsPassed = intValue(tests, "passed")
+        val testsFailed = intValue(tests, "failed")
+        val testsSkipped = intValue(tests, "skipped")
+        val testsUnclassified =
+            if (
+                testsExecuted >= 0 && testsPassed >= 0 &&
+                testsFailed >= 0 && testsSkipped >= 0
+            ) {
+                testsExecuted - testsPassed -
+                    testsFailed - testsSkipped
+            } else {
+                -1
+            }
+        requireWorking(
+            testsExecuted > 0 && testsFailed == 0 &&
+                testsSkipped == 0 && testsUnclassified == 0 &&
+                tests["zeroFailures"] == true &&
+                tests["zeroSkips"] == true,
+            "ordinary-tests-not-passing-with-zero-skips-and-zero-unclassified"
+        )
+        requireWorking(
+            intValue(behavior, "required") == 105 &&
+                intValue(behavior, "executedAndPassing") == 105,
+            "behavior-fixtures-not-105-of-105"
+        )
+        requireWorking(
+            intValue(gas, "required") == 30 &&
+                intValue(gas, "executedAndPassing") == 30,
+            "gas-microfixtures-not-30-of-30"
+        )
+        requireWorking(
+            intValue(vectors, "required") == 60 &&
+                intValue(vectors, "executedAndPassing") == 60 &&
+                vectors["allPassing"] == true,
+            "normative-vectors-not-60-of-60"
+        )
+        requireWorking(
+            intValue(operators, "required") == 86 &&
+                intValue(operators, "executedAndPassing") == 86,
+            "operator-coverage-not-86-of-86"
+        )
+
+        val releaseGates = child(report, "releaseGates")
+        requireWorking(
+            passed(releaseGates, "deterministicArchives"),
+            "bex-owned-reproducibility-check-not-passing"
+        )
+        requireWorking(
+            passed(releaseGates, "binaryApi"),
+            "binary-source-api-report-not-passing"
+        )
+        requireWorking(
+            passed(releaseGates, "java8Bytecode"),
+            "java8-bytecode-check-not-passing"
+        )
+        requireWorking(
+            child(report, "semanticBoundaryInvocationEvidence")
+                ["status"] == "passed" &&
+                child(report, "ledgerLifecycleEvidence")
+                    ["status"] == "passed",
+            "hosted-contracts-boundary-evidence-not-passing"
+        )
+        val semanticParityPassed =
+            child(report, "representationMatrixResult")["status"] ==
+                "passed" &&
+                child(report, "intrinsicEvidence")["status"] ==
+                "passed" &&
+                vectors["allPassing"] == true &&
+                intValue(operators, "executedAndPassing") == 86
+        requireWorking(
+            semanticParityPassed,
+            "semantic-parity-evidence-not-passing"
+        )
+        val counterCoverage = child(report, "counterCoverage")
+        val gasParityPassed =
+            counterCoverage["allMicrofixturesPassing"] == true &&
+                counterCoverage["vocabularyComplete"] == true &&
+                intValue(counterCoverage, "declaredCounterCount") == 30 &&
+                intValue(counterCoverage, "executedMicrofixtureCount") == 30 &&
+                intValue(counterCoverage, "passingMicrofixtureCount") == 30 &&
+                child(report, "gasExhaustionEvidence")["status"] ==
+                "passed" &&
+                child(report, "finiteLoopEvidence")["status"] ==
+                "passed" &&
+                intValue(gas, "executedAndPassing") == 30
+        requireWorking(
+            gasParityPassed,
+            "gas-parity-evidence-not-passing"
+        )
+        requireWorking(
+            child(child(report, "dependency"), "resolution")
+                ["status"] == "passed",
+            "aggregate-compatibility-resolution-report-not-passing"
+        )
+        requireWorking(
+            (report["artifacts"] as? List<*>)?.size == 4,
+            "working-artifacts-not-all-present"
+        )
+
+        fun legacyImportCount(sourceRoot: File): Int =
+            if (!sourceRoot.isDirectory) {
+                0
+            } else {
+                sourceRoot.walkTopDown()
+                    .filter { it.isFile && it.extension == "java" }
+                    .sumOf { source ->
+                        source.useLines { lines ->
+                            lines.count { line ->
+                                forbiddenLegacyImportPatterns.any {
+                                    pattern -> pattern.containsMatchIn(line)
+                                }
+                            }
+                        }
+                    }
+            }
+        val productionLegacyImports =
+            legacyImportCount(file("src/main/java"))
+        val testLegacyImports =
+            legacyImportCount(file("src/test/java"))
+        requireWorking(
+            productionLegacyImports == 0,
+            "production-legacy-language-imports-present"
+        )
+        requireWorking(
+            testLegacyImports == 0,
+            "test-legacy-language-imports-present"
+        )
+
+        val compositeDirectory =
+            blueLanguageCompositePath
+                ?.let { file(it).canonicalFile }
+        requireWorking(
+            blueLanguageDependencyMode == "local-composite" &&
+                compositeDirectory?.isDirectory == true,
+            "bex-working-verification-requires-blueLanguageCompositePath"
+        )
+        val languageFingerprint =
+            compositeDirectory
+                ?.takeIf { it.isDirectory }
+                ?.let(::gitWorkspaceFingerprint)
+        requireWorking(
+            languageFingerprint != null &&
+                !languageFingerprint.dirty,
+            "local-language-checkout-is-dirty-or-unavailable"
+        )
+
+        val aggregateEvidence = readEvidence(
+            blueLanguageAggregateCompatibilityEvidence
+                .get().asFile
+        )
+        requireWorking(
+            aggregateEvidence["status"] == "passed" &&
+                aggregateEvidence["mode"] == "local-composite",
+            "aggregate-language-compatibility-smoke-not-passing"
+        )
+
+        val workingReady = failures.isEmpty()
+        val output = LinkedHashMap<String, Any?>(report)
+        output["schema"] =
+            "blue-bex-working-verification/2.0"
+        output["status"] =
+            if (workingReady) "passed" else "failed"
+        output["workingReady"] = workingReady
+        output["workingFailures"] = failures
+        output["strictRelease"] =
+            linkedMapOf(
+                "releaseReady" to report["releaseReady"],
+                "failures" to report["currentModeFailures"],
+                "evidence" to report["hostedStandaloneMatrix"]
+            )
+        val standalonePublished =
+            child(
+                child(report, "hostedStandaloneMatrix"),
+                "standalonePublished"
+            )
+        output["publishedModeStatus"] =
+            standalonePublished["status"] ?: "not-executed"
+        output["recommendedCommand"] =
+            "./gradlew bexWorkingVerification " +
+                "-PblueLanguageCompositePath=" +
+                (compositeDirectory?.path ?: "<required>")
+        output["recommendedCommandExecuted"] = false
+        output["reportProducerTask"] =
+            ":writeBexWorkingVerificationReport"
+        output["migrationBaseline"] = migrationBaseline
+        output["languageCodeEquivalence"] = baselineLanguage
+        output["sourceApiInventory"] =
+            migrationBaseline["sourceApiInventory"]
+        output["publicApiClassification"] =
+            publicApiClassification
+        output["migrationLedger"] =
+            migrationBaseline["migrationLedger"]
+        output["focusedLanguageResolution"] = focusedResolution
+        output["semanticParity"] =
+            linkedMapOf(
+                "status" to
+                    if (semanticParityPassed) "passed" else "failed",
+                "normativeVectors" to vectors,
+                "behaviorFixtures" to behavior,
+                "operators" to operators,
+                "identities" to report["identities"],
+                "representationMatrixResult" to
+                    report["representationMatrixResult"],
+                "intrinsicEvidence" to report["intrinsicEvidence"]
+            )
+        output["gasParity"] =
+            linkedMapOf(
+                "status" to
+                    if (gasParityPassed) "passed" else "failed",
+                "scope" to
+                    "same-run-local-composite-semantic-and-exact-gas-evidence",
+                "gasMicrofixtures" to gas,
+                "counterCoverage" to report["counterCoverage"],
+                "gasExhaustionEvidence" to
+                    report["gasExhaustionEvidence"],
+                "finiteLoopEvidence" to report["finiteLoopEvidence"],
+                "ledgerLifecycleEvidence" to
+                    report["ledgerLifecycleEvidence"]
+            )
+        output["hostedBoundaryResults"] =
+            linkedMapOf(
+                "semanticBoundaryInvocationEvidence" to
+                    report["semanticBoundaryInvocationEvidence"],
+                "ledgerLifecycleEvidence" to
+                    report["ledgerLifecycleEvidence"],
+                "hostedLocalLimitCapability" to
+                    report["hostedLocalLimitCapability"],
+                "cyclicProofUnavailabilityCapability" to
+                    report["cyclicProofUnavailabilityCapability"],
+                "hostedOutcomes" to report["hostedOutcomes"]
+            )
+        output["workingDependency"] =
+            linkedMapOf(
+                "focusedCoordinates" to
+                    blueLanguageFocusedCoordinates,
+                "languageCommit" to
+                    languageFingerprint?.commit,
+                "languageWorkspaceSha256" to
+                    languageFingerprint?.workspaceSha256,
+                "focusedResolution" to focusedResolution,
+                "aggregateCompatibility" to
+                    aggregateEvidence.toSortedMap(),
+                "aggregateCompatibilityOnly" to true,
+                "productionLegacyImports" to
+                    productionLegacyImports,
+                "testLegacyImports" to testLegacyImports
+            )
+        val outputFile =
+            bexWorkingVerificationReport.get().asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.writeText(
+            JsonOutput.prettyPrint(JsonOutput.toJson(output)) + "\n"
+        )
+        check(workingReady) {
+            "BEX working verification is not ready: " +
+                failures.joinToString("; ") +
+                ". See " + outputFile
+        }
+    }
+}
+
+listOf(
+    tasks.test,
+    writeBexConformanceReport,
+    sourceReleaseArchive,
+    verifyBlueLanguageAggregateCompatibility,
+    writeFocusedLanguageResolutionEvidence,
+    writeLatestLanguageMigrationBaseline
+).forEach { verificationTask ->
+    verificationTask.configure {
+        mustRunAfter(initializeBexWorkingVerificationReceipt)
+    }
+}
+
+val bexWorkingVerification by tasks.registering {
+    group = "verification"
+    description =
+        "Runs the complete local-composite BEX working gate without " +
+            "requiring a published Language release."
+    dependsOn(writeBexWorkingVerificationReport)
+}
+
+val bexReleaseVerify by tasks.registering {
+    group = "verification"
+    description =
+        "Runs the strict published/local release matrix and fails closed " +
+            "when compatible published Language evidence is unavailable."
+    dependsOn(bexReleaseEvidence)
 }
 
 tasks.check {
@@ -2145,12 +3896,12 @@ publishing {
 tasks.withType<
     org.gradle.api.publish.maven.tasks.PublishToMavenRepository
 >().configureEach {
-    dependsOn(bexReleaseEvidence)
+    dependsOn(bexReleaseVerify)
 }
 tasks.withType<
     org.gradle.api.publish.maven.tasks.PublishToMavenLocal
 >().configureEach {
-    dependsOn(bexReleaseEvidence)
+    dependsOn(bexReleaseVerify)
 }
 tasks.matching {
     it.name in setOf(
@@ -2162,7 +3913,7 @@ tasks.matching {
         "jreleaserUpload"
     )
 }.configureEach {
-    dependsOn(bexReleaseEvidence)
+    dependsOn(bexReleaseVerify)
 }
 
 if (System.getenv("CI") != null) {
