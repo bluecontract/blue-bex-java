@@ -3,6 +3,7 @@ package blue.bex;
 import blue.bex.api.BexEngine;
 import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexProgramSource;
+import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.BexCompiledProgramCache;
 import blue.bex.compile.LruBexCompiledProgramCache;
 import blue.bex.gas.BexGasCounter;
@@ -52,6 +53,59 @@ class BexIntrinsicTest {
     private static final String CONSTANT_WORK = "constantWork";
     private static final Map<String, Long> CONSTANT_WORK_WEIGHTS =
             Collections.singletonMap(CONSTANT_WORK, 1L);
+
+    @Test
+    void compiledProgramRejectsARegistryWithTheSameBlueIdButDifferentIdentity() {
+        BexProgramSource source = source(
+                "type: Blue/BEX Program",
+                "expr:",
+                "  $intrinsic:",
+                "    type:",
+                "      blueId: TestIntrinsicEcho",
+                "    payload: bound");
+        BexEngine compilingEngine = BexEngine.builder()
+                .intrinsic(
+                        ECHO_BLUE_ID,
+                        "registry-a",
+                        CONSTANT_WORK_WEIGHTS,
+                        invocation -> invocation.field("payload"))
+                .build();
+        BexCompiledProgram compiled = compilingEngine.compile(source);
+
+        BexEngine differentRegistry = BexEngine.builder()
+                .intrinsic(
+                        ECHO_BLUE_ID,
+                        "registry-b",
+                        CONSTANT_WORK_WEIGHTS,
+                        invocation -> invocation.field("payload"))
+                .build();
+
+        BexException failure = assertThrows(
+                BexException.class,
+                () -> differentRegistry.execute(compiled, defaultContext()));
+        assertTrue(failure.getMessage().contains(
+                "Compiled BEX environment identity mismatch"));
+    }
+
+    @Test
+    void throwingMetricsSinkCannotChangeCompilationOrExecutionOutcome() {
+        BexEngine engine = BexEngine.builder()
+                .metrics(metrics -> {
+                    throw new IllegalStateException("diagnostic sink failure");
+                })
+                .build();
+        BexProgramSource source = source(
+                "type: Blue/BEX Program",
+                "expr: 42");
+
+        BexCompiledProgram first = engine.compile(source);
+        BexCompiledProgram cached = engine.compile(source);
+        BexExecutionResult result = engine.execute(cached, defaultContext());
+
+        assertSame(first, cached);
+        assertEquals("42", String.valueOf(simple(result.value())));
+        assertTrue(result.gasUsed() > 0L);
+    }
 
     @Test
     void registeredIntrinsicReceivesBlueIdAndEvaluatedFields() {

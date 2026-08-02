@@ -1,0 +1,254 @@
+class public abstract interface blue.bex.api.BexDocumentView
+class public abstract interface blue.bex.api.BexDocumentView :: method public abstract canonicalAt(java.lang.String):blue.bex.value.BexValue
+class public abstract interface blue.bex.api.BexDocumentView :: method public abstract currentScopePath():java.lang.String
+class public abstract interface blue.bex.api.BexDocumentView :: method public abstract resolvePointer(java.lang.String):java.lang.String
+class public abstract interface blue.bex.api.BexDocumentView :: method public abstract resolvedAt(java.lang.String):blue.bex.value.BexValue
+class public abstract interface blue.bex.api.BexGasLedgerHost
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public abstract evidenceUnavailable(blue.language.processor.GasMeter$ChildGasLedger):void
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public abstract failedDeterministically(blue.language.processor.GasMeter$ChildGasLedger):void
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public abstract open(java.lang.String,java.util.Map):blue.language.processor.GasMeter$ChildGasLedger
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public abstract submit(blue.language.processor.GasMeter$ChildGasLedger):void
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public localGasLimitExceeded(blue.bex.gas.BexGasLimitExceededException,java.lang.RuntimeException):java.lang.RuntimeException
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public open(java.lang.String,java.util.Map,blue.language.processor.RuntimeWorkBudget):blue.language.processor.GasMeter$ChildGasLedger
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public openSharedBudget(long):blue.language.processor.RuntimeWorkBudget
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public propagateGasExhaustion(blue.language.processor.GasMeter$ChildGasLedger,blue.language.processor.GasLimitExceededException):void
+class public abstract interface blue.bex.api.BexGasLedgerHost :: method public separatesRuntimeNamespaces():boolean
+class public abstract interface blue.bex.api.BexMetricsSink :: method public abstract accept(blue.bex.result.BexMetrics):void
+class public abstract interface blue.bex.runtime.CompiledExpression
+class public abstract interface blue.bex.runtime.CompiledExpression :: method public abstract eval(blue.bex.runtime.CompiledFrame):blue.bex.value.BexValue
+class public abstract interface blue.bex.runtime.CompiledStatement
+class public abstract interface blue.bex.runtime.CompiledStatement :: method public abstract exec(blue.bex.runtime.CompiledFrame):blue.bex.runtime.Control
+class public final blue.bex.api.BexEngine
+class public final blue.bex.api.BexEngine :: method public compile(blue.bex.api.BexProgramSource):blue.bex.compile.BexCompiledProgram
+class public final blue.bex.api.BexEngine :: method public compileAndExecute(blue.bex.api.BexProgramSource,blue.bex.api.BexExecutionContext):blue.bex.result.BexExecutionResult
+class public final blue.bex.api.BexEngine :: method public execute(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext):blue.bex.result.BexExecutionResult
+class public final blue.bex.api.BexEngine :: method public static builder():blue.bex.api.BexEngine$Builder
+class public final blue.bex.api.BexExecutionContext
+class public final blue.bex.api.BexExecutionContext :: method public binding(java.lang.String):blue.bex.value.BexValue
+class public final blue.bex.api.BexExecutionContext :: method public bindings():java.util.Map
+class public final blue.bex.api.BexExecutionContext :: method public currentContract():blue.bex.value.BexValue
+class public final blue.bex.api.BexExecutionContext :: method public currentScopePath():java.lang.String
+class public final blue.bex.api.BexExecutionContext :: method public document():blue.bex.api.BexDocumentView
+class public final blue.bex.api.BexExecutionContext :: method public event():blue.bex.value.BexValue
+class public final blue.bex.api.BexExecutionContext :: method public gasLedgerHost():blue.bex.api.BexGasLedgerHost
+class public final blue.bex.api.BexExecutionContext :: method public gasLimit():long
+class public final blue.bex.api.BexExecutionContext :: method public parentRemainingGas():long
+class public final blue.bex.api.BexExecutionContext :: method public processingEvent():blue.bex.value.BexValue
+class public final blue.bex.api.BexExecutionContext :: method public semanticIdentityBoundary():blue.bex.output.BexSemanticIdentityBoundary
+class public final blue.bex.api.BexExecutionContext :: method public static builder():blue.bex.api.BexExecutionContext$Builder
+class public final blue.bex.api.BexExecutionContext :: method public steps():blue.bex.api.BexStepResults
+class public final blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.api.BexIntrinsicRegistry :: method public identity():java.lang.String
+class public final blue.bex.api.BexIntrinsicRegistry :: method public invoke(java.lang.String,blue.bex.value.BexValue,java.util.Map,blue.bex.gas.BexGasMeter,blue.bex.output.BexOutputAdmission):blue.bex.value.BexValue
+class public final blue.bex.api.BexIntrinsicRegistry :: method public registeredNamedWeights():java.util.Map
+class public final blue.bex.api.BexIntrinsicRegistry :: method public registeredNamedWeights(java.util.Set):java.util.Map
+class public final blue.bex.api.BexIntrinsicRegistry :: method public registeredNamespaceWeights():java.util.Map
+class public final blue.bex.api.BexIntrinsicRegistry :: method public registeredNamespaceWeights(java.util.Set):java.util.Map
+class public final blue.bex.api.BexIntrinsicRegistry :: method public static builder():blue.bex.api.BexIntrinsicRegistry$Builder
+class public final blue.bex.api.BexIntrinsicRegistry :: method public static empty():blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.api.BexIntrinsicRegistry :: method public supportedBlueIds():java.util.Set
+class public final blue.bex.api.BexIntrinsicRegistry :: method public supports(java.lang.String):boolean
+class public final blue.bex.api.BexIntrinsicRegistry :: method public with(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.api.BexIntrinsicRegistry :: method public with(java.lang.Class,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.api.BexIntrinsicRegistry :: method public with(java.lang.String,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.api.BexProgramSource
+class public final blue.bex.api.BexProgramSource :: method public definitionNode():java.util.Optional
+class public final blue.bex.api.BexProgramSource :: method public entry():java.util.Optional
+class public final blue.bex.api.BexProgramSource :: method public isExpression():boolean
+class public final blue.bex.api.BexProgramSource :: method public kind():blue.bex.api.BexProgramSource$Kind
+class public final blue.bex.api.BexProgramSource :: method public programNode():blue.language.snapshot.FrozenNode
+class public final blue.bex.api.BexProgramSource :: method public static expression(blue.language.snapshot.FrozenNode):blue.bex.api.BexProgramSource
+class public final blue.bex.api.BexProgramSource :: method public static inline(blue.language.snapshot.FrozenNode):blue.bex.api.BexProgramSource
+class public final blue.bex.api.BexProgramSource :: method public static withDefinition(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String):blue.bex.api.BexProgramSource
+class public final blue.bex.api.BexStepResults
+class public final blue.bex.api.BexStepResults :: method public asValue():blue.bex.value.BexValue
+class public final blue.bex.api.BexStepResults :: method public static builder():blue.bex.api.BexStepResults$Builder
+class public final blue.bex.api.BexStepResults :: method public static empty():blue.bex.api.BexStepResults
+class public final blue.bex.api.BexStepResults :: method public step(java.lang.String):blue.bex.value.BexValue
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: constructor public <init>(blue.language.processor.ProcessorExecutionContext)
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: method public canonicalAt(java.lang.String):blue.bex.value.BexValue
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: method public currentScopePath():java.lang.String
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: method public resolvePointer(java.lang.String):java.lang.String
+class public final blue.bex.api.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: method public resolvedAt(java.lang.String):blue.bex.value.BexValue
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: constructor public <init>(blue.language.processor.ProcessorExecutionContext)
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: constructor public <init>(blue.language.processor.ProcessorExecutionContext,java.lang.String)
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: constructor public <init>(blue.language.processor.RuntimeWorkSession,java.lang.String)
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public evidenceUnavailable(blue.language.processor.GasMeter$ChildGasLedger):void
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public failedDeterministically(blue.language.processor.GasMeter$ChildGasLedger):void
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public localGasLimitExceeded(blue.bex.gas.BexGasLimitExceededException,java.lang.RuntimeException):java.lang.RuntimeException
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public open(java.lang.String,java.util.Map):blue.language.processor.GasMeter$ChildGasLedger
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public open(java.lang.String,java.util.Map,blue.language.processor.RuntimeWorkBudget):blue.language.processor.GasMeter$ChildGasLedger
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public openSharedBudget(long):blue.language.processor.RuntimeWorkBudget
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public physicalNamespace(java.lang.String):java.lang.String
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public propagateGasExhaustion(blue.language.processor.GasMeter$ChildGasLedger,blue.language.processor.GasLimitExceededException):void
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public runtimeNamespace():java.lang.String
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public separatesRuntimeNamespaces():boolean
+class public final blue.bex.api.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public submit(blue.language.processor.GasMeter$ChildGasLedger):void
+class public final blue.bex.compile.BexCompiledProgram :: constructor public <init>(blue.bex.compile.BexCompiledProgram$CompiledFunction,java.util.Map,java.util.Map,int,java.lang.String)
+class public final blue.bex.compile.BexCompiledProgram :: constructor public <init>(blue.bex.compile.BexCompiledProgram$CompiledFunction,java.util.Map,java.util.Map,int,java.lang.String,java.util.Set)
+class public final blue.bex.compile.BexCompiledProgram :: method public constants():java.util.Map
+class public final blue.bex.compile.BexCompiledProgram :: method public entry():blue.bex.compile.BexCompiledProgram$CompiledFunction
+class public final blue.bex.compile.BexCompiledProgram :: method public execute(blue.bex.runtime.BexRuntime):blue.bex.value.BexValue
+class public final blue.bex.compile.BexCompiledProgram :: method public functions():java.util.Map
+class public final blue.bex.compile.BexCompiledProgram :: method public rootFrameSize():int
+class public final blue.bex.compile.BexCompiledProgramKey :: constructor public <init>(blue.bex.api.BexProgramSource$Kind,java.lang.String,java.lang.String,java.lang.String)
+class public final blue.bex.compile.BexCompiledProgramKey :: constructor public <init>(blue.bex.api.BexProgramSource$Kind,java.lang.String,java.lang.String,java.lang.String,java.lang.String)
+class public final blue.bex.compile.BexCompiledProgramKey :: method public kind():blue.bex.api.BexProgramSource$Kind
+class public final blue.bex.compile.BexCompiledProgramKey :: method public static from(blue.bex.api.BexProgramSource):blue.bex.compile.BexCompiledProgramKey
+class public final blue.bex.compile.BexCompiledProgramKey :: method public static from(blue.bex.api.BexProgramSource,java.lang.String):blue.bex.compile.BexCompiledProgramKey
+class public final blue.bex.compile.BexCompiler
+class public final blue.bex.compile.BexCompiler :: constructor public <init>(blue.bex.result.BexMetrics)
+class public final blue.bex.compile.BexCompiler :: constructor public <init>(blue.bex.result.BexMetrics,blue.bex.api.BexIntrinsicRegistry)
+class public final blue.bex.compile.BexCompiler :: method public compile(blue.bex.api.BexProgramSource):blue.bex.compile.BexCompiledProgram
+class public final blue.bex.compile.BexContainsCache :: method public synchronized containsBex(blue.language.snapshot.FrozenNode,blue.bex.result.BexMetrics):boolean
+class public final blue.bex.gas.BexGasLimitExceededException extends blue.bex.BexException :: method public hostGasLimitExceeded():blue.language.processor.GasLimitExceededException
+class public final blue.bex.gas.BexGasMeter :: constructor public <init>(blue.bex.gas.BexGasSchedule,blue.language.processor.GasMeter$ChildGasLedger)
+class public final blue.bex.gas.BexGasMeter :: constructor public <init>(blue.bex.gas.BexGasSchedule,blue.language.processor.GasMeter$ChildGasLedger,long)
+class public final blue.bex.gas.BexGasMeter :: method public propagateHostGasExhaustion(blue.language.processor.GasLimitExceededException,java.util.function.Consumer,java.util.function.BiConsumer):void
+class public final blue.bex.output.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary
+class public final blue.bex.output.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary :: constructor public <init>(blue.language.processor.ProcessorExecutionContext)
+class public final blue.bex.output.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary :: method public establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
+class public final blue.bex.pointer.BexPointerCache :: method public synchronized get(java.lang.String,blue.bex.result.BexMetrics):blue.bex.pointer.BexPointer
+class public final blue.bex.result.BexChangeset
+class public final blue.bex.result.BexChangeset :: constructor public <init>(java.util.List)
+class public final blue.bex.result.BexChangeset :: method public asValue():blue.bex.value.BexValue
+class public final blue.bex.result.BexChangeset :: method public entries():java.util.List
+class public final blue.bex.result.BexChangeset :: method public static patchEntryValue(blue.bex.result.BexPatchEntry):blue.bex.value.BexValue
+class public final blue.bex.result.BexEvents
+class public final blue.bex.result.BexEvents :: constructor public <init>(java.util.List)
+class public final blue.bex.result.BexEvents :: constructor public <init>(java.util.List,java.util.List)
+class public final blue.bex.result.BexEvents :: method public admittedEvents():java.util.List
+class public final blue.bex.result.BexEvents :: method public asValue():blue.bex.value.BexValue
+class public final blue.bex.result.BexEvents :: method public events():java.util.List
+class public final blue.bex.result.BexExecutionResult :: constructor public <init>(blue.bex.value.BexValue,blue.bex.result.BexChangeset,blue.bex.result.BexEvents,blue.bex.gas.BexGasLedger,blue.bex.result.BexMetrics)
+class public final blue.bex.result.BexExecutionResult :: constructor public <init>(blue.bex.value.BexValue,blue.bex.result.BexChangeset,blue.bex.result.BexEvents,blue.bex.gas.BexGasLedger,blue.bex.result.BexMetrics,blue.bex.output.BexAdmittedValue)
+class public final blue.bex.result.BexExecutionResult :: constructor public <init>(blue.bex.value.BexValue,blue.bex.result.BexChangeset,blue.bex.result.BexEvents,java.util.List,blue.bex.result.BexMetrics)
+class public final blue.bex.result.BexMetrics :: method public addCompileNanos(long):void
+class public final blue.bex.result.BexMetrics :: method public addExecuteNanos(long):void
+class public final blue.bex.result.BexMetrics :: method public incrementCompileCacheHits():void
+class public final blue.bex.result.BexMetrics :: method public incrementCompileCacheMisses():void
+class public final blue.bex.result.BexMetrics :: method public incrementCompiledExecutions():void
+class public final blue.bex.result.BexMetrics :: method public incrementContainsBexCacheHits():void
+class public final blue.bex.result.BexMetrics :: method public incrementContainsBexCacheMisses():void
+class public final blue.bex.result.BexMetrics :: method public incrementContainsBexScans():void
+class public final blue.bex.result.BexMetrics :: method public incrementCurrentContractReads():void
+class public final blue.bex.result.BexMetrics :: method public incrementEventReads():void
+class public final blue.bex.result.BexMetrics :: method public incrementExpressionEvaluations():void
+class public final blue.bex.result.BexMetrics :: method public incrementFrozenDocumentReads():void
+class public final blue.bex.result.BexMetrics :: method public incrementFrozenOutputConversions():void
+class public final blue.bex.result.BexMetrics :: method public incrementFrozenWriterNodeFallbacks():void
+class public final blue.bex.result.BexMetrics :: method public incrementFunctionArgMapAllocations():void
+class public final blue.bex.result.BexMetrics :: method public incrementFunctionCalls():void
+class public final blue.bex.result.BexMetrics :: method public incrementInterpretedFallbacks():void
+class public final blue.bex.result.BexMetrics :: method public incrementLoopIterations():void
+class public final blue.bex.result.BexMetrics :: method public incrementNodeMaterializations():void
+class public final blue.bex.result.BexMetrics :: method public incrementNodeOutputConversions():void
+class public final blue.bex.result.BexMetrics :: method public incrementPointerCacheHits():void
+class public final blue.bex.result.BexMetrics :: method public incrementPointerCacheMisses():void
+class public final blue.bex.result.BexMetrics :: method public incrementPointerParses():void
+class public final blue.bex.result.BexMetrics :: method public incrementResolvedDocumentReads():void
+class public final blue.bex.result.BexMetrics :: method public incrementResultOverlayAncestorHits():void
+class public final blue.bex.result.BexMetrics :: method public incrementResultOverlayDocumentFallbacks():void
+class public final blue.bex.result.BexMetrics :: method public incrementResultOverlayExactHits():void
+class public final blue.bex.result.BexMetrics :: method public incrementResultValueReads():void
+class public final blue.bex.result.BexMetrics :: method public incrementSimpleMaterializations():void
+class public final blue.bex.result.BexMetrics :: method public incrementStatementExecutions():void
+class public final blue.bex.result.BexMetrics :: method public incrementStepsReads():void
+class public final blue.bex.result.BexPatchEntry
+class public final blue.bex.result.BexPatchEntry :: constructor public <init>(java.lang.String,java.lang.String,java.lang.String,blue.bex.value.BexValue)
+class public final blue.bex.result.BexPatchEntry :: constructor public <init>(java.lang.String,java.lang.String,java.lang.String,blue.bex.value.BexValue,blue.bex.output.BexAdmittedValue)
+class public final blue.bex.result.BexPatchEntry :: method public absolutePath():java.lang.String
+class public final blue.bex.result.BexPatchEntry :: method public absoluteSegments():java.util.List
+class public final blue.bex.result.BexPatchEntry :: method public admittedValue():blue.bex.output.BexAdmittedValue
+class public final blue.bex.result.BexPatchEntry :: method public authoredPath():java.lang.String
+class public final blue.bex.result.BexPatchEntry :: method public op():java.lang.String
+class public final blue.bex.result.BexPatchEntry :: method public val():blue.bex.value.BexValue
+class public final blue.bex.result.BexResultOverlay :: constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics)
+class public final blue.bex.result.BexResultOverlay :: constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)
+class public final blue.bex.runtime.BexRuntime
+class public final blue.bex.runtime.BexRuntime :: constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)
+class public final blue.bex.runtime.BexRuntime :: constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)
+class public final blue.bex.runtime.BexRuntime :: method public accumulator():blue.bex.runtime.BexExecutionAccumulator
+class public final blue.bex.runtime.BexRuntime :: method public canonicalPointer(java.lang.String):java.lang.String
+class public final blue.bex.runtime.BexRuntime :: method public context():blue.bex.api.BexExecutionContext
+class public final blue.bex.runtime.BexRuntime :: method public defaultResultValue():blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public execute():blue.bex.result.BexExecutionResult
+class public final blue.bex.runtime.BexRuntime :: method public gas():blue.bex.gas.BexGasMeter
+class public final blue.bex.runtime.BexRuntime :: method public intrinsics():blue.bex.api.BexIntrinsicRegistry
+class public final blue.bex.runtime.BexRuntime :: method public invokeIntrinsic(java.lang.String,blue.bex.value.BexValue,java.util.Map):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public metrics():blue.bex.result.BexMetrics
+class public final blue.bex.runtime.BexRuntime :: method public nodeBlueId(blue.bex.value.BexValue):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public outputAdmission():blue.bex.output.BexOutputAdmission
+class public final blue.bex.runtime.BexRuntime :: method public parseDynamicPointer(java.lang.String):java.util.List
+class public final blue.bex.runtime.BexRuntime :: method public pointerCache():blue.bex.pointer.BexPointerCache
+class public final blue.bex.runtime.BexRuntime :: method public program():blue.bex.compile.BexCompiledProgram
+class public final blue.bex.runtime.BexRuntime :: method public readBinding(java.lang.String,java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readCurrentContract(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readDocument(java.lang.String,java.util.List,boolean):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readEvent(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readProcessingEvent(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readResultValue(java.lang.String,java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readSteps(java.lang.String,java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public readValuePointer(blue.bex.value.BexValue,java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.BexRuntime :: method public resolvePointer(java.lang.String):java.lang.String
+class public final blue.bex.runtime.BexRuntime :: method public typeMatcher():blue.bex.type.BexBlueTypeMatcher
+class public final blue.bex.runtime.CompileScope
+class public final blue.bex.runtime.CompileScope :: constructor public <init>()
+class public final blue.bex.runtime.CompileScope :: constructor public <init>(blue.bex.runtime.CompileScope)
+class public final blue.bex.runtime.CompileScope :: method public captureVisibility():blue.bex.runtime.CompileScope$Visibility
+class public final blue.bex.runtime.CompileScope :: method public declareOrGetSlot(java.lang.String):int
+class public final blue.bex.runtime.CompileScope :: method public frameSize():int
+class public final blue.bex.runtime.CompileScope :: method public hasSlot(java.lang.String):boolean
+class public final blue.bex.runtime.CompileScope :: method public resolveSlot(java.lang.String):int
+class public final blue.bex.runtime.CompileScope :: method public restoreVisibility(blue.bex.runtime.CompileScope$Visibility):void
+class public final blue.bex.runtime.CompiledFrame
+class public final blue.bex.runtime.CompiledFrame :: constructor public <init>(blue.bex.runtime.BexRuntime,int,blue.bex.runtime.CompiledFrame)
+class public final blue.bex.runtime.CompiledFrame :: method public accumulator():blue.bex.runtime.BexExecutionAccumulator
+class public final blue.bex.runtime.CompiledFrame :: method public clear(int):void
+class public final blue.bex.runtime.CompiledFrame :: method public enter(blue.bex.BexSourcePath):blue.bex.BexSourcePath
+class public final blue.bex.runtime.CompiledFrame :: method public get(int):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public getRequired(int):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public isInitialized(int):boolean
+class public final blue.bex.runtime.CompiledFrame :: method public parent():blue.bex.runtime.CompiledFrame
+class public final blue.bex.runtime.CompiledFrame :: method public readBinding(java.lang.String,java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public readCurrentContract(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public readDocument(java.lang.String,java.util.List,boolean):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public readEvent(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public readProcessingEvent(java.util.List):blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public restore(blue.bex.BexSourcePath):void
+class public final blue.bex.runtime.CompiledFrame :: method public returnValue():blue.bex.value.BexValue
+class public final blue.bex.runtime.CompiledFrame :: method public returnValue(blue.bex.value.BexValue):void
+class public final blue.bex.runtime.CompiledFrame :: method public runtime():blue.bex.runtime.BexRuntime
+class public final blue.bex.runtime.CompiledFrame :: method public set(int,blue.bex.value.BexValue):void
+class public final blue.bex.runtime.CompiledFrame :: method public sourcePath():blue.bex.BexSourcePath
+class public final blue.bex.runtime.Control extends java.lang.Enum
+class public final blue.bex.runtime.Control extends java.lang.Enum :: field public static final CONTINUE:blue.bex.runtime.Control
+class public final blue.bex.runtime.Control extends java.lang.Enum :: field public static final RETURN:blue.bex.runtime.Control
+class public final blue.bex.runtime.Control extends java.lang.Enum :: method public static valueOf(java.lang.String):blue.bex.runtime.Control
+class public final blue.bex.runtime.Control extends java.lang.Enum :: method public static values():blue.bex.runtime.Control[]
+class public final blue.bex.value.BexFrozenWriter :: method public static toFrozen(blue.bex.value.BexValue,blue.bex.result.BexMetrics):blue.language.snapshot.FrozenNode
+class public final blue.bex.value.ChangesetBexValue extends blue.bex.value.AbstractBexValue :: constructor public <init>(blue.bex.result.BexChangeset)
+class public final blue.bex.value.EventsBexValue extends blue.bex.value.AbstractBexValue :: constructor public <init>(blue.bex.result.BexEvents)
+class public final blue.bex.value.PatchEntryBexValue extends blue.bex.value.AbstractBexValue :: constructor public <init>(blue.bex.result.BexPatchEntry)
+class public static final blue.bex.api.BexExecutionContext$Builder :: method public processorExecutionContext(blue.language.processor.ProcessorExecutionContext):blue.bex.api.BexExecutionContext$Builder
+class public static final blue.bex.api.BexExecutionContext$Builder :: method public processorExecutionContext(blue.language.processor.ProcessorExecutionContext,java.lang.String):blue.bex.api.BexExecutionContext$Builder
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: constructor public <init>(java.lang.String,int,blue.language.snapshot.FrozenNode,java.lang.String)
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: method public name():java.lang.String
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: method public pattern():blue.language.snapshot.FrozenNode
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: method public slot():int
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: method public sourcePointer():java.lang.String
+class public static final blue.bex.compile.BexCompiledProgram$ArgSpec :: method public typed():boolean
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: constructor public <init>(java.lang.String,java.util.List,java.util.List,blue.bex.runtime.CompiledExpression,int)
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public arg(java.lang.String):blue.bex.compile.BexCompiledProgram$ArgSpec
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public argSlot(java.lang.String):int
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public args():java.util.Collection
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public frameSize():int
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public hasArg(java.lang.String):boolean
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public invokePrepared(blue.bex.runtime.BexRuntime,blue.bex.runtime.CompiledFrame,int[],blue.bex.value.BexValue[]):blue.bex.value.BexValue
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public invokeRoot(blue.bex.runtime.BexRuntime):blue.bex.value.BexValue
+class public static final blue.bex.compile.BexCompiledProgram$CompiledFunction :: method public name():java.lang.String
+class public static final blue.bex.runtime.CompileScope$Visibility

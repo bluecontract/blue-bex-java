@@ -3,7 +3,7 @@ package blue.bex;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.gas.BexGasCounter;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.result.BexPatchEntry;
 import blue.bex.result.BexResultOverlay;
 import blue.bex.value.BexValue;
@@ -78,7 +78,7 @@ class BexPointerSet20Test {
         FrozenBexDocumentView document = new FrozenBexDocumentView(
                 frozen(obj("items", list("a", "b", "c"))));
         BexResultOverlay overlay =
-                new BexResultOverlay(document, new BexMetrics());
+                new BexResultOverlay(document, new BexMetricsRecorder());
         overlay.append(new BexPatchEntry(
                 "remove",
                 "/items/1",

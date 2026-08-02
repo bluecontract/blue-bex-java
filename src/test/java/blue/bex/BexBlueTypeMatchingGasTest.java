@@ -16,7 +16,6 @@ import blue.bex.test.TestBlue;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
-import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.ProcessorErrorCategory;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.provider.NodeProviderResult;
@@ -208,9 +207,9 @@ class BexBlueTypeMatchingGasTest {
             BexGasMeter meter = new BexGasMeter(
                     BexGasSchedule.defaults(),
                     1_000_000L);
-            ExecutionEvidenceUnavailableException failure =
+            BexExecutionEvidenceUnavailableException failure =
                     assertThrows(
-                            ExecutionEvidenceUnavailableException.class,
+                            BexExecutionEvidenceUnavailableException.class,
                             () -> new BexBlueTypeMatcher(
                                     unavailableBlue.runtime())
                                     .matches(
@@ -252,9 +251,9 @@ class BexBlueTypeMatchingGasTest {
             BexGasMeter meter = new BexGasMeter(
                     BexGasSchedule.defaults(),
                     1_000_000L);
-            InvalidExecutionEvidenceException failure =
+            BexInvalidExecutionEvidenceException failure =
                     assertThrows(
-                            InvalidExecutionEvidenceException.class,
+                            BexInvalidExecutionEvidenceException.class,
                             () -> new BexBlueTypeMatcher(
                                     invalidBlue.runtime())
                                     .matches(

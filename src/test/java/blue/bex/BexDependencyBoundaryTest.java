@@ -20,16 +20,26 @@ class BexDependencyBoundaryTest {
                 "package-linked", "processCustomerPayNote", "reseller-weekend-package", "myos"
         );
         StringBuilder scanned = new StringBuilder();
-        Files.walk(root.resolve("src/main/java"))
-                .filter(path -> path.toString().endsWith(".java"))
-                .forEach(path -> {
-                    try {
-                        scanned.append(new String(Files.readAllBytes(path), StandardCharsets.UTF_8)).append('\n');
-                    } catch (Exception ex) {
-                        throw new RuntimeException(ex);
-                    }
-                });
-        scanned.append(new String(Files.readAllBytes(root.resolve("build.gradle.kts")), StandardCharsets.UTF_8));
+        for (String module : Arrays.asList(
+                "blue-bex-core", "blue-bex-contracts", "blue-bex-java")) {
+            Path sourceRoot = root.resolve(module).resolve("src/main/java");
+            try (java.util.stream.Stream<Path> paths = Files.walk(sourceRoot)) {
+                paths.filter(path -> path.toString().endsWith(".java"))
+                        .forEach(path -> {
+                            try {
+                                scanned.append(new String(
+                                        Files.readAllBytes(path),
+                                        StandardCharsets.UTF_8)).append('\n');
+                            } catch (Exception ex) {
+                                throw new RuntimeException(ex);
+                            }
+                        });
+            }
+            scanned.append(new String(
+                    Files.readAllBytes(root.resolve(module)
+                            .resolve("build.gradle.kts")),
+                    StandardCharsets.UTF_8));
+        }
 
         for (String value : forbidden) {
             assertFalse(scanned.toString().contains(value), "Forbidden dependency/reference found: " + value);

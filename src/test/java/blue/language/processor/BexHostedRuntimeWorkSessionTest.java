@@ -7,18 +7,24 @@ import blue.bex.api.BexGasLedgerHost;
 import blue.bex.api.BexIntrinsicRegistry;
 import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
-import blue.bex.api.ProcessorExecutionContextBexGasLedgerHost;
+import blue.bex.contracts.BexContractsExecutionContext;
+import blue.bex.contracts.BexContractsFailureBoundary;
+import blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasCounter;
+import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.gas.BexGasLimitExceededException;
 import blue.bex.gas.BexGasSchedule;
+import blue.bex.gas.BexHostGasExhaustion;
+import blue.bex.gas.BexSharedGasBudget;
 import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.provider.CyclicAwareNodeProvider;
@@ -191,10 +197,10 @@ class BexHostedRuntimeWorkSessionTest {
                 new ProcessorExecutionContextBexGasLedgerHost(
                         session, "bex:first");
 
-        GasMeter.ChildGasLedger bex = host.open(
+        BexGasLedgerCapability bex = host.open(
                 "bex",
                 Collections.singletonMap("expressionEvaluated", 1L));
-        GasMeter.ChildGasLedger intrinsic = host.open(
+        BexGasLedgerCapability intrinsic = host.open(
                 "intrinsic:test",
                 Collections.singletonMap("work", 2L));
 
@@ -429,7 +435,7 @@ class BexHostedRuntimeWorkSessionTest {
                 BexProgramSource.inline(frozen(program));
         BexCompiledProgram compiled =
                 BexEngine.builder().build().compile(source);
-        BexMetrics metrics = new BexMetrics();
+        BexMetricsRecorder metrics = new BexMetricsRecorder();
         try (TestBlue blue = new TestBlue()) {
             BexRuntime runtime = new BexRuntime(
                     compiled,
@@ -581,6 +587,8 @@ class BexHostedRuntimeWorkSessionTest {
                         .semanticIdentityBoundary(
                                 BexSemanticIdentityBoundary
                                         .STANDALONE)
+                        .failureBoundary(
+                                BexContractsFailureBoundary.INSTANCE)
                         .build();
 
         try (TestBlue blue = new TestBlue(provider)) {
@@ -652,7 +660,7 @@ class BexHostedRuntimeWorkSessionTest {
                             }),
                     blue.runtime(),
                     BexGasSchedule.defaults(),
-                    new BexMetrics(),
+                    new BexMetricsRecorder(),
                     new BexPointerCache(),
                     BexIntrinsicRegistry.empty());
 
@@ -1091,10 +1099,9 @@ class BexHostedRuntimeWorkSessionTest {
                                  new Node(),
                                  false)) {
                 BexExecutionContext context =
-                        BexExecutionContext.builder()
-                                .processorExecutionContext(
-                                        processorContext,
-                                        "bex:semantic-adapter")
+                        BexContractsExecutionContext.builder(
+                                processorContext,
+                                "bex:semantic-adapter")
                                 .build();
                 result = BexEngine.builder()
                         .build()
@@ -1236,6 +1243,8 @@ class BexHostedRuntimeWorkSessionTest {
                             .semanticIdentityBoundary(
                                     BexSemanticIdentityBoundary
                                             .STANDALONE)
+                            .failureBoundary(
+                                    BexContractsFailureBoundary.INSTANCE)
                             .build();
 
             ExecutionEvidenceUnavailableException failure =
@@ -1549,7 +1558,9 @@ class BexHostedRuntimeWorkSessionTest {
                 BexExecutionContext.builder()
                         .document(new FrozenBexDocumentView(document))
                         .gasLedgerHost(host)
-                        .semanticIdentityBoundary(identityBoundary);
+                        .semanticIdentityBoundary(identityBoundary)
+                        .failureBoundary(
+                                BexContractsFailureBoundary.INSTANCE);
         if (localLimit >= 0L) {
             builder.gasLimit(localLimit);
         }
@@ -1594,13 +1605,13 @@ class BexHostedRuntimeWorkSessionTest {
         private final ProcessorExecutionContextBexGasLedgerHost delegate;
         private final List<String> openLogicalNamespaces =
                 new ArrayList<>();
-        private final List<GasMeter.ChildGasLedger> openedLedgers =
+        private final List<BexGasLedgerCapability> openedLedgers =
                 new ArrayList<>();
         private int submitCount;
         private int deterministicFailureCount;
         private int unavailableCount;
         private int openSharedBudgetCount;
-        private RuntimeWorkBudget sharedBudget;
+        private BexSharedGasBudget sharedBudget;
         private GasLimitExceededException propagatedExhaustion;
 
         private RecordingSessionHost(
@@ -1612,7 +1623,7 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public RuntimeWorkBudget openSharedBudget(
+        public BexSharedGasBudget openSharedBudget(
                 long maximumGas) {
             openSharedBudgetCount++;
             sharedBudget =
@@ -1621,7 +1632,7 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
             return open(
@@ -1631,12 +1642,12 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights,
-                RuntimeWorkBudget sharedBudget) {
+                BexSharedGasBudget sharedBudget) {
             openLogicalNamespaces.add(namespace);
-            GasMeter.ChildGasLedger ledger =
+            BexGasLedgerCapability ledger =
                     delegate.open(
                             namespace,
                             counterWeights,
@@ -1646,7 +1657,7 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
             submitCount++;
             delegate.submit(ledger);
         }
@@ -1658,14 +1669,14 @@ class BexHostedRuntimeWorkSessionTest {
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             deterministicFailureCount++;
             delegate.failedDeterministically(ledger);
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             unavailableCount++;
             delegate.evidenceUnavailable(ledger);
         }
@@ -1680,9 +1691,10 @@ class BexHostedRuntimeWorkSessionTest {
 
         @Override
         public void propagateGasExhaustion(
-                GasMeter.ChildGasLedger ledger,
-                GasLimitExceededException exhaustion) {
-            propagatedExhaustion = exhaustion;
+                BexGasLedgerCapability ledger,
+                BexHostGasExhaustion exhaustion) {
+            propagatedExhaustion = (GasLimitExceededException)
+                    exhaustion.hostFailure();
             delegate.propagateGasExhaustion(
                     ledger, exhaustion);
         }
@@ -1711,7 +1723,7 @@ class BexHostedRuntimeWorkSessionTest {
         private int openCount;
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
             openCount++;
@@ -1725,17 +1737,17 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
         }
     }
 
@@ -1760,31 +1772,31 @@ class BexHostedRuntimeWorkSessionTest {
         }
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
             openCount++;
             if (openCount == 2) {
                 throw secondOpenFailure;
             }
-            return parent.childLedger(
-                    namespace, counterWeights);
+            return TestGasLedgerCapability.wrap(
+                    parent.childLedger(namespace, counterWeights));
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
             successfulSubmissions++;
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             deterministicFinalizations++;
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             unavailableFinalizations++;
         }
     }

@@ -9,8 +9,6 @@ import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
-import blue.language.processor.ExecutionEvidenceUnavailableException;
-import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProof;
 import blue.language.provider.CyclicSetProofResult;
@@ -225,7 +223,7 @@ class BexExactReferenceDocumentTest {
             assertEquals(memberBlueId,
                     prooflessMember.exactBlueId());
             assertThrows(
-                    InvalidExecutionEvidenceException.class,
+                    BexInvalidExecutionEvidenceException.class,
                     prooflessMember::isObject);
         }
 
@@ -331,9 +329,9 @@ class BexExactReferenceDocumentTest {
 
             assertEquals(fixture.memberBlueId,
                     member.exactBlueId());
-            ExecutionEvidenceUnavailableException failure =
+            BexExecutionEvidenceUnavailableException failure =
                     assertThrows(
-                            ExecutionEvidenceUnavailableException.class,
+                            BexExecutionEvidenceUnavailableException.class,
                             member::isObject);
 
             assertEquals(
@@ -363,9 +361,9 @@ class BexExactReferenceDocumentTest {
 
             assertEquals(fixture.memberBlueId,
                     member.exactBlueId());
-            InvalidExecutionEvidenceException failure =
+            BexInvalidExecutionEvidenceException failure =
                     assertThrows(
-                            InvalidExecutionEvidenceException.class,
+                            BexInvalidExecutionEvidenceException.class,
                             member::isObject);
 
             assertTrue(failure.getMessage().contains(
@@ -391,9 +389,9 @@ class BexExactReferenceDocumentTest {
 
             assertEquals(fixture.memberBlueId,
                     member.exactBlueId());
-            ExecutionEvidenceUnavailableException failure =
+            BexExecutionEvidenceUnavailableException failure =
                     assertThrows(
-                            ExecutionEvidenceUnavailableException.class,
+                            BexExecutionEvidenceUnavailableException.class,
                             member::isObject);
 
             assertEquals(
@@ -431,9 +429,9 @@ class BexExactReferenceDocumentTest {
 
             assertEquals(fixture.memberBlueId,
                     member.exactBlueId());
-            InvalidExecutionEvidenceException failure =
+            BexInvalidExecutionEvidenceException failure =
                     assertThrows(
-                            InvalidExecutionEvidenceException.class,
+                            BexInvalidExecutionEvidenceException.class,
                             member::isObject);
 
             assertTrue(failure.getMessage().contains(

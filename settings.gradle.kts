@@ -1,51 +1,61 @@
+pluginManagement {
+    includeBuild("build-logic")
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 rootProject.name = "blue-bex-java"
 
-val blueLanguageCompositePath =
-    providers.gradleProperty("blueLanguageCompositePath")
-        .orNull
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+include(
+    ":blue-bex-core",
+    ":blue-bex-contracts",
+    ":blue-bex-conformance",
+    ":blue-bex-java",
+    ":examples"
+)
 
-if (blueLanguageCompositePath != null) {
-    val compositeDirectory = file(blueLanguageCompositePath)
-    require(compositeDirectory.isDirectory) {
-        "blueLanguageCompositePath is not a directory: " +
-            compositeDirectory.absolutePath
+val compositePath = providers.gradleProperty("blueLanguageCompositePath")
+    .orNull
+    ?.trim()
+    ?.takeIf(String::isNotEmpty)
+
+if (compositePath != null) {
+    val checkout = file(compositePath)
+    require(checkout.isDirectory) {
+        "blueLanguageCompositePath is not a directory: ${checkout.absolutePath}"
     }
     require(
-        file("${compositeDirectory.path}/settings.gradle.kts").isFile ||
-            file("${compositeDirectory.path}/settings.gradle").isFile
+        file("${checkout.path}/settings.gradle.kts").isFile ||
+            file("${checkout.path}/settings.gradle").isFile
     ) {
-        "blueLanguageCompositePath is not a Gradle build: " +
-            compositeDirectory.absolutePath
+        "blueLanguageCompositePath is not a Gradle build: ${checkout.absolutePath}"
     }
-    val requiredLanguageProjects =
-        listOf(
-            "blue-language-model",
-            "blue-language-core",
-            "blue-language-mapping",
-            "blue-language-ipfs",
-            "blue-contracts-core",
-            "blue-conformance",
-            "blue-language-java"
-        )
-    val missingLanguageProjects =
-        requiredLanguageProjects.filter { projectName ->
-            val projectDirectory =
-                file("${compositeDirectory.path}/$projectName")
-            !projectDirectory.isDirectory ||
-                (!file("${projectDirectory.path}/build.gradle.kts").isFile &&
-                    !file("${projectDirectory.path}/build.gradle").isFile)
-        }
-    require(missingLanguageProjects.isEmpty()) {
-        "blueLanguageCompositePath does not contain the required Gradle " +
-            "subprojects: " + missingLanguageProjects.joinToString(", ")
+
+    val required = listOf(
+        "blue-language-model",
+        "blue-language-core",
+        "blue-language-mapping",
+        "blue-contracts-core",
+        "blue-language-java"
+    )
+    val missing = required.filter { name ->
+        val projectDirectory = file("${checkout.path}/$name")
+        !projectDirectory.isDirectory ||
+            (!file("${projectDirectory.path}/build.gradle.kts").isFile &&
+                !file("${projectDirectory.path}/build.gradle").isFile)
     }
-    includeBuild(compositeDirectory) {
+    require(missing.isEmpty()) {
+        "blueLanguageCompositePath is missing required projects: " +
+            missing.joinToString(", ")
+    }
+
+    includeBuild(checkout) {
         dependencySubstitution {
             substitute(module("blue.language:blue-language-model"))
                 .using(project(":blue-language-model"))
@@ -53,12 +63,8 @@ if (blueLanguageCompositePath != null) {
                 .using(project(":blue-language-core"))
             substitute(module("blue.language:blue-language-mapping"))
                 .using(project(":blue-language-mapping"))
-            substitute(module("blue.language:blue-language-ipfs"))
-                .using(project(":blue-language-ipfs"))
             substitute(module("blue.language:blue-contracts-core"))
                 .using(project(":blue-contracts-core"))
-            substitute(module("blue.language:blue-conformance"))
-                .using(project(":blue-conformance"))
             substitute(module("blue.language:blue-language-java"))
                 .using(project(":blue-language-java"))
         }

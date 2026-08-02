@@ -5,8 +5,6 @@ import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
-import blue.language.processor.ExecutionEvidenceUnavailableException;
-import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.api.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
@@ -32,8 +30,8 @@ class BexStructuredReferenceEvidenceTest {
                 NodeProviderResult.notFound());
 
         try (TestBlue blue = new TestBlue(provider)) {
-            ExecutionEvidenceUnavailableException failure = assertThrows(
-                    ExecutionEvidenceUnavailableException.class,
+            BexExecutionEvidenceUnavailableException failure = assertThrows(
+                    BexExecutionEvidenceUnavailableException.class,
                     () -> exactReference(blue, blueId).isObject());
 
             assertEquals(
@@ -54,8 +52,8 @@ class BexStructuredReferenceEvidenceTest {
                 NodeProviderResult.unavailable("feeder is offline"));
 
         try (TestBlue blue = new TestBlue(provider)) {
-            ExecutionEvidenceUnavailableException failure = assertThrows(
-                    ExecutionEvidenceUnavailableException.class,
+            BexExecutionEvidenceUnavailableException failure = assertThrows(
+                    BexExecutionEvidenceUnavailableException.class,
                     () -> exactReference(blue, blueId).keys());
 
             assertEquals(
@@ -74,8 +72,8 @@ class BexStructuredReferenceEvidenceTest {
                         "signature does not match"));
 
         try (TestBlue blue = new TestBlue(provider)) {
-            InvalidExecutionEvidenceException failure = assertThrows(
-                    InvalidExecutionEvidenceException.class,
+            BexInvalidExecutionEvidenceException failure = assertThrows(
+                    BexInvalidExecutionEvidenceException.class,
                     () -> exactReference(blue, blueId).get("value"));
 
             assertEquals(
@@ -94,8 +92,8 @@ class BexStructuredReferenceEvidenceTest {
                                 obj("value", "different"))));
 
         try (TestBlue blue = new TestBlue(provider)) {
-            InvalidExecutionEvidenceException failure = assertThrows(
-                    InvalidExecutionEvidenceException.class,
+            BexInvalidExecutionEvidenceException failure = assertThrows(
+                    BexInvalidExecutionEvidenceException.class,
                     () -> exactReference(
                             blue, requestedBlueId).isObject());
 
@@ -148,8 +146,8 @@ class BexStructuredReferenceEvidenceTest {
             provider.set(NodeProviderResult.unavailable(
                     "second attempt cannot acquire evidence"));
 
-            ExecutionEvidenceUnavailableException failure = assertThrows(
-                    ExecutionEvidenceUnavailableException.class,
+            BexExecutionEvidenceUnavailableException failure = assertThrows(
+                    BexExecutionEvidenceUnavailableException.class,
                     () -> exactReference(blue, blueId).isObject());
 
             assertEquals(

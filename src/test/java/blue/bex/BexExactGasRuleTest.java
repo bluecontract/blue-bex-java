@@ -7,8 +7,10 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.gas.BexGasCounter;
+import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.result.BexExecutionResult;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.model.Node;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
@@ -296,29 +298,30 @@ class BexExactGasRuleTest {
             implements BexGasLedgerHost {
         private final GasMeter parent =
                 new GasMeter(GasSchedule.contracts10());
-        private GasMeter.ChildGasLedger child;
+        private BexGasLedgerCapability child;
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace, Map<String, Long> counterWeights) {
-            child = parent.childLedger(namespace, counterWeights);
+            child = TestGasLedgerCapability.wrap(
+                    parent.childLedger(namespace, counterWeights));
             return child;
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
-            parent.merge(ledger);
+        public void submit(BexGasLedgerCapability ledger) {
+            parent.merge(((TestGasLedgerCapability) ledger).delegate());
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
-            parent.merge(ledger);
+                BexGasLedgerCapability ledger) {
+            submit(ledger);
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             // Detached child ledgers reserve nothing until merge.
         }
 

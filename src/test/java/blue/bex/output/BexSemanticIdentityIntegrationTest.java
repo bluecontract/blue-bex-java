@@ -4,10 +4,11 @@ import blue.bex.BexException;
 import blue.bex.api.BexEngine;
 import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexProgramSource;
+import blue.bex.contracts.BexContractsFailureBoundary;
 import blue.bex.gas.BexGasMeter;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.result.BexPatchEntry;
 import blue.bex.result.BexResultOverlay;
 import blue.bex.runtime.BexExecutionAccumulator;
@@ -513,7 +514,7 @@ class BexSemanticIdentityIntegrationTest {
                 new BexExecutionAccumulator(
                         new BexResultOverlay(
                                 defaultDocumentView(),
-                                new BexMetrics()),
+                                new BexMetricsRecorder()),
                         admission);
 
         ExecutionEvidenceUnavailableException patchFailure =
@@ -725,7 +726,8 @@ class BexSemanticIdentityIntegrationTest {
                 new BexGasMeter(
                         BexGasSchedule.defaults(),
                         1_000_000L),
-                boundary);
+                boundary,
+                BexContractsFailureBoundary.INSTANCE);
     }
 
     private static Map<String, Object> map(

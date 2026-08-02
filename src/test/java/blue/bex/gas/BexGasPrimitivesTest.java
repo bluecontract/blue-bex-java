@@ -1,7 +1,8 @@
 package blue.bex.gas;
 
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.processor.GasMeter;
 import org.junit.jupiter.api.Test;
 
@@ -190,7 +191,8 @@ class BexGasPrimitivesTest {
                                 "bad-sequence"))));
 
         BexExecutionResult result =
-                new BexExecutionResult(null, null, null, ledger, new BexMetrics());
+                new BexExecutionResult(null, null, null, ledger,
+                        new BexMetricsRecorder().snapshot());
         assertEquals(ledger, result.gasLedger());
         assertEquals(ledger.trace(), result.gasTrace());
         assertEquals(12L, result.gasUsed());
@@ -205,7 +207,9 @@ class BexGasPrimitivesTest {
         GasMeter.ChildGasLedger child =
                 host.childLedger(BexGasCounter.NAMESPACE,
                         schedule.counterWeights());
-        BexGasMeter meter = new BexGasMeter(schedule, child, 20L);
+        TestGasLedgerCapability hosted =
+                TestGasLedgerCapability.wrap(child);
+        BexGasMeter meter = new BexGasMeter(schedule, hosted, 20L);
 
         meter.charge(BexGasCounter.INTRINSIC_CALLED, 2L, "intrinsic");
         assertTrue(meter.hasHostLedger());
@@ -213,7 +217,8 @@ class BexGasPrimitivesTest {
         assertEquals(10L, child.totalGas());
         assertEquals(0L, host.totalGas());
 
-        meter.submitHostLedger(host::merge);
+        meter.submitHostLedger(ledger -> host.merge(
+                ((TestGasLedgerCapability) ledger).delegate()));
 
         assertTrue(meter.hostLedgerSubmitted());
         assertEquals(10L, host.totalGas());
@@ -221,7 +226,8 @@ class BexGasPrimitivesTest {
         assertEquals("bex", host.trace().get(0).namespace());
         assertEquals("intrinsicCalled", host.trace().get(0).counter());
         assertThrows(IllegalStateException.class,
-                () -> meter.submitHostLedger(host::merge));
+                () -> meter.submitHostLedger(ledger -> host.merge(
+                        ((TestGasLedgerCapability) ledger).delegate())));
         assertThrows(IllegalStateException.class,
                 () -> meter.charge(BexGasCounter.EVENT_READ));
     }
@@ -296,12 +302,35 @@ class BexGasPrimitivesTest {
                         0L,
                         BexGasCounter.EVENT_READ,
                         1L,
-                        1L,
+                        BexGasCounter.EVENT_READ.defaultWeight(),
                         null,
                         null,
                         "read"));
         BexGasLedger ledger = new BexGasLedger(external);
-        assertEquals(1L, ledger.totalGas());
+        assertEquals(BexGasCounter.EVENT_READ.defaultWeight(),
+                ledger.totalGas());
+        assertThrows(IllegalArgumentException.class,
+                () -> new BexGasLedger(Collections.singletonList(
+                        new BexGasCharge(
+                                0L,
+                                BexGasCounter.EVENT_READ,
+                                1L,
+                                BexGasCounter.EVENT_READ.defaultWeight() + 1L,
+                                null,
+                                null,
+                                "wrong-manifest"))));
+        BexGasLedger explicit = new BexGasLedger(
+                Collections.singletonList(new BexGasCharge(
+                        0L,
+                        BexGasCounter.EVENT_READ,
+                        1L,
+                        1L,
+                        null,
+                        null,
+                        "custom")),
+                "custom-schedule",
+                "sha256:custom-manifest");
+        assertEquals("sha256:custom-manifest", explicit.manifestIdentity());
     }
 
     @Test
@@ -316,10 +345,14 @@ class BexGasPrimitivesTest {
         GasMeter.ChildGasLedger intrinsic = parent.childLedger(
                 "bex-run/intrinsic-test",
                 Collections.singletonMap("work", 1L));
-        Map<String, GasMeter.ChildGasLedger> ledgers =
+        TestGasLedgerCapability bexCapability =
+                TestGasLedgerCapability.wrap(bex);
+        TestGasLedgerCapability intrinsicCapability =
+                TestGasLedgerCapability.wrap(intrinsic);
+        Map<String, BexGasLedgerCapability> ledgers =
                 new LinkedHashMap<>();
-        ledgers.put(BexGasCounter.NAMESPACE, bex);
-        ledgers.put("intrinsic-test", intrinsic);
+        ledgers.put(BexGasCounter.NAMESPACE, bexCapability);
+        ledgers.put("intrinsic-test", intrinsicCapability);
         Map<String, Long> registered = Collections.singletonMap(
                 BexGasMeter.qualifiedCounterName(
                         "intrinsic-test", "work"),
@@ -329,14 +362,14 @@ class BexGasPrimitivesTest {
                 ledgers,
                 BexGasMeter.NO_LOCAL_LIMIT,
                 registered);
-        Map<GasMeter.ChildGasLedger, Boolean> callbacks =
+        Map<BexGasLedgerCapability, Boolean> callbacks =
                 new IdentityHashMap<>();
 
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
                 () -> meter.failHostLedger(ledger -> {
                     callbacks.put(ledger, Boolean.TRUE);
-                    if (ledger == bex) {
+                    if (ledger == bexCapability) {
                         throw new IllegalStateException(
                                 "first callback failed");
                     }
@@ -344,8 +377,8 @@ class BexGasPrimitivesTest {
 
         assertEquals("first callback failed", failure.getMessage());
         assertEquals(2, callbacks.size());
-        assertTrue(callbacks.containsKey(bex));
-        assertTrue(callbacks.containsKey(intrinsic));
+        assertTrue(callbacks.containsKey(bexCapability));
+        assertTrue(callbacks.containsKey(intrinsicCapability));
         assertTrue(meter.hostLedgerFinalized());
         assertThrows(
                 IllegalStateException.class,

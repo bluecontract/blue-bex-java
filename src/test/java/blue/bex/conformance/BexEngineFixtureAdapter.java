@@ -12,6 +12,7 @@ import blue.bex.api.BexStepResults;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasCharge;
+import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.gas.BexGasLimitExceededException;
 import blue.bex.output.BexEstablishedIdentity;
 import blue.bex.output.BexSemanticIdentityBoundary;
@@ -19,6 +20,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.GasMeter;
@@ -664,7 +666,7 @@ final class BexEngineFixtureAdapter {
     private static final class RecordingGasHost implements BexGasLedgerHost {
         private final GasMeter parent;
         private final long parentBudgetBefore;
-        private final Map<GasMeter.ChildGasLedger, Boolean> opened =
+        private final Map<BexGasLedgerCapability, Boolean> opened =
                 new IdentityHashMap<>();
         private int openCount;
         private int mergeCount;
@@ -676,12 +678,12 @@ final class BexEngineFixtureAdapter {
         }
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
             openCount++;
-            GasMeter.ChildGasLedger ledger =
-                    parent.childLedger(namespace, counterWeights);
+            BexGasLedgerCapability ledger = TestGasLedgerCapability.wrap(
+                    parent.childLedger(namespace, counterWeights));
             opened.put(ledger, Boolean.TRUE);
             liveBounded = openCount == 1
                     ? ledger.remainingGas() == parent.remainingGas()
@@ -691,24 +693,24 @@ final class BexEngineFixtureAdapter {
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
             mergeCount++;
             if (!opened.containsKey(ledger)) {
                 throw new IllegalArgumentException(
                         "BEX submitted a different child ledger");
             }
-            parent.merge(ledger);
+            parent.merge(((TestGasLedgerCapability) ledger).delegate());
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             submit(ledger);
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             if (!opened.containsKey(ledger)) {
                 throw new IllegalArgumentException(
                         "BEX finalized a different child ledger");

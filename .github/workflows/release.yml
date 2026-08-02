@@ -43,7 +43,9 @@ jobs:
         run: bash .github/scripts/run-final-publication-gates.sh
 
       - name: Execute Gradle publish
-        run: ./gradlew publish
+        run: >-
+          ./gradlew publish
+          -PblueLanguageCompositePath="$BLUE_LANGUAGE_COMPOSITE_PATH"
 
       - name: Execute Gradle release
         env:
@@ -53,7 +55,9 @@ jobs:
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
-        run: ./gradlew jreleaserFullRelease
+        run: >-
+          ./gradlew jreleaserFullRelease
+          -PblueLanguageCompositePath="$BLUE_LANGUAGE_COMPOSITE_PATH"
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
@@ -62,9 +66,13 @@ jobs:
           name: artifacts
           path: |
             build/distributions
-            build/libs
-            build/publications
+            blue-bex-core/build/libs
+            blue-bex-contracts/build/libs
+            blue-bex-java/build/libs
+            blue-bex-core/build/publications
+            blue-bex-contracts/build/publications
+            blue-bex-java/build/publications
             build/reports
-            build/test-results
+            **/build/reports
+            **/build/test-results
             build/jreleaser
-            .gradle/bex-hosted-release

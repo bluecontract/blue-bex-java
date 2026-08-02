@@ -6,7 +6,7 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.LruBexCompiledProgramCache;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsSnapshot;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import blue.language.model.wire.JsonPointer;
@@ -117,10 +117,10 @@ class BexConformancePropertyTest {
 
     @Test
     void compileCacheHitAndMissHaveIdenticalResultAndGas() {
-        List<BexMetrics> observed = new ArrayList<BexMetrics>();
+        List<BexMetricsSnapshot> observed = new ArrayList<BexMetricsSnapshot>();
         BexEngine engine = BexEngine.builder()
                 .cache(new LruBexCompiledProgramCache())
-                .metrics(metrics -> observed.add(metrics.copy()))
+                .metrics(observed::add)
                 .build();
         BexProgramSource source = BexProgramSource.inline(
                 FrozenNode.fromResolvedNode(

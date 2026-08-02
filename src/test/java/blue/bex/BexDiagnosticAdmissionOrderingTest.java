@@ -11,7 +11,7 @@ import blue.bex.gas.BexGasLimitExceededException;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.test.TestBlue;
 import blue.language.model.Node;
@@ -86,27 +86,27 @@ class BexDiagnosticAdmissionOrderingTest {
         assertRejectedReadMetric(
                 op("$document", "/"),
                 BexGasCounter.DOCUMENT_READ,
-                BexMetrics::frozenDocumentReads);
+                BexMetricsRecorder::frozenDocumentReads);
         assertRejectedReadMetric(
                 op("$document", obj("path", "/", "view", "resolved")),
                 BexGasCounter.DOCUMENT_READ,
-                BexMetrics::resolvedDocumentReads);
+                BexMetricsRecorder::resolvedDocumentReads);
         assertRejectedReadMetric(
                 op("$event", "/"),
                 BexGasCounter.EVENT_READ,
-                BexMetrics::eventReads);
+                BexMetricsRecorder::eventReads);
         assertRejectedReadMetric(
                 op("$currentContract", "/"),
                 BexGasCounter.CURRENT_CONTRACT_READ,
-                BexMetrics::currentContractReads);
+                BexMetricsRecorder::currentContractReads);
         assertRejectedReadMetric(
                 op("$steps", obj("step", "Build", "path", "/")),
                 BexGasCounter.STEPS_READ,
-                BexMetrics::stepsReads);
+                BexMetricsRecorder::stepsReads);
         assertRejectedReadMetric(
                 op("$resultValue", "/"),
                 BexGasCounter.RESULT_VALUE_READ,
-                BexMetrics::resultValueReads);
+                BexMetricsRecorder::resultValueReads);
     }
 
     @Test
@@ -138,7 +138,7 @@ class BexDiagnosticAdmissionOrderingTest {
                     BexGasCounter.LIST_ITEM_READ,
                     "$forEach");
 
-            BexMetrics metrics = new BexMetrics();
+            BexMetricsRecorder metrics = new BexMetricsRecorder();
             BexRuntime runtime = new BexRuntime(
                     program,
                     context(prefixGas),
@@ -166,7 +166,7 @@ class BexDiagnosticAdmissionOrderingTest {
     private static void assertRejectedReadMetric(
             Node expression,
             BexGasCounter expectedCounter,
-            ToLongFunction<BexMetrics> metric) {
+            ToLongFunction<BexMetricsRecorder> metric) {
         RejectedExecution rejected = reject(
                 stepExpr(expression),
                 3L);
@@ -183,7 +183,7 @@ class BexDiagnosticAdmissionOrderingTest {
                     .build();
             BexCompiledProgram program = engine.compile(
                     BexProgramSource.inline(frozen(programNode)));
-            BexMetrics metrics = new BexMetrics();
+            BexMetricsRecorder metrics = new BexMetricsRecorder();
             BexRuntime runtime = new BexRuntime(
                     program,
                     context(gasLimit),
@@ -267,11 +267,11 @@ class BexDiagnosticAdmissionOrderingTest {
 
     private static final class RejectedExecution {
         private final BexGasLimitExceededException failure;
-        private final BexMetrics metrics;
+        private final BexMetricsRecorder metrics;
 
         private RejectedExecution(
                 BexGasLimitExceededException failure,
-                BexMetrics metrics) {
+                BexMetricsRecorder metrics) {
             this.failure = failure;
             this.metrics = metrics;
         }

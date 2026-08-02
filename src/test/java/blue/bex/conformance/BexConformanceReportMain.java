@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,11 +46,12 @@ public final class BexConformanceReportMain {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 8) {
+        if (args.length != 9) {
             throw new IllegalArgumentException(
                     "Expected projectDir, buildDir, Gradle version, project "
                             + "version, dependency mode, declared dependency, "
-                            + "persistent evidence root, and composite path");
+                            + "persistent evidence root, composite path, and "
+                            + "artifact build directory");
         }
         Path projectDir = Paths.get(args[0]).toAbsolutePath().normalize();
         Path buildDir = Paths.get(args[1]).toAbsolutePath().normalize();
@@ -61,6 +64,8 @@ public final class BexConformanceReportMain {
         Path compositePath = args[7].isEmpty()
                 ? null
                 : Paths.get(args[7]).toAbsolutePath().normalize();
+        Path artifactBuildDir =
+                Paths.get(args[8]).toAbsolutePath().normalize();
 
         TestEvidence tests = readTests(
                 buildDir.resolve("test-results").resolve("test"));
@@ -76,13 +81,14 @@ public final class BexConformanceReportMain {
         Map<String, Object> normativeVectorCoverage =
                 normativeVectorCoverage(tests);
         List<Object> artifacts = artifactEvidence(
-                projectDir, buildDir, projectVersion);
+                projectDir, artifactBuildDir, projectVersion);
         Map<String, Object> dependencyResolution =
                 dependencyResolutionEvidence(
                         buildDir,
                         dependencyMode,
                         declaredDependency,
-                        publishedApiInspection);
+                        publishedApiInspection,
+                        compositePath);
         Map<String, Object> releaseGates = releaseGateEvidence(
                 projectDir,
                 buildDir,
@@ -480,114 +486,124 @@ public final class BexConformanceReportMain {
             Path buildDir,
             String expectedMode,
             String declaredDependency,
-            Map<String, String> publishedInspection)
+            Map<String, String> publishedInspection,
+            Path compositePath)
             throws Exception {
         Path evidencePath = buildDir.resolve("reports")
-                .resolve("bex-release")
-                .resolve("dependency-resolution.properties");
-        Map<String, String> evidence = readEvidence(evidencePath);
-        if (evidence.isEmpty()) {
+                .resolve("dependencies")
+                .resolve("language.json");
+        if (!Files.isRegularFile(evidencePath)) {
             return map(
                     "status", "not-executed",
                     "evidencePresent", false);
         }
-        Path artifact = pathOrNull(evidence.get("artifact.path"));
-        boolean artifactPresent =
-                artifact != null && Files.isRegularFile(artifact);
-        String actualHash = artifactPresent
-                ? sha256(artifact)
-                : "unavailable";
-        boolean artifactValid = artifactPresent
-                && actualHash.equals(evidence.get("artifact.sha256"));
-        boolean standalone =
-                "standalone-published".equals(expectedMode);
-        boolean repositoryPolicyValid =
-                "maven-central-only".equals(
-                        evidence.get("repository.policy"));
-        boolean provenanceValid = standalone
-                ? "verified-against-recorded-maven-central-hash"
-                        .equals(evidence.get("provenance.status"))
-                        && declaredDependency.equals(
-                        evidence.get(
-                                "provenance.recorded.coordinate"))
-                        && publishedInspection.get(
-                        "repository").equals(
-                        evidence.get(
-                                "provenance.recorded.repository"))
-                        && publishedInspection.get(
-                        "artifact.sha256").equals(
-                        evidence.get(
-                                "provenance.recorded.sha256"))
-                        && actualHash.equals(
-                        evidence.get(
-                                "provenance.recorded.sha256"))
-                : "not-applicable-local-composite".equals(
-                        evidence.get("provenance.status"));
-        boolean passed =
-                "resolved".equals(evidence.get("status"))
-                        && expectedMode.equals(evidence.get("mode"))
-                        && declaredDependency.equals(
-                                evidence.get("declared.coordinate"))
-                        && artifactValid
-                        && repositoryPolicyValid
-                        && provenanceValid;
+        String evidence = new String(
+                Files.readAllBytes(evidencePath), StandardCharsets.UTF_8);
+        String mode = jsonString(evidence, "mode");
+        String declaredVersion = jsonString(
+                evidence, "declaredLanguageVersion");
+        String languageCommit = jsonString(evidence, "languageCommit");
+        String languageCheckoutState = jsonString(
+                evidence, "languageCheckoutState");
+        boolean standalone = "standalone-published".equals(expectedMode);
+        boolean cleanCacheInitiallyAbsent = jsonBoolean(
+                evidence, "exactVersionCacheInitiallyAbsent");
+        List<Map<String, Object>> artifacts =
+                dependencyArtifacts(evidence);
+        boolean artifactsValid = !artifacts.isEmpty();
+        Map<String, Object> aggregateArtifact = null;
+        for (Map<String, Object> artifact : artifacts) {
+            Path path = Paths.get(String.valueOf(artifact.get("path")));
+            boolean valid = Files.isRegularFile(path)
+                    && Files.size(path) == ((Long) artifact.get("bytes"))
+                    && sha256(path).equals(artifact.get("sha256"));
+            artifact.put("matchesRecordedEvidence", valid);
+            artifactsValid &= valid;
+            if (String.valueOf(artifact.get("name"))
+                    .startsWith("blue-language-java-")) {
+                aggregateArtifact = artifact;
+            }
+        }
+        String[] focusedModules = {
+                "blue-language-model",
+                "blue-language-core",
+                "blue-language-mapping",
+                "blue-contracts-core"
+        };
+        boolean focusedModulesResolved = true;
+        for (String module : focusedModules) {
+            focusedModulesResolved &= evidence.contains(module);
+        }
+        String expectedVersion = declaredDependency.substring(
+                declaredDependency.lastIndexOf(':') + 1);
+        boolean sourceProvenanceValid = standalone
+                ? "compatible-with-final-hosted-adapter".equals(
+                        publishedInspection.get("status"))
+                        && aggregateArtifact != null
+                        && publishedInspection.get("artifact.sha256").equals(
+                                aggregateArtifact.get("sha256"))
+                : languageCommit.matches("[0-9a-f]{40}")
+                        && "clean".equals(languageCheckoutState);
+        boolean cleanCacheAccepted = !standalone
+                || cleanCacheInitiallyAbsent;
+        boolean passed = "passed".equals(jsonString(evidence, "status"))
+                && expectedMode.equals(mode)
+                && expectedVersion.equals(declaredVersion)
+                && artifactsValid
+                && aggregateArtifact != null
+                && focusedModulesResolved
+                && sourceProvenanceValid
+                && cleanCacheAccepted;
         return map(
                 "status", passed ? "passed" : "stale-or-failed",
                 "evidencePresent", true,
-                "mode", evidence.get("mode"),
-                "declaredCoordinate",
-                evidence.get("declared.coordinate"),
-                "effectiveComponent",
-                evidence.get("effective.component"),
-                "effectiveCoordinate", joinCoordinate(
-                        evidence.get("effective.group"),
-                        evidence.get("effective.name"),
-                        evidence.get("effective.version")),
-                "artifact", map(
-                        "path", evidence.get("artifact.path"),
-                        "bytes", evidence.get("artifact.bytes"),
-                        "sha256", actualHash,
-                        "matchesRecordedEvidence", artifactValid),
+                "receiptPath", evidencePath.toString(),
+                "receiptSha256", sha256(evidencePath),
+                "mode", mode,
+                "declaredCoordinate", declaredDependency,
+                "effectiveComponent", standalone
+                        ? declaredDependency : "project :blue-language-java",
+                "effectiveCoordinate", declaredDependency,
+                "declaredLanguageVersion", declaredVersion,
+                "languageCommit", languageCommit,
+                "languageCheckoutState", languageCheckoutState,
+                "focusedModulesResolved", focusedModulesResolved,
+                "artifactCount", artifacts.size(),
+                "artifacts", artifacts,
+                "artifact", aggregateArtifact != null
+                        ? aggregateArtifact : Collections.emptyMap(),
                 "provenance", map(
-                        "status", evidence.get("provenance.status"),
-                        "repositoryPolicy",
-                        evidence.get("repository.policy"),
+                        "status", sourceProvenanceValid
+                                ? "passed" : "failed",
+                        "kind", standalone
+                                ? "reviewed-published-focused-modules"
+                                : "exact-clean-local-composite",
+                        "publishedReviewStatus",
+                        publishedInspection.get("status"),
+                        "repositoryPolicy", "maven-central-only",
                         "recordedRepository",
-                        evidence.get(
-                                "provenance.recorded.repository"),
+                        publishedInspection.get("repository"),
                         "recordedCoordinate",
-                        evidence.get(
-                                "provenance.recorded.coordinate"),
+                        publishedInspection.get("coordinate"),
                         "recordedSha256",
-                        evidence.get(
-                                "provenance.recorded.sha256"),
+                        publishedInspection.get("artifact.sha256"),
                         "resolvedHashMatchesRecordedMavenCentralHash",
-                        provenanceValid && standalone,
+                        standalone && sourceProvenanceValid,
                         "networkFetchObservation",
-                        evidence.get(
-                                "provenance.networkFetchObservation")),
+                        standalone ? "isolated-resolution" : "not-applicable"),
                 "cleanDependencyCacheAcceptance", map(
-                        "status", evidence.get("cache.acceptance"),
-                        "freshProofRequired",
-                        Boolean.parseBoolean(evidence.get(
-                                "cache.freshProofRequired")),
-                        "scope",
-                        evidence.get("cache.acceptanceScope"),
-                        "moduleVersionPath",
-                        evidence.get(
-                                "cache.blueLanguageModuleVersionPath"),
+                        "status", cleanCacheAccepted
+                                ? "passed" : "failed",
+                        "freshProofRequired", standalone,
+                        "scope", "all focused and aggregate Language modules",
+                        "moduleVersionPath", "Gradle module cache for exact version",
                         "moduleVersionInitiallyAbsentAtProjectConfiguration",
-                        Boolean.parseBoolean(evidence.get(
-                                "cache.blueLanguageModuleVersionInitiallyAbsent")),
-                        "reason",
-                        "passed".equals(
-                                evidence.get("cache.acceptance"))
-                                ? "exact-blue-language-module-version-cache-was-absent-before-resolution"
-                                : Boolean.parseBoolean(evidence.get(
-                                        "cache.freshProofRequired"))
-                                ? "exact-blue-language-module-version-cache-was-not-proven-absent-before-resolution"
-                                : "fresh-module-cache-proof-not-required-for-current-run"),
-                "compositePath", evidence.get("composite.path"));
+                        cleanCacheInitiallyAbsent,
+                        "reason", standalone
+                                ? "exact focused-module version cache must be absent before isolated resolution"
+                                : "fresh module cache proof is not required for local composite mode"),
+                "compositePath", compositePath != null
+                        ? compositePath.toString() : "");
     }
 
     static boolean modeRunCanPersistEvidence(
@@ -603,14 +619,40 @@ public final class BexConformanceReportMain {
                 && "passed".equals(cache.get("status"));
     }
 
-    private static String joinCoordinate(
-            String group,
-            String name,
-            String version) {
-        if (group == null || name == null || version == null) {
-            return "unavailable";
+    private static String jsonString(String json, String field) {
+        Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(field)
+                + "\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\"")
+                .matcher(json);
+        return matcher.find()
+                ? matcher.group(1).replace("\\\\", "\\")
+                        .replace("\\\"", "\"")
+                : "";
+    }
+
+    private static boolean jsonBoolean(String json, String field) {
+        return Pattern.compile("\\\"" + Pattern.quote(field)
+                + "\\\"\\s*:\\s*true").matcher(json).find();
+    }
+
+    private static List<Map<String, Object>> dependencyArtifacts(
+            String json) {
+        Pattern artifactPattern = Pattern.compile(
+                "\\{\\\"name\\\":\\\"((?:\\\\.|[^\\\"])*)\\\","
+                        + "\\\"path\\\":\\\"((?:\\\\.|[^\\\"])*)\\\","
+                        + "\\\"bytes\\\":([0-9]+),"
+                        + "\\\"sha256\\\":\\\"([0-9a-f]{64})\\\"\\}");
+        Matcher matcher = artifactPattern.matcher(json);
+        List<Map<String, Object>> artifacts =
+                new ArrayList<Map<String, Object>>();
+        while (matcher.find()) {
+            artifacts.add(map(
+                    "name", matcher.group(1),
+                    "path", matcher.group(2).replace("\\\\", "\\")
+                            .replace("\\\"", "\""),
+                    "bytes", Long.valueOf(matcher.group(3)),
+                    "sha256", matcher.group(4)));
         }
-        return group + ":" + name + ":" + version;
+        return artifacts;
     }
 
     private static Map<String, Object> specificationEvidence(
@@ -4494,6 +4536,12 @@ public final class BexConformanceReportMain {
                 || "settings.gradle.kts".equals(path)
                 || path.startsWith(".github/")
                 || path.startsWith("docs/")
+                || path.startsWith("build-logic/")
+                || path.startsWith("blue-bex-core/")
+                || path.startsWith("blue-bex-contracts/")
+                || path.startsWith("blue-bex-conformance/")
+                || path.startsWith("blue-bex-java/")
+                || path.startsWith("examples/")
                 || path.startsWith("gradle/")
                 || path.startsWith("specifications/")
                 || path.startsWith("src/");

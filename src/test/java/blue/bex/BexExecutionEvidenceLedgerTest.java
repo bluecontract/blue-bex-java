@@ -5,8 +5,11 @@ import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexGasLedgerHost;
 import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
+import blue.bex.contracts.BexContractsFailureBoundary;
+import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.test.TestBlue;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
@@ -166,6 +169,7 @@ class BexExecutionEvidenceLedgerTest {
                 .gasLedgerHost(host)
                 .semanticIdentityBoundary(
                         BexSemanticIdentityBoundary.STANDALONE)
+                .failureBoundary(BexContractsFailureBoundary.INSTANCE)
                 .build();
         BexEngine.builder()
                 .language(blue.runtime())
@@ -251,36 +255,37 @@ class BexExecutionEvidenceLedgerTest {
             implements BexGasLedgerHost {
         private final GasMeter parent =
                 new GasMeter(GasSchedule.contracts10(), 100_000L);
-        private GasMeter.ChildGasLedger child;
+        private BexGasLedgerCapability child;
         private int openCount;
         private int mergeCount;
         private int unavailableCount;
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
             openCount++;
-            child = parent.childLedger(namespace, counterWeights);
+            child = TestGasLedgerCapability.wrap(
+                    parent.childLedger(namespace, counterWeights));
             return child;
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
             mergeCount++;
             assertEquals(child, ledger);
-            parent.merge(ledger);
+            parent.merge(((TestGasLedgerCapability) ledger).delegate());
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             submit(ledger);
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             unavailableCount++;
             assertEquals(child, ledger);
         }

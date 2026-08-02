@@ -210,6 +210,22 @@ class Bex20ApiSurfaceTest {
                     NoSuchMethodException.class,
                     () -> BexMetrics.class.getMethod(method));
         }
+
+        String[] mutableMetricMethods = {
+                "incrementCompiledExecutions",
+                "incrementCompileCacheHits",
+                "incrementExpressionEvaluations",
+                "incrementStatementExecutions",
+                "incrementFunctionCalls",
+                "incrementLoopIterations",
+                "addCompileNanos",
+                "addExecuteNanos"
+        };
+        for (String method : mutableMetricMethods) {
+            assertThrows(
+                    NoSuchMethodException.class,
+                    () -> BexMetrics.class.getMethod(method));
+        }
     }
 
     private static void assertNoAggregateGasConstructor(Class<?> type) {

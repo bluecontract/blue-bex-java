@@ -7,7 +7,7 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
@@ -766,7 +766,7 @@ class BexLazyBindingTest {
         BexCompiledProgram program = BexEngine.builder().build()
                 .compile(BexProgramSource.inline(frozen(stepExpr(op("$binding", "broken")))));
         BexRuntime runtime = new BexRuntime(program, context, new TestBlue().runtime(), schedule,
-                new BexMetrics(), new BexPointerCache());
+                new BexMetricsRecorder(), new BexPointerCache());
 
         assertThrows(IllegalStateException.class, () -> runtime.readBinding("broken", Collections.<String>emptyList()));
         assertEquals(schedule.bindingRead, runtime.gas().used());

@@ -10,16 +10,20 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.gas.BexGasCounter;
 import blue.bex.gas.BexGasLimitExceededException;
+import blue.bex.gas.BexGasLedgerCapability;
+import blue.bex.gas.BexHostGasExhaustion;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexEstablishedIdentity;
 import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
+import blue.bex.result.BexMetricsSnapshot;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
+import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.GasLimitExceededException;
@@ -81,9 +85,9 @@ class BexCompositeExhaustionEvidenceTest {
                 sentinelEvent(),
                 op("$return", true))));
 
-        List<BexMetrics> compileMetrics = new ArrayList<>();
+        List<BexMetricsSnapshot> compileMetrics = new ArrayList<>();
         BexEngine warmEngine = BexEngine.builder()
-                .metrics(metrics -> compileMetrics.add(metrics.copy()))
+                .metrics(compileMetrics::add)
                 .build();
         BexCompiledProgram firstCompilation = warmEngine.compile(source);
         BexCompiledProgram cachedCompilation = warmEngine.compile(source);
@@ -486,7 +490,7 @@ class BexCompositeExhaustionEvidenceTest {
                             target.prefixGas),
                     blue.runtime(),
                     BexGasSchedule.defaults(),
-                    new BexMetrics(),
+                    new BexMetricsRecorder(),
                     new BexPointerCache(),
                     BexIntrinsicRegistry.empty());
 
@@ -768,7 +772,7 @@ class BexCompositeExhaustionEvidenceTest {
                 failure.admittedGas());
         assertEquals(target.prefixGas,
                 failure.effectiveBudget());
-        assertNull(failure.hostGasLimitExceeded(),
+        assertNull(failure.hostGasExhaustion(),
                 "the stricter local sub-limit must reject before "
                         + "touching the host ledger");
 
@@ -1099,7 +1103,7 @@ class BexCompositeExhaustionEvidenceTest {
             implements BexGasLedgerHost {
         private final GasMeter parent =
                 new GasMeter(GasSchedule.contracts10());
-        private final Map<GasMeter.ChildGasLedger, Boolean>
+        private final Map<BexGasLedgerCapability, Boolean>
                 openedLedgers = new IdentityHashMap<>();
         private int successfulSubmissions;
         private int deterministicFailures;
@@ -1107,11 +1111,11 @@ class BexCompositeExhaustionEvidenceTest {
         private int exhaustionPropagations;
 
         @Override
-        public GasMeter.ChildGasLedger open(
+        public BexGasLedgerCapability open(
                 String namespace,
                 Map<String, Long> counterWeights) {
-            GasMeter.ChildGasLedger ledger =
-                    parent.childLedger(namespace, counterWeights);
+            BexGasLedgerCapability ledger = TestGasLedgerCapability.wrap(
+                    parent.childLedger(namespace, counterWeights));
             openedLedgers.put(ledger, Boolean.TRUE);
             return ledger;
         }
@@ -1122,42 +1126,42 @@ class BexCompositeExhaustionEvidenceTest {
         }
 
         @Override
-        public void submit(GasMeter.ChildGasLedger ledger) {
+        public void submit(BexGasLedgerCapability ledger) {
             successfulSubmissions++;
             mergeOwned(ledger);
         }
 
         @Override
         public void failedDeterministically(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             deterministicFailures++;
             mergeOwned(ledger);
         }
 
         @Override
         public void evidenceUnavailable(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             unavailableFinalizations++;
             requireOwned(ledger);
         }
 
         @Override
         public void propagateGasExhaustion(
-                GasMeter.ChildGasLedger ledger,
-                GasLimitExceededException exhaustion) {
+                BexGasLedgerCapability ledger,
+                BexHostGasExhaustion exhaustion) {
             exhaustionPropagations++;
             requireOwned(ledger);
-            throw exhaustion;
+            throw exhaustion.hostFailure();
         }
 
         private void mergeOwned(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             requireOwned(ledger);
-            parent.merge(ledger);
+            parent.merge(((TestGasLedgerCapability) ledger).delegate());
         }
 
         private void requireOwned(
-                GasMeter.ChildGasLedger ledger) {
+                BexGasLedgerCapability ledger) {
             assertTrue(openedLedgers.containsKey(ledger),
                     "host may finalize only a ledger it opened");
         }
