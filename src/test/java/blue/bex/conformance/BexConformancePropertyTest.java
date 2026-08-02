@@ -9,7 +9,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

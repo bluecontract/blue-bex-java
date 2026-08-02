@@ -27,13 +27,14 @@ class public final blue.bex.api.BexEngine
   method public static builder():blue.bex.api.BexEngine$Builder
 class public static final blue.bex.api.BexEngine$Builder
   constructor public <init>()
-  method public blue(blue.language.Blue):blue.bex.api.BexEngine$Builder
   method public build():blue.bex.api.BexEngine
   method public cache(blue.bex.compile.BexCompiledProgramCache):blue.bex.api.BexEngine$Builder
   method public gasSchedule(blue.bex.gas.BexGasSchedule):blue.bex.api.BexEngine$Builder
+  method public intrinsic(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexEngine$Builder
   method public intrinsic(java.lang.Class,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexEngine$Builder
   method public intrinsic(java.lang.String,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexEngine$Builder
   method public intrinsics(blue.bex.api.BexIntrinsicRegistry):blue.bex.api.BexEngine$Builder
+  method public language(blue.language.runtime.BlueLanguage):blue.bex.api.BexEngine$Builder
   method public metrics(blue.bex.api.BexMetricsSink):blue.bex.api.BexEngine$Builder
 class public final blue.bex.api.BexExecutionContext
   method public binding(java.lang.String):blue.bex.value.BexValue
@@ -100,11 +101,13 @@ class public final blue.bex.api.BexIntrinsicRegistry
   method public static empty():blue.bex.api.BexIntrinsicRegistry
   method public supportedBlueIds():java.util.Set
   method public supports(java.lang.String):boolean
+  method public with(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
   method public with(java.lang.Class,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
   method public with(java.lang.String,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry
 class public static final blue.bex.api.BexIntrinsicRegistry$Builder
   constructor public <init>()
   method public build():blue.bex.api.BexIntrinsicRegistry
+  method public register(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder
   method public register(java.lang.Class,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder
   method public register(java.lang.String,java.lang.String,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder
   method public register(java.lang.String,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder
@@ -135,6 +138,8 @@ class public static final blue.bex.api.BexStepResults$Builder
   method public build():blue.bex.api.BexStepResults
   method public put(java.lang.String,blue.bex.result.BexExecutionResult):blue.bex.api.BexStepResults$Builder
   method public put(java.lang.String,blue.bex.value.BexValue):blue.bex.api.BexStepResults$Builder
+class public abstract interface blue.bex.api.BexTypeBlueIdResolver
+  method public abstract resolve(java.lang.Class):java.lang.String
 class public final blue.bex.api.FrozenBexDocumentView implements blue.bex.api.BexDocumentView
   constructor public <init>(blue.language.snapshot.FrozenNode)
   constructor public <init>(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String)
@@ -575,7 +580,7 @@ class public final blue.bex.result.BexPatchEntry
   method public val():blue.bex.value.BexValue
 class public final blue.bex.result.BexResultOverlay
   constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics)
-  constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.Blue)
+  constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)
   method public append(blue.bex.result.BexPatchEntry):void
   method public rootValue():blue.bex.value.BexValue
   method public valueAt(java.lang.String,java.util.List):blue.bex.value.BexValue
@@ -588,8 +593,8 @@ class public final blue.bex.runtime.BexExecutionAccumulator
   method public events():blue.bex.result.BexEvents
   method public overlay():blue.bex.result.BexResultOverlay
 class public final blue.bex.runtime.BexRuntime
-  constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)
-  constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)
+  constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)
+  constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)
   method public accumulator():blue.bex.runtime.BexExecutionAccumulator
   method public canonicalPointer(java.lang.String):java.lang.String
   method public context():blue.bex.api.BexExecutionContext
@@ -654,7 +659,7 @@ class public final blue.bex.runtime.Control extends java.lang.Enum
   method public static valueOf(java.lang.String):blue.bex.runtime.Control
   method public static values():blue.bex.runtime.Control[]
 class public final blue.bex.type.BexBlueTypeMatcher
-  constructor public <init>(blue.language.Blue)
+  constructor public <init>(blue.language.runtime.BlueLanguage)
   method public matches(blue.bex.value.BexValue,blue.language.snapshot.FrozenNode,blue.bex.gas.BexGasMeter,blue.bex.BexSourcePath):boolean
 class public final blue.bex.value.BexBlueNodeWriter
   method public static hasLanguageField(blue.bex.value.BexValue):boolean
@@ -714,7 +719,7 @@ class public final blue.bex.value.BexValues
   method public static nullValue():blue.bex.value.BexValue
   method public static overlay(blue.bex.value.BexValue,java.lang.String,blue.bex.value.BexValue):blue.bex.value.BexValue
   method public static pointerSet(blue.bex.value.BexValue,java.util.List,blue.bex.value.BexValue,java.lang.String):blue.bex.value.BexValue
-  method public static referenceBacked(blue.bex.value.BexValue,blue.language.Blue):blue.bex.value.BexValue
+  method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue
   method public static resultOverlayPointerSet(blue.bex.value.BexValue,java.util.List,blue.bex.value.BexValue,java.lang.String):blue.bex.value.BexValue
   method public static scalar(java.lang.Object):blue.bex.value.BexValue
   method public static transientFrozen(blue.language.snapshot.FrozenNode):blue.bex.value.BexValue

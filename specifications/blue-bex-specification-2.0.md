@@ -1746,10 +1746,18 @@ fixture package SHA-256
 
 A conforming BEX 2.0 implementation MUST report the exact runtime-registry, gas-manifest, and fixture-package identities it implements and passes.
 
-The implementation-baseline fixture package is bound to the exact BEX runtime registry and `blue-bex/gas/2.0` manifest. It covers 57 normative vectors with 102 behavior fixtures, including direct executable coverage of every normative operator, and 30 gas-counter microfixtures. Its identity is:
+The implementation-baseline fixture package is bound to the exact BEX runtime
+registry and `blue-bex/gas/2.0` manifest. Its authoritative inventory and
+identities are:
 
 ```text
-sha256:f5f64a38152ef0e50ebb1b03caaa1b07fd556552eb071b940937079fc0234dfe
+normative vectors: 60
+behavior fixtures: 105
+gas microfixtures: 30
+normative operators: 86
+runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
+fixture package: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
 ```
 
 ## 17. Conformance Vectors

@@ -19,15 +19,15 @@ import blue.bex.result.BexMetrics;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.GasLimitExceededException;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
 import blue.language.processor.GasTraceEntry;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -121,7 +121,7 @@ class BexCompositeExhaustionEvidenceTest {
     void exhaustionIsStableAcrossInlineColdReferenceAndWarmReferenceDocuments() {
         Node document = obj("items", integerList(48));
         String documentBlueId =
-                BlueIdCalculator.calculateBlueId(document);
+                DirectBlueIdCalculator.calculateBlueId(document);
         FrozenNode inlineDocument =
                 FrozenNode.fromResolvedNode(document);
         FrozenNode referenceDocument = FrozenNode.fromNode(
@@ -148,11 +148,11 @@ class BexCompositeExhaustionEvidenceTest {
         ExactDocumentProvider warmProvider =
                 new ExactDocumentProvider(
                         documentBlueId, document);
-        try (Blue inlineBlue = new Blue();
-             Blue coldBlue = new Blue(coldProvider);
-             Blue warmBlue = new Blue(warmProvider)) {
+        try (TestBlue inlineBlue = new TestBlue();
+             TestBlue coldBlue = new TestBlue(coldProvider);
+             TestBlue warmBlue = new TestBlue(warmProvider)) {
             BexEngine inlineEngine = BexEngine.builder()
-                    .blue(inlineBlue)
+                    .language(inlineBlue.runtime())
                     .build();
             BexCompiledProgram inlineProgram =
                     inlineEngine.compile(source);
@@ -186,7 +186,7 @@ class BexCompositeExhaustionEvidenceTest {
                     inlineView);
 
             BexEngine coldEngine = BexEngine.builder()
-                    .blue(coldBlue)
+                    .language(coldBlue.runtime())
                     .build();
             LimitedEvidence coldReference =
                     assertRejectedAtPrefix(
@@ -201,7 +201,7 @@ class BexCompositeExhaustionEvidenceTest {
                     new Node().blueId(documentBlueId));
             int warmupDemands = warmProvider.demands;
             BexEngine warmEngine = BexEngine.builder()
-                    .blue(warmBlue)
+                    .language(warmBlue.runtime())
                     .build();
             LimitedEvidence warmReference =
                     assertRejectedAtPrefix(
@@ -461,9 +461,9 @@ class BexCompositeExhaustionEvidenceTest {
                 sentinelEvent(),
                 op("$return", true)));
 
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .build();
             BexCompiledProgram program =
                     engine.compile(source(programNode));
@@ -484,7 +484,7 @@ class BexCompositeExhaustionEvidenceTest {
                             host,
                             boundary,
                             target.prefixGas),
-                    blue,
+                    blue.runtime(),
                     BexGasSchedule.defaults(),
                     new BexMetrics(),
                     new BexPointerCache(),

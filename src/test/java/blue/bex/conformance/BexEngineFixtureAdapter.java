@@ -18,15 +18,15 @@ import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
 import blue.language.processor.GasTraceEntry;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.merge.ResolvedSnapshot;
+import blue.language.identity.DirectBlueIdCalculator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
@@ -74,7 +74,7 @@ final class BexEngineFixtureAdapter {
                         parseProviderNodes(providerData),
                         batching(variant));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             Map<String, Object> effectiveRoot =
                     effectiveRoot(context, variant, providerData);
             Node root = rootNode(blue, effectiveRoot, variant);
@@ -101,7 +101,7 @@ final class BexEngineFixtureAdapter {
                     parentBudget,
                     localLimit);
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .intrinsics(fixtureIntrinsics())
                     .build();
 
@@ -187,7 +187,7 @@ final class BexEngineFixtureAdapter {
     }
 
     private static BexExecutionContext executionContext(
-            Blue blue,
+            TestBlue blue,
             ResolvedSnapshot root,
             Map<String, Object> context,
             RecordingGasHost gasHost,
@@ -225,7 +225,7 @@ final class BexEngineFixtureAdapter {
     }
 
     private static BexStepResults stepResults(
-            Blue blue,
+            TestBlue blue,
             Map<String, Object> steps) {
         BexStepResults.Builder builder = BexStepResults.builder();
         for (Map.Entry<String, Object> entry : steps.entrySet()) {
@@ -234,7 +234,7 @@ final class BexEngineFixtureAdapter {
         return builder.build();
     }
 
-    private static BexValue exactValue(Blue blue, Object value) {
+    private static BexValue exactValue(TestBlue blue, Object value) {
         ResolvedSnapshot snapshot =
                 blue.resolveToSnapshot(
                         ConformancePackage.semanticNode(blue, value));
@@ -245,7 +245,7 @@ final class BexEngineFixtureAdapter {
 
     private static ResolvedSnapshot resolveDocumentSnapshot(
             ConformancePackage.Fixture fixture,
-            Blue blue,
+            TestBlue blue,
             Node root,
             Map<String, Object> variant,
             RecordingNodeProvider provider) {
@@ -275,7 +275,7 @@ final class BexEngineFixtureAdapter {
     }
 
     private static Node rootNode(
-            Blue blue,
+            TestBlue blue,
             Map<String, Object> root,
             Map<String, Object> variant) {
         Object rawJson = variant.get("rawRootDocumentJson");
@@ -355,7 +355,7 @@ final class BexEngineFixtureAdapter {
     private static Map<String, Node> parseProviderNodes(
             Map<String, Object> provider) {
         Map<String, Node> result = new LinkedHashMap<String, Node>();
-        try (Blue parser = new Blue()) {
+        try (TestBlue parser = new TestBlue()) {
             for (Map.Entry<String, Object> entry : provider.entrySet()) {
                 result.put(entry.getKey(),
                         ConformancePackage.semanticNode(
@@ -726,7 +726,7 @@ final class BexEngineFixtureAdapter {
                 complexIdentityCalls++;
             }
             return new BexEstablishedIdentity(
-                    BlueIdCalculator.calculateBlueId(node),
+                    DirectBlueIdCalculator.calculateBlueId(node),
                     FrozenNode.fromResolvedNode(node.clone()));
         }
     }

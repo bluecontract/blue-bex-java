@@ -14,6 +14,7 @@ import blue.bex.runtime.BexExecutionAccumulator;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
+import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.GasLimitExceededException;
 import blue.language.processor.GasMeter;
@@ -22,7 +23,7 @@ import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorErrorCategory;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -61,7 +62,7 @@ class BexSemanticIdentityIntegrationTest {
         assertTrue(standaloneValue.value().isExact());
         assertEquals(
                 standaloneValue.nodeBlueId(),
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         standaloneValue.node()));
 
         Node hostNormalized =
@@ -69,7 +70,7 @@ class BexSemanticIdentityIntegrationTest {
         FrozenNode hostFrozen =
                 FrozenNode.fromResolvedNode(hostNormalized);
         String hostBlueId =
-                BlueIdCalculator.calculateBlueId(hostNormalized);
+                DirectBlueIdCalculator.calculateBlueId(hostNormalized);
         BexSemanticIdentityBoundary hosted = ignored ->
                 new BexEstablishedIdentity(hostBlueId, hostFrozen);
         BexAdmittedValue hostedValue = admission(hosted).admit(
@@ -93,7 +94,7 @@ class BexSemanticIdentityIntegrationTest {
         FrozenNode frozen =
                 FrozenNode.fromResolvedNode(content);
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         BexValue exact =
                 BexValues.exact(frozen, frozen, blueId);
         RecordingBoundary boundary = new RecordingBoundary();
@@ -153,12 +154,10 @@ class BexSemanticIdentityIntegrationTest {
                 new BigDecimal("1.0"),
                 supplied.getRawValue());
         assertEquals(
-                blue.language.utils.Properties
-                        .DOUBLE_TYPE_BLUE_ID,
+                BlueCoreTypeRegistry.INSTANCE.blueId("Double"),
                 supplied.getType().getBlueId());
         assertEquals(
-                blue.language.utils.Properties
-                        .DOUBLE_TYPE_BLUE_ID,
+                BlueCoreTypeRegistry.INSTANCE.blueId("Double"),
                 admitted.node().getType().getBlueId());
         assertEquals(
                 "double",
@@ -192,7 +191,7 @@ class BexSemanticIdentityIntegrationTest {
         Node exactContent = obj(
                 "deep", "already-resolved");
         String exactChildBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         exactContent);
         FrozenNode exactChildFrozen =
                 FrozenNode.fromResolvedNode(
@@ -207,7 +206,7 @@ class BexSemanticIdentityIntegrationTest {
                 FrozenNode.fromResolvedNode(
                         mismatchedSourceContent);
         String mismatchedSourceBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         mismatchedSourceContent);
         BexValue mismatchedSourceExact =
                 BexValues.exact(
@@ -215,11 +214,11 @@ class BexSemanticIdentityIntegrationTest {
                         mismatchedSourceFrozen,
                         mismatchedSourceBlueId);
         String hostMismatchBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         obj("host", "authoritative"));
 
         String authoredReferenceBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         obj("remote", "content"));
         BexValue supplied = BexValues.fromSimple(
                 map(
@@ -249,7 +248,7 @@ class BexSemanticIdentityIntegrationTest {
                 FrozenNode.fromResolvedNode(
                         hostNormalized);
         String hostBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         hostNormalized);
 
         BexValue admitted = admission(ignored ->
@@ -553,7 +552,7 @@ class BexSemanticIdentityIntegrationTest {
     @Test
     void exactCyclicMemberStaysOpaqueAndTransientCounterfeitsFailClosed() {
         String cyclicMember =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         new Node().value("cyclic-set"))
                         + "#0";
         FrozenNode reference = FrozenNode.fromResolvedNode(
@@ -755,7 +754,7 @@ class BexSemanticIdentityIntegrationTest {
             Node exact = node.clone();
             inputs.add(exact);
             return new BexEstablishedIdentity(
-                    BlueIdCalculator.calculateBlueId(exact),
+                    DirectBlueIdCalculator.calculateBlueId(exact),
                     FrozenNode.fromResolvedNode(exact));
         }
     }

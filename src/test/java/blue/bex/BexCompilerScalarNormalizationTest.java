@@ -6,8 +6,9 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.BexStepResults;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
+import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
@@ -20,12 +21,13 @@ import static blue.bex.test.BexTestFixtures.m;
 import static blue.bex.test.BexTestFixtures.obj;
 import static blue.bex.test.BexTestFixtures.op;
 import static blue.bex.test.BexTestFixtures.simple;
-import static blue.language.utils.Properties.TEXT_TYPE_BLUE_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class BexCompilerScalarNormalizationTest {
-    private final Blue blue = new Blue();
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
+    private static final String TEXT_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Text");
+    private final TestBlue blue = new TestBlue();
+    private final BexEngine engine = BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void blueAuthoredCoreTypedScalarsRemainBexScalars() {

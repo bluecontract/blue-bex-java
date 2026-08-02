@@ -18,16 +18,16 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProofResult;
-import blue.language.provider.NodeProviderOutcome;
+import blue.language.api.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
-import blue.language.utils.CircularBlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
+import blue.language.identity.CircularSetIdentityCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -430,11 +430,11 @@ class BexHostedRuntimeWorkSessionTest {
         BexCompiledProgram compiled =
                 BexEngine.builder().build().compile(source);
         BexMetrics metrics = new BexMetrics();
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             BexRuntime runtime = new BexRuntime(
                     compiled,
                     context,
-                    blue,
+                    blue.runtime(),
                     BexGasSchedule.defaults(),
                     metrics,
                     new BexPointerCache());
@@ -536,7 +536,7 @@ class BexHostedRuntimeWorkSessionTest {
         Node exactContent = obj(
                 "value", "temporarily-offline");
         String exactBlueId =
-                BlueIdCalculator.calculateBlueId(exactContent);
+                DirectBlueIdCalculator.calculateBlueId(exactContent);
         AtomicInteger providerDemands =
                 new AtomicInteger();
         NodeProvider provider = new NodeProvider() {
@@ -583,12 +583,12 @@ class BexHostedRuntimeWorkSessionTest {
                                         .STANDALONE)
                         .build();
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ExecutionEvidenceUnavailableException failure =
                     assertThrows(
                             ExecutionEvidenceUnavailableException.class,
                             () -> BexEngine.builder()
-                                    .blue(blue)
+                                    .language(blue.runtime())
                                     .build()
                                     .compileAndExecute(
                                             BexProgramSource.expression(
@@ -634,9 +634,9 @@ class BexHostedRuntimeWorkSessionTest {
                 new RecordingSessionHost(session, "bex:exhaustion");
         AtomicInteger identityCalls = new AtomicInteger();
 
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .build();
             BexCompiledProgram compiled =
                     engine.compile(literalExpression());
@@ -650,7 +650,7 @@ class BexHostedRuntimeWorkSessionTest {
                                 return BexSemanticIdentityBoundary.STANDALONE
                                         .establishIdentity(node);
                             }),
-                    blue,
+                    blue.runtime(),
                     BexGasSchedule.defaults(),
                     new BexMetrics(),
                     new BexPointerCache(),
@@ -1070,9 +1070,9 @@ class BexHostedRuntimeWorkSessionTest {
 
     @Test
     void processorExecutionContextUsesItsInvocationSemanticOutputBoundary() {
-        try (Blue blue = new Blue()) {
-            ProcessorEngine.Execution execution =
-                    new ProcessorEngine.Execution(
+        try (TestBlue blue = new TestBlue()) {
+            ProcessorInvocationState execution =
+                    new ProcessorInvocationState(
                             blue.getDocumentProcessor(),
                             new Node().properties(
                                     Collections.<String, Node>emptyMap()));
@@ -1108,7 +1108,7 @@ class BexHostedRuntimeWorkSessionTest {
                 assertTrue(result.output().reconstructed());
                 assertEquals(
                         result.output().nodeBlueId(),
-                        BlueIdCalculator.calculateBlueId(
+                        DirectBlueIdCalculator.calculateBlueId(
                                 result.output().node()));
                 processorContext.applyBufferedEffects();
             }
@@ -1133,7 +1133,7 @@ class BexHostedRuntimeWorkSessionTest {
     @Test
     void hostedOpaqueCyclicMemberSupportsIdentityAndOutputWithoutProofDemand() {
         String memberBlueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         new Node().value("hosted-cyclic-set"))
                         + "#0";
         FrozenNode document = FrozenNode.fromResolvedNode(
@@ -1204,7 +1204,7 @@ class BexHostedRuntimeWorkSessionTest {
         List<Node> placeholders =
                 Collections.singletonList(placeholder);
         String memberBlueId =
-                CircularBlueIdCalculator
+                CircularSetIdentityCalculator
                         .calculateCircularSetBlueIds(
                                 placeholders)
                         .get(0);
@@ -1222,7 +1222,7 @@ class BexHostedRuntimeWorkSessionTest {
                         session,
                         "bex:cyclic-proof-unavailable");
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexExecutionContext context =
                     BexExecutionContext.builder()
                             .document(
@@ -1242,7 +1242,7 @@ class BexHostedRuntimeWorkSessionTest {
                     assertThrows(
                             ExecutionEvidenceUnavailableException.class,
                             () -> BexEngine.builder()
-                                    .blue(blue)
+                                    .language(blue.runtime())
                                     .build()
                                     .compileAndExecute(
                                             BexProgramSource.expression(

@@ -6,7 +6,7 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BexUseCaseConformanceTest {
-    private final Blue blue = new Blue();
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
+    private final TestBlue blue = new TestBlue();
+    private final BexEngine engine = BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void existsDistinguishesMissingFromPresentFalsyValues() {

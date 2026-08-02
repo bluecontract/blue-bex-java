@@ -1,6 +1,6 @@
 package blue.bex.conformance;
 
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import org.yaml.snakeyaml.Yaml;
 
@@ -187,7 +187,7 @@ final class ConformancePackage {
         return result.toString();
     }
 
-    static Node node(Blue blue, Object value) {
+    static Node node(TestBlue blue, Object value) {
         return blue.jsonToNode(json(value, false));
     }
 
@@ -240,7 +240,7 @@ final class ConformancePackage {
      * Exact pure references and explicitly typed nodes retain their Blue
      * meaning.
      */
-    static Node semanticNode(Blue blue, Object value) {
+    static Node semanticNode(TestBlue blue, Object value) {
         if (value == null) {
             return new Node();
         }

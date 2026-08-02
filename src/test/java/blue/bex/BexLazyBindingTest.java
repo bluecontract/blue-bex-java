@@ -13,7 +13,7 @@ import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -765,7 +765,7 @@ class BexLazyBindingTest {
                 .build();
         BexCompiledProgram program = BexEngine.builder().build()
                 .compile(BexProgramSource.inline(frozen(stepExpr(op("$binding", "broken")))));
-        BexRuntime runtime = new BexRuntime(program, context, new Blue(), schedule,
+        BexRuntime runtime = new BexRuntime(program, context, new TestBlue().runtime(), schedule,
                 new BexMetrics(), new BexPointerCache());
 
         assertThrows(IllegalStateException.class, () -> runtime.readBinding("broken", Collections.<String>emptyList()));

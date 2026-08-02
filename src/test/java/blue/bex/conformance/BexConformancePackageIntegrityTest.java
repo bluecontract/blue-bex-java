@@ -1,6 +1,6 @@
 package blue.bex.conformance;
 
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -303,7 +303,7 @@ class BexConformancePackageIntegrityTest {
 
         Set<String> declaredBlueIds = new LinkedHashSet<String>();
         Set<String> fixtureOnlyBlueIds = new LinkedHashSet<String>();
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             for (Object value : ConformancePackage.list(
                     registry.get("entries"), "registry.entries")) {
                 Map<String, Object> entry =

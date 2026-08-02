@@ -8,8 +8,9 @@ import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
+import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,6 @@ import static blue.bex.test.BexTestFixtures.obj;
 import static blue.bex.test.BexTestFixtures.op;
 import static blue.bex.test.BexTestFixtures.simple;
 import static blue.bex.test.BexTestFixtures.stepExpr;
-import static blue.language.utils.Properties.INTEGER_TYPE_BLUE_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -32,7 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexBlueTypeSupportTest {
-    private static final Blue YAML_BLUE = new Blue();
+    private static final String INTEGER_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Integer");
+    private static final TestBlue YAML_BLUE = new TestBlue();
     private static final Node HOTEL_ORDER_TYPE = YAML_BLUE.yamlToNode(yaml(
             "status:",
             "  type: Text"));
@@ -43,7 +45,7 @@ class BexBlueTypeSupportTest {
             FrozenNode.fromNode(HOTEL_ORDER_TYPE).blueId();
     private static final String RESTAURANT_ORDER_TYPE_ID =
             FrozenNode.fromNode(RESTAURANT_ORDER_TYPE).blueId();
-    private final Blue blue = new Blue(blueId -> {
+    private final TestBlue blue = new TestBlue(blueId -> {
         if (HOTEL_ORDER_TYPE_ID.equals(blueId)) {
             return Collections.singletonList(HOTEL_ORDER_TYPE.clone());
         }
@@ -53,7 +55,7 @@ class BexBlueTypeSupportTest {
         }
         return Collections.emptyList();
     });
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
+    private final BexEngine engine = BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void functionArgAcceptsMatchingPrimitiveType() {

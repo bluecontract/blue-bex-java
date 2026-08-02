@@ -16,11 +16,11 @@ import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.model.TypeBlueId;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexIntrinsicTest {
-    private static final Blue BLUE = new Blue();
+    private static final TestBlue BLUE = new TestBlue();
     private static final String ECHO_BLUE_ID = "TestIntrinsicEcho";
     private static final String GAS_BLUE_ID = "TestIntrinsicGas";
     private static final String TEST_REGISTRY_IDENTITY = "test-intrinsics/1";
@@ -317,7 +317,7 @@ class BexIntrinsicTest {
             boundaryCalls.incrementAndGet();
             Node exact = node.clone();
             return new BexEstablishedIdentity(
-                    BlueIdCalculator.calculateBlueId(exact),
+                    DirectBlueIdCalculator.calculateBlueId(exact),
                     FrozenNode.fromResolvedNode(exact));
         };
         BexValue[] exactFromIntrinsic = new BexValue[1];

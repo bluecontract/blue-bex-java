@@ -6,7 +6,7 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.BexCompiledProgramKey;
 import blue.bex.compile.BexNodeIdentity;
 import blue.bex.compile.LruBexCompiledProgramCache;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ import static blue.bex.test.BexTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BexCompiledProgramCacheTest {
-    private final Blue blue = new Blue();
+    private final TestBlue blue = new TestBlue();
 
     @Test
     void differentNodesWithoutBlueIdDoNotCollide() {
@@ -99,7 +99,7 @@ class BexCompiledProgramCacheTest {
         assertNotEquals(BexCompiledProgramKey.from(minLengthOne), BexCompiledProgramKey.from(minLengthFive));
 
         BexEngine engine = BexEngine.builder()
-                .blue(blue)
+                .language(blue.runtime())
                 .cache(new LruBexCompiledProgramCache())
                 .build();
 

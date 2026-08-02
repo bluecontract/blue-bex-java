@@ -13,10 +13,10 @@ import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
+import blue.language.merge.ResolvedSnapshot;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class BexRichFixtureTest {
     private static final String FIXTURE_ROOT = "rich-fixtures";
-    private static final Blue YAML_BLUE = new Blue();
+    private static final TestBlue YAML_BLUE = new TestBlue();
     private static final String TINY_EVENT_PROGRAM = String.join("\n",
             "type: Blue/BEX Program",
             "do:",
@@ -72,7 +72,7 @@ class BexRichFixtureTest {
     private void runFixture(Path path) throws Exception {
         Map<String, Object> fixture = readFixture(path);
         validateFixtureShape(fixture, path);
-        Blue blue = blueForFixture(fixture);
+        TestBlue blue = blueForFixture(fixture);
         Map<String, Object> expectation = map(fixture.get("expectation"));
         String outcome = string(expectation.get("outcome"));
         assertNotNull(outcome, "Fixture outcome is required: " + path);
@@ -122,7 +122,7 @@ class BexRichFixtureTest {
                 result, expectation, isLegacyGasFixture(path));
     }
 
-    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation, Blue blue) {
+    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation, TestBlue blue) {
         Node program;
         try {
             program = parseProgram(fixture, blue);
@@ -152,7 +152,7 @@ class BexRichFixtureTest {
         assertErrorContains(thrown, expectation);
     }
 
-    private void assertGasProperty(BexEngine engine, BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation, Blue blue) {
+    private void assertGasProperty(BexEngine engine, BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation, TestBlue blue) {
         String property = string(expectation.get("property"));
         if (!"gasUsedGreaterThanEquivalentTinyEvent".equals(property)) {
             fail("Unsupported gas property: " + property);
@@ -209,7 +209,7 @@ class BexRichFixtureTest {
                 && "gas".equals(parent.getFileName().toString());
     }
 
-    private BexExecutionContext context(Map<String, Object> fixture, Blue blue) {
+    private BexExecutionContext context(Map<String, Object> fixture, TestBlue blue) {
         Map<String, Object> context = map(fixture.get("context"));
         String scope = string(context.get("documentScope"));
         if (scope == null) {
@@ -243,9 +243,9 @@ class BexRichFixtureTest {
         return builder.build();
     }
 
-    private BexEngine engineForFixture(Map<String, Object> fixture, Blue blue) {
+    private BexEngine engineForFixture(Map<String, Object> fixture, TestBlue blue) {
         return BexEngine.builder()
-                .blue(blue)
+                .language(blue.runtime())
                 .gasSchedule(gasSchedule(fixture))
                 .build();
     }
@@ -320,35 +320,37 @@ class BexRichFixtureTest {
         return builder.build();
     }
 
-    private Blue blueForFixture(Map<String, Object> fixture) {
+    private TestBlue blueForFixture(Map<String, Object> fixture) {
         Map<String, Object> definitions = map(fixture.get("blueDefinitions"));
         if (definitions.isEmpty()) {
-            return new Blue();
+            return new TestBlue();
         }
         Map<String, List<Node>> parsed = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : definitions.entrySet()) {
             parsed.put(entry.getKey(), Collections.singletonList(YAML_BLUE.yamlToNode(requiredString(entry.getValue(),
                     "blueDefinitions." + entry.getKey()))));
         }
-        return new Blue(blueId -> {
+        return new TestBlue(blueId -> {
             List<Node> nodes = parsed.get(blueId);
             return nodes != null ? nodes : Collections.emptyList();
         });
     }
 
-    private Node parseProgram(Map<String, Object> fixture, Blue blue) {
-        return blue.yamlToNode(requiredString(fixture.get("programSource"), "programSource"));
+    private Node parseProgram(Map<String, Object> fixture, TestBlue blue) {
+        return blue.yamlToBexSource(requiredString(
+                fixture.get("programSource"), "programSource"));
     }
 
-    private Node parseNodeSource(String source, Blue blue) {
+    private Node parseNodeSource(String source, TestBlue blue) {
         if (source == null || source.trim().isEmpty()) {
             return blue.yamlToNode("{}");
         }
         return blue.yamlToNode(source);
     }
 
-    private BexProgramSource source(String source, Blue blue) {
-        return BexProgramSource.inline(FrozenNode.fromResolvedNode(blue.yamlToNode(source)));
+    private BexProgramSource source(String source, TestBlue blue) {
+        return BexProgramSource.inline(FrozenNode.fromResolvedNode(
+                blue.yamlToBexSource(source)));
     }
 
     @SuppressWarnings("unchecked")

@@ -6,8 +6,8 @@ import blue.bex.api.BexGasLedgerHost;
 import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.output.BexSemanticIdentityBoundary;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.GasMeter;
@@ -16,8 +16,8 @@ import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProofResult;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
-import blue.language.utils.CircularBlueIdCalculator;
+import blue.language.merge.ResolvedSnapshot;
+import blue.language.identity.CircularSetIdentityCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -39,7 +39,7 @@ class BexExecutionEvidenceLedgerTest {
         NodeProvider unavailable =
                 ignored -> Collections.<Node>emptyList();
 
-        try (Blue blue = new Blue(unavailable)) {
+        try (TestBlue blue = new TestBlue(unavailable)) {
             RecordingGasHost host = new RecordingGasHost();
             assertThrows(
                     ExecutionEvidenceUnavailableException.class,
@@ -60,7 +60,7 @@ class BexExecutionEvidenceLedgerTest {
                     "deterministic invalid provider evidence");
         };
 
-        try (Blue blue = new Blue(invalid)) {
+        try (TestBlue blue = new TestBlue(invalid)) {
             RecordingGasHost host = new RecordingGasHost();
             assertThrows(
                     InvalidExecutionEvidenceException.class,
@@ -81,7 +81,7 @@ class BexExecutionEvidenceLedgerTest {
         List<Node> placeholders =
                 Collections.singletonList(placeholder);
         String memberBlueId =
-                CircularBlueIdCalculator
+                CircularSetIdentityCalculator
                         .calculateCircularSetBlueIds(
                                 placeholders)
                         .get(0);
@@ -92,7 +92,7 @@ class BexExecutionEvidenceLedgerTest {
                 new ProoflessCyclicProvider(
                         memberBlueId, resolvedMember);
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             RecordingGasHost host = new RecordingGasHost();
             InvalidExecutionEvidenceException failure =
                     assertThrows(
@@ -118,7 +118,7 @@ class BexExecutionEvidenceLedgerTest {
         List<Node> placeholders =
                 Collections.singletonList(placeholder);
         String memberBlueId =
-                CircularBlueIdCalculator
+                CircularSetIdentityCalculator
                         .calculateCircularSetBlueIds(
                                 placeholders)
                         .get(0);
@@ -130,7 +130,7 @@ class BexExecutionEvidenceLedgerTest {
                         memberBlueId,
                         resolvedMember);
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             RecordingGasHost host = new RecordingGasHost();
             ExecutionEvidenceUnavailableException failure =
                     assertThrows(
@@ -153,7 +153,7 @@ class BexExecutionEvidenceLedgerTest {
     }
 
     private static void executeKindRead(
-            Blue blue,
+            TestBlue blue,
             String blueId,
             RecordingGasHost host) {
         ResolvedSnapshot document = blue.resolveToSnapshot(
@@ -168,7 +168,7 @@ class BexExecutionEvidenceLedgerTest {
                         BexSemanticIdentityBoundary.STANDALONE)
                 .build();
         BexEngine.builder()
-                .blue(blue)
+                .language(blue.runtime())
                 .build()
                 .compileAndExecute(
                         BexProgramSource.inline(FrozenNode.fromResolvedNode(
@@ -179,7 +179,7 @@ class BexExecutionEvidenceLedgerTest {
     }
 
     private static String calculateBlueId(Node node) {
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             return blue.calculateBlueId(node);
         }
     }

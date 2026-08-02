@@ -12,8 +12,8 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.type.BexBlueTypeMatcher;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
@@ -21,7 +21,7 @@ import blue.language.processor.ProcessorErrorCategory;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -38,9 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexBlueTypeMatchingGasTest {
-    private final Blue blue = new Blue();
+    private final TestBlue blue = new TestBlue();
     private final BexEngine engine =
-            BexEngine.builder().blue(blue).build();
+            BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void structuralIsChargesEveryComparedSemanticOccurrence() {
@@ -180,7 +180,7 @@ class BexBlueTypeMatchingGasTest {
                 BexGasSchedule.defaults(), 1L);
 
         assertThrows(BexGasLimitExceededException.class,
-                () -> new BexBlueTypeMatcher(blue).matches(
+                () -> new BexBlueTypeMatcher(blue.runtime()).matches(
                         BexValues.fromSimple(candidate),
                         pattern,
                         meter,
@@ -199,12 +199,12 @@ class BexBlueTypeMatchingGasTest {
                         "value",
                         new Node().value("known")));
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         NodeProvider provider = providerReturning(
                 NodeProviderResult.unavailable(
                         "type evidence is offline"));
 
-        try (Blue unavailableBlue = new Blue(provider)) {
+        try (TestBlue unavailableBlue = new TestBlue(provider)) {
             BexGasMeter meter = new BexGasMeter(
                     BexGasSchedule.defaults(),
                     1_000_000L);
@@ -212,7 +212,7 @@ class BexBlueTypeMatchingGasTest {
                     assertThrows(
                             ExecutionEvidenceUnavailableException.class,
                             () -> new BexBlueTypeMatcher(
-                                    unavailableBlue)
+                                    unavailableBlue.runtime())
                                     .matches(
                                             transientWithReference(
                                                     unavailableBlue,
@@ -243,12 +243,12 @@ class BexBlueTypeMatchingGasTest {
                         "value",
                         new Node().value("known")));
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         NodeProvider provider = providerReturning(
                 NodeProviderResult.invalidEvidence(
                         "type evidence is invalid"));
 
-        try (Blue invalidBlue = new Blue(provider)) {
+        try (TestBlue invalidBlue = new TestBlue(provider)) {
             BexGasMeter meter = new BexGasMeter(
                     BexGasSchedule.defaults(),
                     1_000_000L);
@@ -256,7 +256,7 @@ class BexBlueTypeMatchingGasTest {
                     assertThrows(
                             InvalidExecutionEvidenceException.class,
                             () -> new BexBlueTypeMatcher(
-                                    invalidBlue)
+                                    invalidBlue.runtime())
                                     .matches(
                                             transientWithReference(
                                                     invalidBlue,
@@ -280,7 +280,7 @@ class BexBlueTypeMatchingGasTest {
     @Test
     void malformedLocalBlueShapeRemainsATypeMismatch() {
         String blueId =
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         new Node().value("referenced"));
         Map<String, Object> malformed =
                 new LinkedHashMap<>();
@@ -290,7 +290,7 @@ class BexBlueTypeMatchingGasTest {
                 BexGasSchedule.defaults(),
                 1_000_000L);
 
-        assertFalse(new BexBlueTypeMatcher(blue)
+        assertFalse(new BexBlueTypeMatcher(blue.runtime())
                 .matches(
                         BexValues.fromSimple(malformed),
                         nonEmptyPattern(),
@@ -311,7 +311,7 @@ class BexBlueTypeMatchingGasTest {
                         "value",
                         new Node().value("known")));
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         IllegalStateException expected =
                 new IllegalStateException(
                         "reference provider implementation defect");
@@ -319,7 +319,7 @@ class BexBlueTypeMatchingGasTest {
             throw expected;
         };
 
-        try (Blue providerBlue = new Blue(provider)) {
+        try (TestBlue providerBlue = new TestBlue(provider)) {
             IllegalStateException observed = assertThrows(
                     IllegalStateException.class,
                     () -> executeProviderBackedIs(
@@ -336,7 +336,7 @@ class BexBlueTypeMatchingGasTest {
                         "value",
                         new Node().value("known")));
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         ExecutionEvidenceUnavailableException nested =
                 new ExecutionEvidenceUnavailableException(
                         "nested evidence detail");
@@ -350,7 +350,7 @@ class BexBlueTypeMatchingGasTest {
             throw expected;
         };
 
-        try (Blue providerBlue = new Blue(provider)) {
+        try (TestBlue providerBlue = new TestBlue(provider)) {
             ProcessorFailureException observed = assertThrows(
                     ProcessorFailureException.class,
                     () -> executeProviderBackedIs(
@@ -366,13 +366,13 @@ class BexBlueTypeMatchingGasTest {
                 new AtomicInteger();
         Node content = new Node().value("known");
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         NodeProvider provider = countingProvider(
                 providerDemands,
                 NodeProviderResult.unavailable(
                         "later child is offline"));
 
-        try (Blue unavailableBlue = new Blue(provider)) {
+        try (TestBlue unavailableBlue = new TestBlue(provider)) {
             Map<String, BexValue> wide =
                     new LinkedHashMap<>();
             for (int index = 0; index < 256; index++) {
@@ -397,7 +397,7 @@ class BexBlueTypeMatchingGasTest {
             assertThrows(
                     BexGasLimitExceededException.class,
                     () -> new BexBlueTypeMatcher(
-                            unavailableBlue).matches(
+                            unavailableBlue.runtime()).matches(
                                     BexValues.map(wide),
                                     pattern,
                                     meter,
@@ -415,13 +415,13 @@ class BexBlueTypeMatchingGasTest {
                 new AtomicInteger();
         Node content = new Node().value("known");
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         NodeProvider provider = countingProvider(
                 providerDemands,
                 NodeProviderResult.unavailable(
                         "deep leaf is offline"));
 
-        try (Blue unavailableBlue = new Blue(provider)) {
+        try (TestBlue unavailableBlue = new TestBlue(provider)) {
             int depth = 32;
             BexValue candidate = exactReference(
                     unavailableBlue, blueId);
@@ -450,7 +450,7 @@ class BexBlueTypeMatchingGasTest {
             assertThrows(
                     BexGasLimitExceededException.class,
                     () -> new BexBlueTypeMatcher(
-                            unavailableBlue).matches(
+                            unavailableBlue.runtime()).matches(
                                     deepCandidate,
                                     pattern,
                                     meter,
@@ -470,13 +470,13 @@ class BexBlueTypeMatchingGasTest {
                 new AtomicInteger();
         Node content = new Node().value("known");
         String blueId =
-                BlueIdCalculator.calculateBlueId(content);
+                DirectBlueIdCalculator.calculateBlueId(content);
         NodeProvider provider = countingProvider(
                 providerDemands,
                 NodeProviderResult.unavailable(
                         "nested exact child is offline"));
 
-        try (Blue unavailableBlue = new Blue(provider)) {
+        try (TestBlue unavailableBlue = new TestBlue(provider)) {
             FrozenNode exactRoot =
                     FrozenNode.fromResolvedNode(
                             new Node().properties(
@@ -487,7 +487,7 @@ class BexBlueTypeMatchingGasTest {
             BexValue candidate =
                     BexValues.referenceBacked(
                             BexValues.frozen(exactRoot),
-                            unavailableBlue);
+                            unavailableBlue.runtime());
             FrozenNode pattern =
                     FrozenNode.fromResolvedNode(
                             new Node().properties(
@@ -501,7 +501,7 @@ class BexBlueTypeMatchingGasTest {
             assertThrows(
                     BexGasLimitExceededException.class,
                     () -> new BexBlueTypeMatcher(
-                            unavailableBlue).matches(
+                            unavailableBlue.runtime()).matches(
                                     candidate,
                                     pattern,
                                     meter,
@@ -522,7 +522,7 @@ class BexBlueTypeMatchingGasTest {
     }
 
     private static void executeProviderBackedIs(
-            Blue blue,
+            TestBlue blue,
             String blueId) {
         FrozenNode document = FrozenNode.fromResolvedNode(
                 new Node().properties(
@@ -544,7 +544,7 @@ class BexBlueTypeMatchingGasTest {
                 "      value: expected"));
 
         BexEngine.builder()
-                .blue(blue)
+                .language(blue.runtime())
                 .build()
                 .compileAndExecute(
                         BexProgramSource.inline(
@@ -573,7 +573,7 @@ class BexBlueTypeMatchingGasTest {
     }
 
     private static BexValue transientWithReference(
-            Blue blue,
+            TestBlue blue,
             String blueId) {
         Map<String, BexValue> candidate =
                 new LinkedHashMap<>();
@@ -584,19 +584,19 @@ class BexBlueTypeMatchingGasTest {
                                 FrozenNode.fromNode(
                                         new Node().blueId(
                                                 blueId))),
-                        blue));
+                        blue.runtime()));
         return BexValues.map(candidate);
     }
 
     private static BexValue exactReference(
-            Blue blue,
+            TestBlue blue,
             String blueId) {
         return BexValues.referenceBacked(
                 BexValues.frozen(
                         FrozenNode.fromNode(
                                 new Node().blueId(
                                         blueId))),
-                blue);
+                blue.runtime());
     }
 
     private static FrozenNode nonEmptyPattern() {

@@ -51,7 +51,8 @@ class BexSchemaValueTest {
         assertTrue(schema.get("required").asBoolean());
         assertEquals(BigInteger.valueOf(2), schema.get("multipleOf").asInteger());
         assertEquals("draft", schema.get("enum").get("0").asText());
-        assertEquals("Active option", schema.get("enum").get("1").get("name").asText());
+        assertEquals("Active option",
+                schema.get("enum").get("1").get("type").get("name").asText());
         assertEquals("active", schema.get("enum").get("1").get("value").asText());
 
         Node roundTripped = BexNodeWriter.toNode(BexValues.fromSimple(sourceValue.toSimple()));
@@ -92,7 +93,9 @@ class BexSchemaValueTest {
                 .maxFields(integer(5))
                 .enumValues(Arrays.asList(
                         new Node().value("draft"),
-                        new Node().name("Active option").value("active")));
+                        new Node()
+                                .type(new Node().name("Active option"))
+                                .value("active")));
     }
 
     private static Node integer(long value) {

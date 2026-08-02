@@ -14,12 +14,12 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexPatchEntry;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.provider.ExactNodeGraphFragments;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -198,7 +198,7 @@ class BexRepresentationInvarianceTest {
         Node eventRoot = present(
                 eventGraph.roots().get(0), variant.rootForm);
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             if (variant.cacheForm == CacheForm.WARM) {
                 materialize(blue, programRoot, variant.exactForm);
                 materialize(blue, documentRoot, variant.exactForm);
@@ -214,7 +214,7 @@ class BexRepresentationInvarianceTest {
             CountingIdentityBoundary boundary =
                     new CountingIdentityBoundary();
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .intrinsics(representationIntrinsics())
                     .build();
             BexCompiledProgram compiled = engine.compile(
@@ -284,7 +284,7 @@ class BexRepresentationInvarianceTest {
     }
 
     private static ExactPair runtimePair(
-            Blue blue,
+            TestBlue blue,
             Node presented,
             ExactForm exactForm) {
         if (exactForm == ExactForm.MATERIALIZED) {
@@ -301,7 +301,7 @@ class BexRepresentationInvarianceTest {
     }
 
     private static ExactPair materialize(
-            Blue blue,
+            TestBlue blue,
             Node presented,
             ExactForm exactForm) {
         Node expanded = blue.expand(presented);
@@ -536,7 +536,7 @@ class BexRepresentationInvarianceTest {
              * so inline children and materialized children carry the same
              * exact scalar identities.
              */
-            try (Blue blue = new Blue()) {
+            try (TestBlue blue = new TestBlue()) {
                 Node textPattern = blue.yamlToNode("type: Text");
                 Node program = stepDo(list(
                         op("$let", obj(
@@ -703,7 +703,7 @@ class BexRepresentationInvarianceTest {
             FrozenNode frozen =
                     FrozenNode.fromResolvedNode(node.clone());
             return new BexEstablishedIdentity(
-                    BlueIdCalculator.calculateBlueId(
+                    DirectBlueIdCalculator.calculateBlueId(
                             frozen.toNode()),
                     frozen);
         }

@@ -6,19 +6,19 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProof;
 import blue.language.provider.CyclicSetProofResult;
-import blue.language.provider.NodeProviderOutcome;
+import blue.language.api.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
-import blue.language.utils.CircularBlueIdCalculator;
+import blue.language.merge.ResolvedSnapshot;
+import blue.language.identity.CircularSetIdentityCalculator;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -46,7 +46,7 @@ class BexExactReferenceDocumentTest {
                     : Collections.<Node>emptyList();
         };
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ResolvedSnapshot snapshot = blue.resolveToSnapshot(
                     obj("x", new Node().blueId(blueId)));
             assertTrue(snapshot.frozenResolvedRoot()
@@ -57,7 +57,7 @@ class BexExactReferenceDocumentTest {
                     BexValues.exact(
                             snapshot.frozenCanonicalRoot(),
                             snapshot.frozenResolvedRoot()),
-                    blue);
+                    blue.runtime());
             BexValue referenced = root.get("x");
 
             assertEquals(blueId, referenced.exactBlueId());
@@ -84,14 +84,14 @@ class BexExactReferenceDocumentTest {
             return Collections.<Node>emptyList();
         };
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ResolvedSnapshot snapshot = blue.resolveToSnapshot(
                     obj("x", new Node().blueId(unavailableBlueId)));
             BexValue root = BexValues.referenceBacked(
                     BexValues.exact(
                             snapshot.frozenCanonicalRoot(),
                             snapshot.frozenResolvedRoot()),
-                    blue);
+                    blue.runtime());
 
             RuntimeException failure = assertThrows(
                     RuntimeException.class,
@@ -113,7 +113,7 @@ class BexExactReferenceDocumentTest {
                     : Collections.<Node>emptyList();
         };
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ResolvedSnapshot snapshot = blue.resolveToSnapshot(
                     obj("x", new Node().blueId(blueId)));
             BexExecutionContext context = BexExecutionContext.builder()
@@ -131,7 +131,7 @@ class BexExactReferenceDocumentTest {
                     op("$return", op("$resultValue", "/x"))));
 
             BexValue result = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .build()
                     .compileAndExecute(
                             BexProgramSource.inline(
@@ -157,7 +157,7 @@ class BexExactReferenceDocumentTest {
         Node content = obj("a", 1);
         String blueId = calculateBlueId(content);
         ResolvedSnapshot snapshot;
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             snapshot = blue.resolveToSnapshot(
                     obj("x", new Node().blueId(blueId)));
         }
@@ -184,7 +184,7 @@ class BexExactReferenceDocumentTest {
         java.util.List<Node> placeholders =
                 Collections.singletonList(member);
         String memberBlueId =
-                CircularBlueIdCalculator
+                CircularSetIdentityCalculator
                         .calculateCircularSetBlueIds(placeholders)
                         .get(0);
         Node resolvedMember = member.clone();
@@ -197,14 +197,14 @@ class BexExactReferenceDocumentTest {
                         placeholders);
         assertTrue(memberBlueId.contains("#"));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ResolvedSnapshot snapshot = blue.resolveToSnapshot(
                     obj("x", new Node().blueId(memberBlueId)));
             BexValue root = BexValues.referenceBacked(
                     BexValues.exact(
                             snapshot.frozenCanonicalRoot(),
                             snapshot.frozenResolvedRoot()),
-                    blue);
+                    blue.runtime());
 
             assertEquals(memberBlueId,
                     root.get("x").exactBlueId());
@@ -217,11 +217,11 @@ class BexExactReferenceDocumentTest {
         NodeProvider proofless = requested -> memberBlueId.equals(requested)
                 ? Collections.singletonList(resolvedMember.clone())
                 : Collections.<Node>emptyList();
-        try (Blue blue = new Blue(proofless)) {
+        try (TestBlue blue = new TestBlue(proofless)) {
             BexValue prooflessMember = BexValues.referenceBacked(
                     BexValues.frozen(FrozenNode.fromNode(
                             new Node().blueId(memberBlueId))),
-                    blue);
+                    blue.runtime());
             assertEquals(memberBlueId,
                     prooflessMember.exactBlueId());
             assertThrows(
@@ -295,13 +295,13 @@ class BexExactReferenceDocumentTest {
                         fixture.resolvedMember,
                         Collections.singletonList(
                                 fixture.placeholder));
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexValue verifiedParent =
                     BexValues.referenceBacked(
                             BexValues.exact(
                                     canonicalParent,
                                     resolvedParent),
-                            blue);
+                            blue.runtime());
             BexValue verifiedCyclic =
                     verifiedParent.get("cyclic");
 
@@ -325,7 +325,7 @@ class BexExactReferenceDocumentTest {
                                 "cyclic member content temporarily unavailable"),
                         null);
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexValue member = exactReference(
                     blue, fixture.memberBlueId);
 
@@ -357,7 +357,7 @@ class BexExactReferenceDocumentTest {
                                         fixture.resolvedMember)),
                         null);
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexValue member = exactReference(
                     blue, fixture.memberBlueId);
 
@@ -385,7 +385,7 @@ class BexExactReferenceDocumentTest {
                         CyclicSetProofResult.unavailable(
                                 "cyclic proof store temporarily unavailable"));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexValue member = exactReference(
                     blue, fixture.memberBlueId);
 
@@ -425,7 +425,7 @@ class BexExactReferenceDocumentTest {
                         CyclicSetProofResult.found(
                                 wrongProof));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             BexValue member = exactReference(
                     blue, fixture.memberBlueId);
 
@@ -490,7 +490,7 @@ class BexExactReferenceDocumentTest {
                     .name("cyclic-member");
             java.util.List<Node> placeholders =
                     Collections.singletonList(placeholder);
-            memberBlueId = CircularBlueIdCalculator
+            memberBlueId = CircularSetIdentityCalculator
                     .calculateCircularSetBlueIds(placeholders)
                     .get(0);
             resolvedMember = placeholder.clone();
@@ -537,17 +537,17 @@ class BexExactReferenceDocumentTest {
     }
 
     private static String calculateBlueId(Node node) {
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             return blue.calculateBlueId(node);
         }
     }
 
     private static BexValue exactReference(
-            Blue blue, String blueId) {
+            TestBlue blue, String blueId) {
         return BexValues.referenceBacked(
                 BexValues.frozen(FrozenNode.fromNode(
                         new Node().blueId(blueId))),
-                blue);
+                blue.runtime());
     }
 
     private static String messageChain(Throwable failure) {

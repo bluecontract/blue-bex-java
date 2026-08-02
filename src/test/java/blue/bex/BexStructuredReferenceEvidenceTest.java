@@ -2,12 +2,12 @@ package blue.bex;
 
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.NodeProvider;
+import blue.bex.test.TestBlue;
+import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
-import blue.language.provider.NodeProviderOutcome;
+import blue.language.api.NodeProviderOutcome;
 import blue.language.provider.NodeProviderResult;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class BexStructuredReferenceEvidenceTest {
         MutableProvider provider = new MutableProvider(
                 NodeProviderResult.notFound());
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ExecutionEvidenceUnavailableException failure = assertThrows(
                     ExecutionEvidenceUnavailableException.class,
                     () -> exactReference(blue, blueId).isObject());
@@ -53,7 +53,7 @@ class BexStructuredReferenceEvidenceTest {
         MutableProvider provider = new MutableProvider(
                 NodeProviderResult.unavailable("feeder is offline"));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             ExecutionEvidenceUnavailableException failure = assertThrows(
                     ExecutionEvidenceUnavailableException.class,
                     () -> exactReference(blue, blueId).keys());
@@ -73,7 +73,7 @@ class BexStructuredReferenceEvidenceTest {
                 NodeProviderResult.invalidEvidence(
                         "signature does not match"));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             InvalidExecutionEvidenceException failure = assertThrows(
                     InvalidExecutionEvidenceException.class,
                     () -> exactReference(blue, blueId).get("value"));
@@ -93,7 +93,7 @@ class BexStructuredReferenceEvidenceTest {
                         Collections.singletonList(
                                 obj("value", "different"))));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             InvalidExecutionEvidenceException failure = assertThrows(
                     InvalidExecutionEvidenceException.class,
                     () -> exactReference(
@@ -126,7 +126,7 @@ class BexStructuredReferenceEvidenceTest {
             }
         };
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             IllegalStateException failure = assertThrows(
                     IllegalStateException.class,
                     () -> exactReference(blue, blueId).isObject());
@@ -143,7 +143,7 @@ class BexStructuredReferenceEvidenceTest {
                 NodeProviderResult.found(
                         Collections.singletonList(content)));
 
-        try (Blue blue = new Blue(provider)) {
+        try (TestBlue blue = new TestBlue(provider)) {
             assertTrue(exactReference(blue, blueId).isObject());
             provider.set(NodeProviderResult.unavailable(
                     "second attempt cannot acquire evidence"));
@@ -160,15 +160,15 @@ class BexStructuredReferenceEvidenceTest {
     }
 
     private static BexValue exactReference(
-            Blue blue, String blueId) {
+            TestBlue blue, String blueId) {
         return BexValues.referenceBacked(
                 BexValues.frozen(FrozenNode.fromNode(
                         new Node().blueId(blueId))),
-                blue);
+                blue.runtime());
     }
 
     private static String calculateBlueId(Node node) {
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             return blue.calculateBlueId(node);
         }
     }

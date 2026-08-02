@@ -13,7 +13,7 @@ import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetrics;
 import blue.bex.runtime.BexRuntime;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import org.junit.jupiter.api.Test;
 
@@ -118,9 +118,9 @@ class BexDiagnosticAdmissionOrderingTest {
                         "do", list())),
                 op("$return", true)));
 
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .build();
             BexCompiledProgram program = engine.compile(
                     BexProgramSource.inline(frozen(programNode)));
@@ -142,7 +142,7 @@ class BexDiagnosticAdmissionOrderingTest {
             BexRuntime runtime = new BexRuntime(
                     program,
                     context(prefixGas),
-                    blue,
+                    blue.runtime(),
                     BexGasSchedule.defaults(),
                     metrics,
                     new BexPointerCache(),
@@ -177,9 +177,9 @@ class BexDiagnosticAdmissionOrderingTest {
     private static RejectedExecution reject(
             Node programNode,
             long gasLimit) {
-        try (Blue blue = new Blue()) {
+        try (TestBlue blue = new TestBlue()) {
             BexEngine engine = BexEngine.builder()
-                    .blue(blue)
+                    .language(blue.runtime())
                     .build();
             BexCompiledProgram program = engine.compile(
                     BexProgramSource.inline(frozen(programNode)));
@@ -187,7 +187,7 @@ class BexDiagnosticAdmissionOrderingTest {
             BexRuntime runtime = new BexRuntime(
                     program,
                     context(gasLimit),
-                    blue,
+                    blue.runtime(),
                     BexGasSchedule.defaults(),
                     metrics,
                     new BexPointerCache(),
