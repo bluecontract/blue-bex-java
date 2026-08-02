@@ -4,7 +4,7 @@ import blue.bex.BexException;
 import blue.bex.output.BexAdmittedValue;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.util.Collections;
 import java.util.List;

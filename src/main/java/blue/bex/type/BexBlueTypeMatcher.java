@@ -7,16 +7,17 @@ import blue.bex.gas.BexGasMeter;
 import blue.bex.value.BexBlueNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
 import blue.language.model.Node;
 import blue.language.model.Schema;
+import blue.language.registry.BlueCoreTypeRegistry;
+import blue.language.runtime.BlueLanguage;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.GasLimitExceededException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.FrozenTypeMatcher;
+import blue.language.matching.FrozenTypeMatcher;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -25,22 +26,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static blue.language.utils.Properties.BOOLEAN_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.DOUBLE_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.INTEGER_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.TEXT_TYPE_BLUE_ID;
-
 /**
  * BEX boundary adapter for Blue's node/type matcher.
  */
 public final class BexBlueTypeMatcher {
     private static final int TEXT_BLOCK_CODE_POINTS = 64;
+    private static final String TEXT_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Text");
+    private static final String INTEGER_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Integer");
+    private static final String DOUBLE_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Double");
+    private static final String BOOLEAN_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Boolean");
 
-    private final Blue blue;
+    private final BlueLanguage blue;
     private final FrozenTypeMatcher matcher;
 
-    public BexBlueTypeMatcher(Blue blue) {
-        this.blue = blue != null ? blue : new Blue();
+    public BexBlueTypeMatcher(BlueLanguage blue) {
+        this.blue = blue != null
+                ? blue : BlueLanguage.builder().build();
         this.matcher = FrozenTypeMatcher.withVerifiedReferenceMaterializer(
                 reference -> FrozenNode.fromResolvedNode(
                         BexValues.referenceBacked(

@@ -3,8 +3,8 @@ package blue.bex.value;
 import blue.bex.BexException;
 import blue.language.model.Node;
 import blue.language.model.Schema;
-import blue.language.utils.BlueIds;
-import blue.language.utils.Nodes;
+import blue.language.identity.BlueIds;
+import blue.language.model.Nodes;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

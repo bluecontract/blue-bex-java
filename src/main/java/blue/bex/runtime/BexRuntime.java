@@ -19,7 +19,7 @@ import blue.bex.result.BexResultOverlay;
 import blue.bex.type.BexBlueTypeMatcher;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.language.runtime.BlueLanguage;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasLimitExceededException;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
@@ -27,7 +27,7 @@ import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.processor.RuntimeWorkBudget;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,7 +46,7 @@ public final class BexRuntime {
     private final BexPointerCache pointerCache;
     private final BexExecutionAccumulator accumulator;
     private final BexBlueTypeMatcher typeMatcher;
-    private final Blue blue;
+    private final BlueLanguage blue;
     private final BexIntrinsicRegistry intrinsics;
     private final BexOutputAdmission outputAdmission;
     private final BexGasLedgerHost gasLedgerHost;
@@ -54,7 +54,7 @@ public final class BexRuntime {
 
     public BexRuntime(BexCompiledProgram program,
                       BexExecutionContext context,
-                      Blue blue,
+                      BlueLanguage blue,
                       BexGasSchedule gasSchedule,
                       BexMetrics metrics,
                       BexPointerCache pointerCache) {
@@ -63,7 +63,7 @@ public final class BexRuntime {
 
     public BexRuntime(BexCompiledProgram program,
                       BexExecutionContext context,
-                      Blue blue,
+                      BlueLanguage blue,
                       BexGasSchedule gasSchedule,
                       BexMetrics metrics,
                       BexPointerCache pointerCache,

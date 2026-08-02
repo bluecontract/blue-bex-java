@@ -3,8 +3,8 @@ package blue.bex.result;
 import blue.bex.api.BexDocumentView;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
+import blue.language.runtime.BlueLanguage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +16,7 @@ public final class BexResultOverlay {
     private final BexDocumentView document;
     private final List<BexPatchEntry> entries = new ArrayList<>();
     private final BexMetrics metrics;
-    private final Blue blue;
+    private final BlueLanguage blue;
 
     public BexResultOverlay(BexDocumentView document, BexMetrics metrics) {
         this(document, metrics, null);
@@ -25,7 +25,7 @@ public final class BexResultOverlay {
     public BexResultOverlay(
             BexDocumentView document,
             BexMetrics metrics,
-            Blue blue) {
+            BlueLanguage blue) {
         this.document = document;
         this.metrics = metrics;
         this.blue = blue;

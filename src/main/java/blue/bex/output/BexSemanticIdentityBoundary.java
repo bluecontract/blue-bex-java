@@ -2,7 +2,7 @@ package blue.bex.output;
 
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIdCalculator;
+import blue.language.identity.DirectBlueIdCalculator;
 
 /**
  * Host-owned Blue semantic identity establishment.
@@ -17,7 +17,7 @@ public interface BexSemanticIdentityBoundary {
         FrozenNode frozen = FrozenNode.fromResolvedNode(
                 node.clone());
         return new BexEstablishedIdentity(
-                BlueIdCalculator.calculateBlueId(
+                DirectBlueIdCalculator.calculateBlueId(
                         frozen.toNode()),
                 frozen);
     };

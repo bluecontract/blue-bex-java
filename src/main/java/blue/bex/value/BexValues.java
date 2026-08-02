@@ -1,19 +1,17 @@
 package blue.bex.value;
 
 import blue.bex.BexException;
-import blue.language.Blue;
-import blue.language.BlueOperationLimits;
-import blue.language.BlueOperationOutcome;
-import blue.language.BlueOperationResult;
+import blue.language.api.BlueOperationLimits;
+import blue.language.api.BlueOperationOutcome;
+import blue.language.api.BlueOperationResult;
 import blue.language.model.Node;
 import blue.language.model.Schema;
 import blue.language.processor.ExecutionEvidenceUnavailableException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
-import blue.language.utils.JsonPointer;
-import blue.language.utils.NodeToMapListOrValue;
-import blue.language.utils.SchemaToMapListOrValue;
+import blue.language.merge.ResolvedSnapshot;
+import blue.language.model.wire.JsonPointer;
+import blue.language.runtime.BlueLanguage;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -23,11 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
-
-import static blue.language.utils.Properties.BOOLEAN_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.DOUBLE_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.INTEGER_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.TEXT_TYPE_BLUE_ID;
 
 /**
  * Value factories and shared value helpers.
@@ -155,12 +148,13 @@ public final class BexValues {
      * Adds demand-driven, verified reference materialization to an exact
      * frozen value.
      *
-     * <p>{@link Blue#resolveToSnapshot(Object)} intentionally leaves untyped
+     * <p>{@link blue.language.merge.BlueSnapshots#resolve(Node)} intentionally leaves untyped
      * pure references collapsed. BEX may carry those values by identity
      * without loading them, but semantic operations such as member access,
      * kind inspection, or key enumeration must establish their content.
-     * {@link Blue#expandLimited(Node, BlueOperationLimits)} is the structured
-     * Language boundary that both obtains and verifies that evidence.
+     * {@link blue.language.graph.BlueGraph#expandLimited(Node, BlueOperationLimits)}
+     * is the focused Language boundary
+     * that both obtains and verifies that evidence.
      * Provider absence and temporary unavailability remain incomplete
      * execution evidence, while invalid evidence remains a deterministic
      * failure; neither is converted to BEX {@code undefined}.</p>
@@ -170,7 +164,8 @@ public final class BexValues {
      * @return a lazy reference-backed exact value, or {@code value} when it is
      *         not backed by a {@link FrozenNode}
      */
-    public static BexValue referenceBacked(BexValue value, Blue blue) {
+    public static BexValue referenceBacked(
+            BexValue value, BlueLanguage blue) {
         if (value instanceof FrozenNodeBexValue && blue != null) {
             return ((FrozenNodeBexValue) value)
                     .withReferenceMaterializer(
@@ -180,8 +175,8 @@ public final class BexValues {
     }
 
     private static ResolvedSnapshot loadReference(
-            Blue blue, String blueId) {
-        BlueOperationResult<Node> result = blue.expandLimited(
+            BlueLanguage blue, String blueId) {
+        BlueOperationResult<Node> result = blue.graph().expandLimited(
                 new Node().blueId(blueId),
                 BlueOperationLimits.demandedPath(""));
         if (result.outcome() == BlueOperationOutcome.INVALID) {
@@ -218,7 +213,7 @@ public final class BexValues {
         if (node == null) {
             return UNDEFINED;
         }
-        return fromSimple(NodeToMapListOrValue.get(node.toNode()));
+        return fromSimple(BexBlueValueImporter.node(node.toNode()));
     }
 
     static BexValue schemaSnapshot(Schema schema) {
@@ -226,49 +221,7 @@ public final class BexValues {
             return UNDEFINED;
         }
         // Schema is the value of a node's "schema" key, not another schema-bearing node.
-        return fromSimple(SchemaToMapListOrValue.get(
-                schema.clone(),
-                BexValues::schemaNodeToSimple));
-    }
-
-    private static Object schemaNodeToSimple(Node node) {
-        if (isCoreTypedScalar(node)) {
-            return node.getValue();
-        }
-        return NodeToMapListOrValue.get(node);
-    }
-
-    private static boolean isCoreTypedScalar(Node node) {
-        if (node == null
-                || node.getValue() == null
-                || node.getName() != null
-                || node.getDescription() != null
-                || node.getItems() != null
-                || node.getProperties() != null
-                || node.getContracts() != null
-                || node.getBlueId() != null
-                || node.getSchema() != null
-                || node.getMergePolicy() != null
-                || node.getPreviousBlueId() != null
-                || node.getPosition() != null
-                || node.getBlue() != null
-                || node.getItemType() != null
-                || node.getKeyType() != null
-                || node.getValueType() != null) {
-            return false;
-        }
-        if (node.getType() == null) {
-            return true;
-        }
-        String typeBlueId = node.getType().getBlueId();
-        return TEXT_TYPE_BLUE_ID.equals(typeBlueId)
-                || INTEGER_TYPE_BLUE_ID.equals(typeBlueId)
-                || DOUBLE_TYPE_BLUE_ID.equals(typeBlueId)
-                || BOOLEAN_TYPE_BLUE_ID.equals(typeBlueId)
-                || "Text".equals(typeBlueId)
-                || "Integer".equals(typeBlueId)
-                || "Double".equals(typeBlueId)
-                || "Boolean".equals(typeBlueId);
+        return fromSimple(BexBlueValueImporter.schema(schema.clone()));
     }
 
     public static String frozenBlueId(BexValue value) {

@@ -1,0 +1,202 @@
+{
+  "schema": "blue-bex-api-migration-ledger/1.0",
+  "title": "Blue Language modular API migration",
+  "sourceState": {
+    "bexBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
+    "bexMigrationState": "working-tree delta rooted at bexBaselineCommit",
+    "languageExactCommit": "9a607e584ff5dd973684d35d71eb4022d946b760",
+    "languageVerifiedImplementationCommit": "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453",
+    "languageDeltaClassification": "documentation-and-license-only",
+    "languageDeltaPaths": [
+      "LICENSE",
+      "docs/collection-paths-and-cohesion-migration-report.md",
+      "reports/modernization/phase-collection-paths-final.json"
+    ]
+  },
+  "manifests": {
+    "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
+    "afterSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
+    "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
+    "generatedPath": "build/reports/bex-release/public-api.txt"
+  },
+  "changes": [
+    {
+      "id": "builder-blue-remove",
+      "kind": "removed",
+      "signature": "method public blue(blue.language.Blue):blue.bex.api.BexEngine$Builder",
+      "classification": "stable API",
+      "rationale": "The monolithic blue.language.Blue facade was removed by the modular Language API.",
+      "replacement": "method public language(blue.language.runtime.BlueLanguage):blue.bex.api.BexEngine$Builder",
+      "binaryCompatibility": "breaking: callers linked to Builder.blue(Blue) must relink",
+      "sourceCompatibility": "breaking: callers must construct BlueLanguage and call language"
+    },
+    {
+      "id": "builder-language-add",
+      "kind": "added",
+      "signature": "method public language(blue.language.runtime.BlueLanguage):blue.bex.api.BexEngine$Builder",
+      "classification": "stable API",
+      "rationale": "BEX now accepts the supported modular Language runtime facade.",
+      "replacement": "replaces method public blue(blue.language.Blue):blue.bex.api.BexEngine$Builder",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for Builder.blue callers"
+    },
+    {
+      "id": "engine-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public intrinsic(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexEngine$Builder",
+      "classification": "intrinsic SPI",
+      "rationale": "Class convenience must use an explicit application-owned class-to-BlueId boundary when annotation resolution is not applicable.",
+      "replacement": "additive overload; exact string-BlueId registration remains authoritative",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "registry-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public with(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry",
+      "classification": "intrinsic SPI",
+      "rationale": "The removed Language BlueIdResolver cannot be used; mapping policy is explicit and BEX-owned.",
+      "replacement": "additive overload; with(String,...) remains the exact identity API",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "registry-builder-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public register(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder",
+      "classification": "intrinsic SPI",
+      "rationale": "The builder exposes the same explicit mapping boundary as the immutable registry.",
+      "replacement": "additive overload; register(String,...) remains the exact identity API",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "resolver-type-add",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.api.BexTypeBlueIdResolver",
+      "classification": "intrinsic SPI",
+      "rationale": "BEX owns the optional class-mapping policy instead of depending on removed Language utilities.",
+      "replacement": "new functional SPI used only by class-based intrinsic convenience overloads",
+      "binaryCompatibility": "compatible additive type",
+      "sourceCompatibility": "compatible additive type"
+    },
+    {
+      "id": "resolver-method-add",
+      "kind": "added",
+      "signature": "method public abstract resolve(java.lang.Class):java.lang.String",
+      "classification": "intrinsic SPI",
+      "rationale": "Returns an exact BlueId or null without class-name inference.",
+      "replacement": "new single abstract method of BexTypeBlueIdResolver",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible lambda/function target"
+    },
+    {
+      "id": "overlay-blue-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.Blue)",
+      "owner": "blue.bex.result.BexResultOverlay",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "overlay-language-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)",
+      "owner": "blue.bex.result.BexResultOverlay",
+      "classification": "internal implementation",
+      "rationale": "Reference-backed overlay reads require the modular Language runtime.",
+      "replacement": "replaces the constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "runtime-blue-basic-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "same constructor descriptor with blue.language.runtime.BlueLanguage",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "runtime-language-basic-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "Runtime reference and type operations use the modular Language runtime.",
+      "replacement": "replaces the corresponding constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "runtime-blue-intrinsic-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "same constructor descriptor with blue.language.runtime.BlueLanguage",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "runtime-language-intrinsic-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "Runtime reference and type operations use the modular Language runtime.",
+      "replacement": "replaces the corresponding constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "matcher-blue-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.language.Blue)",
+      "owner": "blue.bex.type.BexBlueTypeMatcher",
+      "classification": "internal implementation",
+      "rationale": "Type matching moved from the old facade to focused modular matching/runtime APIs.",
+      "replacement": "constructor public <init>(blue.language.runtime.BlueLanguage)",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "matcher-language-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.language.runtime.BlueLanguage)",
+      "owner": "blue.bex.type.BexBlueTypeMatcher",
+      "classification": "internal implementation",
+      "rationale": "The matcher uses the supported modular runtime and focused FrozenTypeMatcher API.",
+      "replacement": "replaces the constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "reference-backed-blue-remove",
+      "kind": "removed",
+      "signature": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.Blue):blue.bex.value.BexValue",
+      "classification": "host SPI",
+      "rationale": "Demand-driven reference materialization must use the modular Language graph boundary.",
+      "replacement": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue",
+      "binaryCompatibility": "breaking for direct host callers",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "reference-backed-language-add",
+      "kind": "added",
+      "signature": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue",
+      "classification": "host SPI",
+      "rationale": "BlueLanguage supplies the verified graph expansion boundary needed by lazy exact values.",
+      "replacement": "replaces referenceBacked(BexValue, blue.language.Blue)",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for host integrations"
+    }
+  ]
+}

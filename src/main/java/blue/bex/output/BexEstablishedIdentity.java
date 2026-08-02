@@ -1,7 +1,7 @@
 package blue.bex.output;
 
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIds;
+import blue.language.identity.BlueIds;
 
 import java.util.Objects;
 

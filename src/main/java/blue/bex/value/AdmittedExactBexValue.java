@@ -2,7 +2,7 @@ package blue.bex.value;
 
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

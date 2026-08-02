@@ -12,6 +12,7 @@ import blue.bex.value.BexValues;
 import blue.bex.result.BexMetrics;
 import blue.language.model.Node;
 import blue.language.model.Schema;
+import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.snapshot.FrozenNode;
 
 import java.util.ArrayDeque;
@@ -23,15 +24,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static blue.language.utils.Properties.BOOLEAN_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.DOUBLE_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.INTEGER_TYPE_BLUE_ID;
-import static blue.language.utils.Properties.TEXT_TYPE_BLUE_ID;
-
 /**
  * Compiler from frozen BEX Blue data to specialized runtime objects.
  */
 public final class BexCompiler {
+    private static final String TEXT_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Text");
+    private static final String INTEGER_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Integer");
+    private static final String DOUBLE_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Double");
+    private static final String BOOLEAN_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Boolean");
     private static final Set<String> RESERVED_BLUE_KEYS = reservedBlueKeys();
 
     private final BexContainsCache containsCache = new BexContainsCache();

@@ -1,7 +1,7 @@
 package blue.bex.pointer;
 
 import blue.bex.BexException;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.util.Collections;
 import java.util.List;

@@ -25,6 +25,7 @@ import java.util.Objects;
  * primary and intrinsic ledgers to that exact shared admission boundary.</p>
  */
 public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLedgerHost {
+    private final ProcessorExecutionContext context;
     private final RuntimeWorkSession session;
     private final String runtimeNamespace;
 
@@ -35,13 +36,16 @@ public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLe
     public ProcessorExecutionContextBexGasLedgerHost(
             ProcessorExecutionContext context,
             String runtimeNamespace) {
-        this(Objects.requireNonNull(context, "context").runtimeWorkSession(),
-                runtimeNamespace);
+        this.context = Objects.requireNonNull(context, "context");
+        this.session = null;
+        this.runtimeNamespace =
+                requireRuntimeNamespace(runtimeNamespace);
     }
 
     public ProcessorExecutionContextBexGasLedgerHost(
             RuntimeWorkSession session,
             String runtimeNamespace) {
+        this.context = null;
         this.session = Objects.requireNonNull(session, "session");
         this.runtimeNamespace =
                 requireRuntimeNamespace(runtimeNamespace);
@@ -55,7 +59,9 @@ public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLe
 
     @Override
     public RuntimeWorkBudget openSharedBudget(long maximumGas) {
-        return session.openSharedBudget(maximumGas);
+        return session != null
+                ? session.openSharedBudget(maximumGas)
+                : BexGasLedgerHost.super.openSharedBudget(maximumGas);
     }
 
     @Override
@@ -65,15 +71,28 @@ public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLe
             RuntimeWorkBudget sharedBudget) {
         String logicalNamespace =
                 requireRuntimeNamespace(namespace);
-        return session.openLedger(
-                physicalNamespace(logicalNamespace),
-                counterWeights,
-                sharedBudget);
+        String physicalNamespace = physicalNamespace(logicalNamespace);
+        if (session != null) {
+            return session.openLedger(
+                    physicalNamespace,
+                    counterWeights,
+                    sharedBudget);
+        }
+        if (sharedBudget != null) {
+            throw new IllegalArgumentException(
+                    "ProcessorExecutionContext does not expose shared runtime budgets");
+        }
+        return context.newRuntimeGasLedger(
+                physicalNamespace, counterWeights);
     }
 
     @Override
     public void submit(GasMeter.ChildGasLedger ledger) {
-        session.submit(ledger);
+        if (session != null) {
+            session.submit(ledger);
+        } else {
+            context.submitRuntimeGasLedger(ledger);
+        }
     }
 
     @Override
@@ -118,8 +137,12 @@ public final class ProcessorExecutionContextBexGasLedgerHost implements BexGasLe
             GasMeter.ChildGasLedger ledger,
             GasLimitExceededException exhaustion) {
         Objects.requireNonNull(ledger, "ledger");
-        session.propagateGasExhaustion(
-                Objects.requireNonNull(exhaustion, "exhaustion"));
+        GasLimitExceededException exact =
+                Objects.requireNonNull(exhaustion, "exhaustion");
+        if (session != null) {
+            session.propagateGasExhaustion(exact);
+        }
+        throw exact;
     }
 
     public String runtimeNamespace() {

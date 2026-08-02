@@ -7,7 +7,7 @@ import blue.bex.output.BexOutputKind;
 import blue.bex.value.BexUnicodeOrder;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.utils.BlueIdResolver;
+import blue.language.mapping.TypeClassResolver;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -108,9 +108,23 @@ public final class BexIntrinsicRegistry {
                                      String registryIdentity,
                                      Map<String, Long> counterWeights,
                                      BexIntrinsicProcessor processor) {
+        return with(
+                typeClass,
+                BexIntrinsicRegistry::resolveAnnotatedTypeBlueId,
+                registryIdentity,
+                counterWeights,
+                processor);
+    }
+
+    public BexIntrinsicRegistry with(Class<?> typeClass,
+                                     BexTypeBlueIdResolver typeBlueIdResolver,
+                                     String registryIdentity,
+                                     Map<String, Long> counterWeights,
+                                     BexIntrinsicProcessor processor) {
         return toBuilder()
                 .register(
                         typeClass,
+                        typeBlueIdResolver,
                         registryIdentity,
                         counterWeights,
                         processor)
@@ -249,6 +263,22 @@ public final class BexIntrinsicRegistry {
         return "intrinsic-" + blueId;
     }
 
+    private static String resolveAnnotatedTypeBlueId(Class<?> typeClass) {
+        TypeClassResolver resolver = new TypeClassResolver();
+        try {
+            resolver.registerAnnotatedClass(typeClass);
+        } catch (IllegalArgumentException unannotated) {
+            return null;
+        }
+        for (Map.Entry<String, Class<?>> entry
+                : resolver.getBlueIdMap().entrySet()) {
+            if (typeClass.equals(entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     private static void appendIdentityToken(
             StringBuilder destination,
             String value) {
@@ -347,11 +377,27 @@ public final class BexIntrinsicRegistry {
                                 String registryIdentity,
                                 Map<String, Long> counterWeights,
                                 BexIntrinsicProcessor processor) {
+            return register(
+                    typeClass,
+                    BexIntrinsicRegistry::resolveAnnotatedTypeBlueId,
+                    registryIdentity,
+                    counterWeights,
+                    processor);
+        }
+
+        public Builder register(Class<?> typeClass,
+                                BexTypeBlueIdResolver typeBlueIdResolver,
+                                String registryIdentity,
+                                Map<String, Long> counterWeights,
+                                BexIntrinsicProcessor processor) {
             if (typeClass == null) {
                 throw new IllegalArgumentException(
                         "intrinsic type class is required");
             }
-            String blueId = BlueIdResolver.resolveBlueId(typeClass);
+            Objects.requireNonNull(
+                    typeBlueIdResolver,
+                    "intrinsic type BlueId resolver");
+            String blueId = typeBlueIdResolver.resolve(typeClass);
             if (blueId == null || blueId.trim().isEmpty()) {
                 throw new IllegalArgumentException(
                         "intrinsic type class must have a resolvable @TypeBlueId: "

@@ -3,7 +3,7 @@ package blue.bex.value;
 import blue.bex.BexException;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.snapshot.ResolvedSnapshot;
+import blue.language.merge.ResolvedSnapshot;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

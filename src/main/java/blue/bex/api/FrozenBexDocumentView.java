@@ -3,7 +3,7 @@ package blue.bex.api;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.util.ArrayList;
 import java.util.List;

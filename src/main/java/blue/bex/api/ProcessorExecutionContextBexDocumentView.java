@@ -4,7 +4,7 @@ import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.snapshot.FrozenNode;
 import blue.language.processor.ProcessorExecutionContext;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 
 import java.util.Objects;
 

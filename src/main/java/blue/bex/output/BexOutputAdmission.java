@@ -13,7 +13,7 @@ import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorFailureException;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.BlueIds;
+import blue.language.identity.BlueIds;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
