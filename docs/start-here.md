@@ -32,8 +32,10 @@ BexExecutionContext context = BexExecutionContext.builder()
         .gasLimit(10_000L)
         .build();
 
-BexExecutionResult result = BexEngine.builder().build()
-        .compileAndExecute(BexProgramSource.expression(expression), context);
+try (BexEngine engine = BexEngine.builder().build()) {
+    BexExecutionResult result = engine.compileAndExecute(
+            BexProgramSource.expression(expression), context);
+}
 ```
 
 The complete runnable source is in the `examples` module.

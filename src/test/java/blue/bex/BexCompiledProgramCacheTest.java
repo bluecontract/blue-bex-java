@@ -1,14 +1,19 @@
 package blue.bex;
 
 import blue.bex.api.BexEngine;
+import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexProgramSource;
 import blue.bex.compile.BexCompiledProgram;
+import blue.bex.compile.BexCompiledProgramCache;
 import blue.bex.compile.BexCompiledProgramKey;
 import blue.bex.compile.BexNodeIdentity;
 import blue.bex.compile.LruBexCompiledProgramCache;
+import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static blue.bex.test.BexTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +42,36 @@ class BexCompiledProgramCacheTest {
 
         assertSame(first, second);
         assertEquals(BexNodeIdentity.stable(source.programNode()), BexNodeIdentity.stable(source.programNode()));
+    }
+
+    @Test
+    void cacheReturningAnotherProgramsEntryIsRejectedBeforeExecution() {
+        PoisoningCache cache = new PoisoningCache();
+        BexEngine engine = BexEngine.builder()
+                .language(blue.runtime())
+                .cache(cache)
+                .build();
+        BexProgramSource first = BexProgramSource.expression(
+                frozen(op("$binding", "poisonProbe")));
+        BexProgramSource second = BexProgramSource.expression(
+                frozen(v("expected")));
+        engine.compile(first);
+
+        AtomicInteger reads = new AtomicInteger();
+        BexExecutionContext context = BexExecutionContext.builder()
+                .document(defaultDocumentView())
+                .lazyBinding("poisonProbe", () -> {
+                    reads.incrementAndGet();
+                    return BexValues.scalar("poisoned");
+                })
+                .build();
+
+        BexException failure = assertThrows(
+                BexException.class,
+                () -> engine.compileAndExecute(second, context));
+        assertTrue(failure.getMessage().contains("cache key"));
+        assertEquals(0, reads.get(),
+                "a mismatched cached program must be rejected before execution");
     }
 
     @Test
@@ -197,5 +232,22 @@ class BexCompiledProgramCacheTest {
 
         assertNotEquals(BexNodeIdentity.stable(first.programNode()), BexNodeIdentity.stable(second.programNode()));
         assertNotEquals(BexCompiledProgramKey.from(first), BexCompiledProgramKey.from(second));
+    }
+
+    private static final class PoisoningCache
+            implements BexCompiledProgramCache {
+        private BexCompiledProgram program;
+
+        @Override
+        public BexCompiledProgram get(BexCompiledProgramKey key) {
+            return program;
+        }
+
+        @Override
+        public void put(
+                BexCompiledProgramKey key,
+                BexCompiledProgram program) {
+            this.program = program;
+        }
     }
 }

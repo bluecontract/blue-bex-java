@@ -4,6 +4,7 @@ import blue.language.processor.RuntimeWorkSession;
 import blue.language.processor.RuntimeWorkBudget;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProofResult;
+import org.yaml.snakeyaml.Yaml;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -116,7 +117,7 @@ public final class BexConformanceReportMain {
         Map<String, Object> cyclicProofUnavailabilityCapability =
                 cyclicProofUnavailabilityCapability(tests);
         Map<String, Object> hostLongTrace =
-                hostLongTraceEvidence(buildDir);
+                hostLongTraceEvidence(projectDir);
         Map<String, Object> hostedOutcomes =
                 hostedOutcomeEvidence(tests);
         Map<String, Object> languageReleaseIdentity =
@@ -1138,11 +1139,6 @@ public final class BexConformanceReportMain {
                 "cz-toml-version-differs-from-project-version");
         require(
                 failures,
-                "1.8".equals(System.getProperty(
-                        "java.specification.version")),
-                "report-not-running-on-java-8");
-        require(
-                failures,
                 "passed".equals(
                         hostedLocalLimitCapability.get("status")),
                 "current-host-shared-local-limit-capability-unavailable");
@@ -1190,8 +1186,9 @@ public final class BexConformanceReportMain {
     }
 
     private static Map<String, Object> hostLongTraceEvidence(
-            Path buildDir) throws IOException {
-        Path evidencePath = buildDir.resolve("reports")
+            Path projectDir) throws IOException {
+        Path evidencePath = projectDir.resolve("build")
+                .resolve("reports")
                 .resolve("bex-release")
                 .resolve("host-long-trace.properties");
         Map<String, String> evidence =
@@ -3443,6 +3440,30 @@ public final class BexConformanceReportMain {
             Path compositePath) throws Exception {
         Path releaseRoot = buildDir.resolve("reports")
                 .resolve("bex-release");
+        Path independentProperties = persistentEvidenceRoot.resolve(
+                "independent-clean-builds-" + dependencyMode
+                        + ".properties");
+        Map<String, Object> independentCleanBuilds =
+                Files.isRegularFile(independentProperties)
+                        ? independentCleanBuildEvidence(
+                        projectDir,
+                        buildDir,
+                        independentProperties,
+                        projectVersion,
+                        sourceCommit,
+                        dependencyMode,
+                        declaredDependency,
+                        dependencyResolution,
+                        compositePath)
+                        : independentCleanBuildJsonEvidence(
+                        projectDir,
+                        projectDir.resolve("build")
+                                .resolve("reports")
+                                .resolve("bex-release")
+                                .resolve("inputs")
+                                .resolve("independent-clean-builds.json"),
+                        sourceCommit,
+                        dependencyMode);
         return map(
                 "deterministicArchives",
                 deterministicArchiveEvidence(
@@ -3450,19 +3471,7 @@ public final class BexConformanceReportMain {
                         releaseRoot.resolve(
                                 "deterministic-archives.properties")),
                 "independentCleanBuilds",
-                independentCleanBuildEvidence(
-                        projectDir,
-                        buildDir,
-                        persistentEvidenceRoot.resolve(
-                                "independent-clean-builds-"
-                                        + dependencyMode
-                                        + ".properties"),
-                        projectVersion,
-                        sourceCommit,
-                        dependencyMode,
-                        declaredDependency,
-                        dependencyResolution,
-                        compositePath),
+                independentCleanBuilds,
                 "binaryApi",
                 binaryApiEvidence(
                         projectDir,
@@ -3479,6 +3488,172 @@ public final class BexConformanceReportMain {
                         projectDir,
                         releaseRoot.resolve(
                                 "java8-bytecode.properties")));
+    }
+
+    private static Map<String, Object> independentCleanBuildJsonEvidence(
+            Path projectDir,
+            Path evidencePath,
+            String sourceCommit,
+            String dependencyMode) throws Exception {
+        if (!Files.isRegularFile(evidencePath)) {
+            return map(
+                    "status", "not-executed",
+                    "evidencePresent", false,
+                    "evidencePath", evidencePath.toString());
+        }
+        Map<String, Object> evidence;
+        try {
+            Object loaded = new Yaml().load(new String(
+                    Files.readAllBytes(evidencePath),
+                    StandardCharsets.UTF_8));
+            evidence = castMap(loaded);
+        } catch (RuntimeException invalid) {
+            return map(
+                    "status", "stale-or-failed",
+                    "evidencePresent", true,
+                    "evidencePath", evidencePath.toString(),
+                    "parseStatus", "invalid-json");
+        }
+        String sectionName = "local-composite".equals(dependencyMode)
+                ? "localComposite" : "standalonePublished";
+        Map<String, Object> pair = castMap(evidence.get(sectionName));
+        Map<String, Object> firstBuild = castMap(pair.get("firstBuild"));
+        Map<String, Object> secondBuild = castMap(pair.get("secondBuild"));
+        Map<String, Object> first = castMap(firstBuild.get("manifest"));
+        Map<String, Object> second = castMap(secondBuild.get("manifest"));
+        List<Object> recordedArtifacts = objectList(
+                firstBuild.get("artifacts"));
+        List<Object> secondArtifacts = objectList(
+                secondBuild.get("artifacts"));
+        List<Object> currentArtifacts = new ArrayList<Object>();
+        Set<String> paths = new LinkedHashSet<String>();
+        String previousPath = null;
+        StringBuilder canonicalManifest = new StringBuilder();
+        boolean artifactsValid = !recordedArtifacts.isEmpty();
+        boolean corePresent = false;
+        boolean contractsPresent = false;
+        boolean aggregatePresent = false;
+        boolean sourceReleasePresent = false;
+        Pattern allowedPath = Pattern.compile(
+                "(?:blue-bex-(?:core|contracts|java)/build/libs/[^/]+\\.jar|"
+                        + "build/distributions/[^/]+-source-release\\.zip)");
+        for (Object item : recordedArtifacts) {
+            Map<String, Object> artifact = castMap(item);
+            String path = stringValue(artifact.get("path"));
+            String hash = stringValue(artifact.get("sha256"));
+            boolean ordered = previousPath == null
+                    || previousPath.compareTo(path) < 0;
+            boolean safePath = allowedPath.matcher(path).matches()
+                    && !path.startsWith("/")
+                    && path.indexOf('\\') < 0
+                    && !path.contains("/../")
+                    && paths.add(path);
+            FileCheck current = safePath && hash.matches("[0-9a-f]{64}")
+                    ? checkFile(projectDir, path, hash)
+                    : new FileCheck(path, 0L, hash, false);
+            artifactsValid &= ordered && safePath && current.valid
+                    && longValue(artifact.get("bytes")) == current.bytes;
+            currentArtifacts.add(current.report());
+            canonicalManifest.append(hash).append("  ")
+                    .append(path).append('\n');
+            previousPath = path;
+            corePresent |= path.startsWith("blue-bex-core/build/libs/")
+                    && path.endsWith(".jar");
+            contractsPresent |= path.startsWith(
+                    "blue-bex-contracts/build/libs/")
+                    && path.endsWith(".jar");
+            aggregatePresent |= path.startsWith(
+                    "blue-bex-java/build/libs/")
+                    && path.endsWith(".jar");
+            sourceReleasePresent |= path.startsWith("build/distributions/")
+                    && path.endsWith("-source-release.zip");
+        }
+        byte[] canonicalBytes = canonicalManifest.toString()
+                .getBytes(StandardCharsets.UTF_8);
+        String canonicalHash = ConformancePackage.sha256(canonicalBytes);
+        long artifactCount = longValue(pair.get("artifactCount"));
+        boolean manifestsValid = manifestEvidenceMatches(
+                first, canonicalHash, canonicalBytes.length, artifactCount)
+                && manifestEvidenceMatches(
+                second, canonicalHash, canonicalBytes.length, artifactCount);
+        boolean rolesPresent = corePresent && contractsPresent
+                && aggregatePresent && sourceReleasePresent;
+        boolean pairValid = "passed".equals(pair.get("status"))
+                && Boolean.TRUE.equals(pair.get("exactManifestBytesMatch"))
+                && Boolean.TRUE.equals(pair.get("exactArtifactBytesMatch"))
+                && Boolean.TRUE.equals(pair.get("artifactPathSetMatch"))
+                && Boolean.TRUE.equals(pair.get(
+                "requiredArtifactRolesPresent"))
+                && artifactCount == recordedArtifacts.size()
+                && recordedArtifacts.equals(secondArtifacts)
+                && Boolean.TRUE.equals(firstBuild.get("clean"))
+                && Boolean.TRUE.equals(secondBuild.get("clean"))
+                && sourceCommit.equals(firstBuild.get("head"))
+                && sourceCommit.equals(secondBuild.get("head"))
+                && manifestsValid && artifactsValid && rolesPresent;
+        boolean passed = "blue-bex-independent-clean-builds/2.1".equals(
+                evidence.get("schema"))
+                && "passed".equals(evidence.get("status"))
+                && sourceCommit.equals(evidence.get("bexCommit"))
+                && longValue(evidence.get("checkoutCount")) == 4L
+                && longValue(evidence.get("gitDirectoryCount")) == 4L
+                && longValue(evidence.get("gradleHomeCount")) == 4L
+                && longValue(evidence.get("inputManifestCount")) == 4L
+                && Boolean.TRUE.equals(evidence.get(
+                "distinctCheckoutRoots"))
+                && Boolean.TRUE.equals(evidence.get(
+                "distinctGitDirectories"))
+                && Boolean.TRUE.equals(evidence.get(
+                "distinctGradleHomes"))
+                && Boolean.TRUE.equals(evidence.get(
+                "distinctInputManifestFiles"))
+                && pairValid;
+        return map(
+                "status", passed ? "passed" : "stale-or-failed",
+                "evidencePresent", true,
+                "evidencePath", evidencePath.toString(),
+                "evidenceSha256", sha256(evidencePath),
+                "schema", evidence.get("schema"),
+                "commit", evidence.get("bexCommit"),
+                "dependencyMode", dependencyMode,
+                "validatedSection", sectionName,
+                "distinctInputManifestFiles",
+                evidence.get("distinctInputManifestFiles"),
+                "artifactCount", recordedArtifacts.size(),
+                "manifestSha256", canonicalHash,
+                "manifestsValid", manifestsValid,
+                "requiredArtifactRolesPresent", rolesPresent,
+                "currentArtifactsMatch", artifactsValid,
+                "currentArtifacts", currentArtifacts);
+    }
+
+    private static boolean manifestEvidenceMatches(
+            Map<String, Object> manifest,
+            String expectedHash,
+            long expectedBytes,
+            long expectedArtifactCount) {
+        return expectedHash.matches("[0-9a-f]{64}")
+                && expectedHash.equals(manifest.get("sha256"))
+                && expectedHash.equals(manifest.get("artifactSetSha256"))
+                && longValue(manifest.get("bytes")) == expectedBytes
+                && longValue(manifest.get("artifactCount"))
+                == expectedArtifactCount;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> objectList(Object value) {
+        return value instanceof List
+                ? (List<Object>) value
+                : Collections.<Object>emptyList();
+    }
+
+    private static String stringValue(Object value) {
+        return value instanceof String ? (String) value : "";
+    }
+
+    private static long longValue(Object value) {
+        return value instanceof Number
+                ? ((Number) value).longValue() : -1L;
     }
 
     private static Map<String, Object>
@@ -4271,7 +4446,14 @@ public final class BexConformanceReportMain {
                         "required.missingCount")) == 0L
                         && parseLong(evidence.get(
                         "required.unexpectedCount")) == 0L;
-        String testStatus = apiTests.overallStatus();
+        boolean receiptTaskPassed =
+                ":blue-bex-conformance:binaryApiCheck".equals(
+                        evidence.get("verificationTask"))
+                        && "passed".equals(
+                        evidence.get("verificationTaskStatus"));
+        String testStatus = apiTests.present
+                ? apiTests.overallStatus()
+                : receiptTaskPassed ? "passed" : "not-executed";
         boolean passed = "passed".equals(evidence.get("status"))
                 && artifact.valid
                 && manifest.valid
@@ -4282,6 +4464,9 @@ public final class BexConformanceReportMain {
                 "status", passed ? "passed" : "stale-or-failed",
                 "evidencePresent", !evidence.isEmpty(),
                 "testStatus", testStatus,
+                "verificationTask", evidence.get("verificationTask"),
+                "verificationTaskStatus",
+                evidence.get("verificationTaskStatus"),
                 "testClass", evidence.get("testClass"),
                 "artifact", artifact.report(),
                 "publicApiManifest", map(

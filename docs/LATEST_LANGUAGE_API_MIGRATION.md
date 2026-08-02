@@ -17,7 +17,7 @@ It is the human-readable companion to
 | Language target delta | `LICENSE`, one migration report, and one modernization report only |
 | Previous API manifest SHA-256 | `830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315` |
 | Working-checkpoint API manifest SHA-256 | `43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0` |
-| Final modular API manifest SHA-256 | `df602fa6b14afc285053fc8e34e349d7fa5ce26810a6c79ba14ac6361de463ee` |
+| Final modular API manifest SHA-256 | `5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92` |
 
 The migration target cannot truthfully name its eventual BEX commit while that
 commit is being assembled. The Git commit containing this ledger is the target
@@ -26,7 +26,7 @@ entry was audited.
 
 ## Exact descriptor changes
 
-The subsequent modular modernization contains 254 removed and 483 added exact
+The subsequent modular modernization contains 254 removed and 484 added exact
 owner-qualified descriptors relative to commit `169e589`. Both compared manifests, both
 classifications, and the complete sorted addition/removal sets are
 source-controlled under `gradle/verification/api/`. The `binaryApiCheck` task
@@ -136,6 +136,6 @@ machine-comparable inventory, while the JSON file supplies intent metadata.
 
 At this audited state the required inventory is byte-for-byte identical to
 `blue-bex-conformance/build/reports/bex-release/public-api.txt`, and both have
-SHA-256 `df602fa6b14afc285053fc8e34e349d7fa5ce26810a6c79ba14ac6361de463ee`.
+SHA-256 `5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92`.
 Build wiring generates the latter from compiled classes and fails on any diff
 from the reviewed source-controlled baseline.

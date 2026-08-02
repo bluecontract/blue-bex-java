@@ -183,6 +183,12 @@ artifact_manifest "${checkouts[3]}" "$LOCAL_TWO_MANIFEST"
 node "$SCRIPT_DIR/compare-independent-builds.mjs" \
   "$STANDALONE_ONE_MANIFEST" "$STANDALONE_TWO_MANIFEST" \
   "$LOCAL_ONE_MANIFEST" "$LOCAL_TWO_MANIFEST" \
+  "${checkouts[0]}" "${checkouts[1]}" \
+  "${checkouts[2]}" "${checkouts[3]}" \
+  "$RELEASE_ROOT/gradle-standalone-one" \
+  "$RELEASE_ROOT/gradle-standalone-two" \
+  "$RELEASE_ROOT/gradle-local-one" \
+  "$RELEASE_ROOT/gradle-local-two" \
   "$BEX_COMMIT" "$INDEPENDENT_REPORT"
 
 node "$SCRIPT_DIR/compare-local-published-evidence.mjs" \

@@ -26,9 +26,11 @@ public BexExecutionResult run(
     BexExecutionContext.Builder context = BexExecutionContext.builder();
     BexContractsExecutionContext.configure(context, processor, "bex:policy");
 
-    return BexEngine.builder().build().compileAndExecute(
-            BexProgramSource.expression(selectedExpression),
-            context.build());
+    try (BexEngine engine = BexEngine.builder().build()) {
+        return engine.compileAndExecute(
+                BexProgramSource.expression(selectedExpression),
+                context.build());
+    }
 }
 ```
 

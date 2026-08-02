@@ -4,6 +4,7 @@ import blue.bex.BexException;
 import blue.bex.compile.BexCompiledProgram;
 import blue.bex.compile.BexCompiledProgramCache;
 import blue.bex.compile.BexCompiledProgramKey;
+import blue.bex.compile.BexCompiledProgramRuntimeAccess;
 import blue.bex.compile.BexCompilerRuntimeAccess;
 import blue.bex.compile.LruBexCompiledProgramCache;
 import blue.bex.gas.BexGasSchedule;
@@ -16,6 +17,7 @@ import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.runtime.BlueLanguage;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Public entry point for compiling and executing selected BEX programs.
@@ -65,13 +67,14 @@ public final class BexEngine implements AutoCloseable {
         BexCompiledProgram cached = cache.get(key);
         if (cached != null) {
             metrics.incrementCompileCacheHits();
-            validateCompilationEnvironment(cached);
+            validateCompilationKey(cached, key);
             validateIntrinsicSupport(cached);
             return cached;
         }
         metrics.incrementCompileCacheMisses();
         BexCompiledProgram program = BexCompilerRuntimeAccess.compile(
                 source, metrics, intrinsics, compileEnvironmentIdentity());
+        validateCompilationKey(program, key);
         validateIntrinsicSupport(program);
         cache.put(key, program);
         return program;
@@ -146,6 +149,17 @@ public final class BexEngine implements AutoCloseable {
         }
     }
 
+    private void validateCompilationKey(
+            BexCompiledProgram program,
+            BexCompiledProgramKey expected) {
+        if (!BexCompiledProgramRuntimeAccess.matchesCompilationKey(
+                program, expected)) {
+            throw new BexException(
+                    "Compiled BEX cache key does not match the requested "
+                            + "program, definition, entry, source kind, and environment");
+        }
+    }
+
     private void publishMetrics(BexMetricsSnapshot metrics) {
         try {
             metricsSink.accept(metrics);
@@ -175,12 +189,13 @@ public final class BexEngine implements AutoCloseable {
         }
 
         public Builder gasSchedule(BexGasSchedule gasSchedule) {
-            this.gasSchedule = gasSchedule;
+            this.gasSchedule = Objects.requireNonNull(
+                    gasSchedule, "gasSchedule");
             return this;
         }
 
         public Builder cache(BexCompiledProgramCache cache) {
-            this.cache = cache;
+            this.cache = Objects.requireNonNull(cache, "cache");
             return this;
         }
 

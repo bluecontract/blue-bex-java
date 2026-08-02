@@ -19,34 +19,13 @@ import java.util.Set;
  * Lazy-compiled BEX program.
  */
 public final class BexCompiledProgram {
-    private static final String UNBOUND_ENVIRONMENT_IDENTITY =
-            "blue-bex/unbound-compile-environment";
-
     private final CompiledFunction entry;
     private final Map<String, CompiledFunction> functions;
     private final Map<String, BexValue> constants;
     private final int rootFrameSize;
     private final String programBlueId;
     private final Set<String> requiredIntrinsicBlueIds;
-    private final String compilationEnvironmentIdentity;
-
-    BexCompiledProgram(CompiledFunction entry,
-                       Map<String, CompiledFunction> functions,
-                       Map<String, BexValue> constants,
-                       int rootFrameSize,
-                       String programBlueId) {
-        this(entry, functions, constants, rootFrameSize, programBlueId, Collections.<String>emptySet());
-    }
-
-    BexCompiledProgram(CompiledFunction entry,
-                       Map<String, CompiledFunction> functions,
-                       Map<String, BexValue> constants,
-                       int rootFrameSize,
-                       String programBlueId,
-                       Set<String> requiredIntrinsicBlueIds) {
-        this(entry, functions, constants, rootFrameSize, programBlueId,
-                requiredIntrinsicBlueIds, UNBOUND_ENVIRONMENT_IDENTITY);
-    }
+    private final BexCompiledProgramKey compilationKey;
 
     BexCompiledProgram(CompiledFunction entry,
                        Map<String, CompiledFunction> functions,
@@ -54,7 +33,7 @@ public final class BexCompiledProgram {
                        int rootFrameSize,
                        String programBlueId,
                        Set<String> requiredIntrinsicBlueIds,
-                       String compilationEnvironmentIdentity) {
+                       BexCompiledProgramKey compilationKey) {
         this.entry = entry;
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.constants = Collections.unmodifiableMap(new LinkedHashMap<>(constants));
@@ -63,9 +42,8 @@ public final class BexCompiledProgram {
         this.requiredIntrinsicBlueIds = Collections.unmodifiableSet(new LinkedHashSet<>(requiredIntrinsicBlueIds != null
                 ? requiredIntrinsicBlueIds
                 : Collections.<String>emptySet()));
-        this.compilationEnvironmentIdentity = java.util.Objects.requireNonNull(
-                compilationEnvironmentIdentity,
-                "compilationEnvironmentIdentity");
+        this.compilationKey = java.util.Objects.requireNonNull(
+                compilationKey, "compilationKey");
     }
 
     BexValue execute(BexExecutionMachine machine) {
@@ -78,9 +56,13 @@ public final class BexCompiledProgram {
     int rootFrameSize() { return rootFrameSize; }
     public String programBlueId() { return programBlueId; }
     public Set<String> requiredIntrinsicBlueIds() { return requiredIntrinsicBlueIds; }
+    boolean matchesCompilationKey(BexCompiledProgramKey expected) {
+        return compilationKey.equals(java.util.Objects.requireNonNull(
+                expected, "expected"));
+    }
     /** Exact registry, gas, Language, and compiler identity used to compile. */
     public String compilationEnvironmentIdentity() {
-        return compilationEnvironmentIdentity;
+        return compilationKey.compileEnvironmentIdentity();
     }
 
     public BexValue constant(String name) {

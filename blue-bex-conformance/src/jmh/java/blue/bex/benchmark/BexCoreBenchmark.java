@@ -21,6 +21,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.math.BigDecimal;
@@ -50,13 +51,14 @@ public class BexCoreBenchmark {
     @Benchmark
     public BexExecutionResult coldCompileAndExecute(
             BasicState state) {
-        BexExecutionResult result = BexEngine.builder()
+        try (BexEngine engine = BexEngine.builder()
                 .cache(new LruBexCompiledProgramCache())
-                .build()
-                .compileAndExecute(
-                        state.coldSource,
-                        context());
-        return verify(result, state.coldExpected);
+                .build()) {
+            BexExecutionResult result = engine.compileAndExecute(
+                    state.coldSource,
+                    context());
+            return verify(result, state.coldExpected);
+        }
     }
 
     @Benchmark
@@ -240,8 +242,10 @@ public class BexCoreBenchmark {
                                             1)),
                                     "label", op("$concat", list(
                                             "cold-", "compile"))))));
-            coldExpected = expected(BexEngine.builder().build()
-                    .compileAndExecute(coldSource, context()));
+            try (BexEngine coldEngine = BexEngine.builder().build()) {
+                coldExpected = expected(coldEngine.compileAndExecute(
+                        coldSource, context()));
+            }
 
             cacheSource = BexProgramSource.expression(
                     frozen(op("$pointerGet", obj(
@@ -268,6 +272,12 @@ public class BexCoreBenchmark {
                             standaloneGasProgram,
                             context()));
         }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            cacheEngine.close();
+            engine.close();
+        }
     }
 
     @State(Scope.Thread)
@@ -292,6 +302,11 @@ public class BexCoreBenchmark {
                                     op("$var", "index")))))));
             program = engine.compile(source);
             expected = expected(engine.execute(program, context()));
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
         }
     }
 
@@ -322,6 +337,11 @@ public class BexCoreBenchmark {
                             "path", pointer.toString()))));
             program = engine.compile(source);
             expected = expected(engine.execute(program, context()));
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
         }
     }
 
@@ -373,6 +393,11 @@ public class BexCoreBenchmark {
             numericProgram = engine.compile(numericSource);
             numericExpected = expected(
                     engine.execute(numericProgram, context()));
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
         }
 
         private static String repeat(String value, int count) {
@@ -442,6 +467,11 @@ public class BexCoreBenchmark {
             transientIdentityExpected = expected(engine.execute(
                     transientIdentityProgram, context()));
         }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
+        }
     }
 
     @State(Scope.Thread)
@@ -478,6 +508,11 @@ public class BexCoreBenchmark {
                                     "label", "intrinsic")))));
             program = engine.compile(source);
             expected = expected(engine.execute(program, context()));
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
         }
     }
 }

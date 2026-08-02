@@ -25,6 +25,8 @@ final class BexProgramCompiler extends BexStatementCompiler {
     final BexCompiledProgram compileProgram(
             BexCompilationInput source,
             String compilationEnvironmentIdentity) {
+        BexCompiledProgramKey compilationKey = BexCompiledProgramKey.from(
+                source, compilationEnvironmentIdentity);
         requiredIntrinsicBlueIds.clear();
         FrozenNode step = source.programNode();
         FrozenNode definition = source.definitionNode().orElse(null);
@@ -46,7 +48,7 @@ final class BexProgramCompiler extends BexStatementCompiler {
                     scope.frameSize());
             return new BexCompiledProgram(root, Collections.emptyMap(), constants, scope.frameSize(),
                     BexNodeIdentity.safeBlueId(step), requiredIntrinsicBlueIds,
-                    compilationEnvironmentIdentity);
+                    compilationKey);
         }
         requireProgramNode(step, "program");
         if (definition != null) {
@@ -115,7 +117,7 @@ final class BexProgramCompiler extends BexStatementCompiler {
 
         return new BexCompiledProgram(root, compiledFunctions, constants, rootFrameSize,
                 BexNodeIdentity.safeBlueId(step), requiredIntrinsicBlueIds,
-                compilationEnvironmentIdentity);
+                compilationKey);
     }
 
     BexCompiledProgram.CompiledFunction compileFunction(String name, FrozenNode functionNode, FunctionSignature signature) {

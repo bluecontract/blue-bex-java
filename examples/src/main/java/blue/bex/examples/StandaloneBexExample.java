@@ -24,14 +24,15 @@ public final class StandaloneBexExample {
                                 new Node().value(2L))));
         FrozenNode document = FrozenNode.fromResolvedNode(new Node());
 
-        BexExecutionResult result = BexEngine.builder()
-                .build()
-                .compileAndExecute(
-                        BexProgramSource.expression(expression),
-                        BexExecutionContext.builder()
-                                .document(new FrozenBexDocumentView(document))
-                                .gasLimit(10_000L)
-                                .build());
+        BexExecutionResult result;
+        try (BexEngine engine = BexEngine.builder().build()) {
+            result = engine.compileAndExecute(
+                    BexProgramSource.expression(expression),
+                    BexExecutionContext.builder()
+                            .document(new FrozenBexDocumentView(document))
+                            .gasLimit(10_000L)
+                            .build());
+        }
 
         Object value = result.value().toSimple();
         if (!BigInteger.valueOf(42L).equals(value)) {

@@ -32,15 +32,17 @@ FrozenNode expression = FrozenNode.fromResolvedNode(
                 new Node().value(2L))));
 FrozenNode document = FrozenNode.fromResolvedNode(new Node());
 
-BexExecutionResult result = BexEngine.builder().build().compileAndExecute(
-        BexProgramSource.expression(expression),
-        BexExecutionContext.builder()
-                .document(new FrozenBexDocumentView(document))
-                .gasLimit(10_000L)
-                .build());
+try (BexEngine engine = BexEngine.builder().build()) {
+    BexExecutionResult result = engine.compileAndExecute(
+            BexProgramSource.expression(expression),
+            BexExecutionContext.builder()
+                    .document(new FrozenBexDocumentView(document))
+                    .gasLimit(10_000L)
+                    .build());
 
-System.out.println(result.value().toSimple()); // 42
-System.out.println(result.gasLedger().trace());
+    System.out.println(result.value().toSimple()); // 42
+    System.out.println(result.gasLedger().trace());
+}
 ```
 
 A runnable version lives in

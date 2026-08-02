@@ -205,6 +205,7 @@ class public final blue.bex.compile.BexCompiledProgramKey
   method public static from(blue.bex.compile.BexCompilationInput,java.lang.String):blue.bex.compile.BexCompiledProgramKey
 class public final blue.bex.compile.BexCompiledProgramRuntimeAccess
   method public static execute(blue.bex.compile.BexCompiledProgram,blue.bex.compile.BexExecutionMachine):blue.bex.value.BexValue
+  method public static matchesCompilationKey(blue.bex.compile.BexCompiledProgram,blue.bex.compile.BexCompiledProgramKey):boolean
 class public final blue.bex.compile.BexCompilerRuntimeAccess
   method public static compile(blue.bex.compile.BexCompilationInput,blue.bex.result.BexMetricsRecorder,blue.bex.compile.BexIntrinsicCatalog,java.lang.String):blue.bex.compile.BexCompiledProgram
 class public final blue.bex.compile.BexContainsCache

@@ -423,6 +423,8 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                             project.getRootProject().getProjectDir(), spec ->
                                     spec.exclude(
                                             ".git/**", ".gradle/**", "**/build/**",
+                                            ".idea/**", "**/.idea/**",
+                                            "out/**", "**/out/**", "*.iml",
                                             "**/.DS_Store", "*.zip", "work-status.txt")));
         });
     }

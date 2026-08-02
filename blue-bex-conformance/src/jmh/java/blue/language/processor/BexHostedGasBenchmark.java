@@ -23,6 +23,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.util.List;
@@ -72,6 +73,11 @@ public class BexHostedGasBenchmark {
                                     1))))));
             program = engine.compile(source);
             expected = expected(executeHosted());
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
         }
 
         private BexExecutionResult executeAndVerify() {

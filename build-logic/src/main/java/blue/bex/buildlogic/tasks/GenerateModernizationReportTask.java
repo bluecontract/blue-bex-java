@@ -93,10 +93,7 @@ public abstract class GenerateModernizationReportTask extends DefaultTask {
                     && sectionPassed(conformance, "intrinsicEvidence")
                     && sectionPassed(conformance,
                     "referenceEvidenceClassificationEvidence");
-            boolean benchmarkPresent = jmh.startsWith("[")
-                    && jmh.contains("gc.alloc.rate.norm")
-                    && jmh.contains("scoreConfidence")
-                    && !jmh.contains("NaN")
+            boolean benchmarkPresent = seriousJmhEvidence(jmh)
                     && jmhEnvironment.contains(
                     "\"schema\": \"blue-bex-jmh-environment/1.0\"")
                     && jmhEnvironment.contains("\"profilers\":[\"gc\"]");
@@ -179,7 +176,7 @@ public abstract class GenerateModernizationReportTask extends DefaultTask {
                     + totals.requiredOperators + "\n"
                     + "- Architecture: "
                     + (architecturePassed ? "passed" : "failed") + "\n"
-                    + "- JMH smoke evidence: "
+                    + "- JMH benchmark evidence: "
                     + (benchmarkPresent ? "serious campaign present"
                     : "missing or incomplete") + "\n"
                     + "- Concurrency/property gates: "
@@ -206,6 +203,58 @@ public abstract class GenerateModernizationReportTask extends DefaultTask {
         } catch (Exception exception) {
             throw new GradleException("Cannot generate modernization report", exception);
         }
+    }
+
+    private static boolean seriousJmhEvidence(String json) {
+        if (!json.trim().startsWith("[")) {
+            return false;
+        }
+        int benchmarks = matchCount(json,
+                Pattern.compile("\\\"benchmark\\\"\\s*:"));
+        if (benchmarks == 0
+                || matchCount(json, Pattern.compile(
+                "\\\"forks\\\"\\s*:\\s*2(?:\\s*[,}])")) != benchmarks
+                || matchCount(json, Pattern.compile(
+                "\\\"warmupIterations\\\"\\s*:\\s*3(?:\\s*[,}])"))
+                != benchmarks
+                || matchCount(json, Pattern.compile(
+                "\\\"measurementIterations\\\"\\s*:\\s*5(?:\\s*[,}])"))
+                != benchmarks
+                || matchCount(json, Pattern.compile(
+                "\\\"warmupTime\\\"\\s*:\\s*\\\"250 ms\\\""))
+                != benchmarks
+                || matchCount(json, Pattern.compile(
+                "\\\"measurementTime\\\"\\s*:\\s*\\\"250 ms\\\""))
+                != benchmarks) {
+            return false;
+        }
+        String number = "-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)"
+                + "(?:[eE][+-]?[0-9]+)?";
+        Pattern finitePrimary = Pattern.compile(
+                "\\\"primaryMetric\\\"\\s*:\\s*\\{[^}]*?"
+                        + "\\\"score\\\"\\s*:\\s*" + number + "[^}]*?"
+                        + "\\\"scoreConfidence\\\"\\s*:\\s*\\[\\s*"
+                        + number + "\\s*,\\s*" + number + "\\s*\\]",
+                Pattern.DOTALL);
+        Pattern finiteAllocation = Pattern.compile(
+                "\\\"gc\\.alloc\\.rate\\.norm\\\"\\s*:\\s*\\{[^}]*?"
+                        + "\\\"score\\\"\\s*:\\s*" + number + "[^}]*?"
+                        + "\\\"scoreConfidence\\\"\\s*:\\s*\\[\\s*"
+                        + number + "\\s*,\\s*" + number + "\\s*\\]",
+                Pattern.DOTALL);
+        return matchCount(json, finitePrimary) == benchmarks
+                && matchCount(json, Pattern.compile(
+                "\\\"gc\\.alloc\\.rate\\.norm\\\"\\s*:")) == benchmarks
+                && matchCount(json, finiteAllocation) == benchmarks;
+    }
+
+    private static int matchCount(String text, Pattern pattern) {
+        int count = 0;
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
     }
 
     private static TestTotals readTests(File directory) throws Exception {

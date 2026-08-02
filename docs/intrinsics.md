@@ -21,7 +21,9 @@ BexIntrinsicRegistry registry = BexIntrinsicRegistry.builder()
                 })
         .build();
 
-BexEngine engine = BexEngine.builder().intrinsics(registry).build();
+try (BexEngine engine = BexEngine.builder().intrinsics(registry).build()) {
+    // Compile and execute programs for this host lifecycle.
+}
 ```
 
 A class convenience is valid only when an explicit `BexTypeBlueIdResolver` or

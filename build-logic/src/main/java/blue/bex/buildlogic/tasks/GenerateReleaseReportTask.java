@@ -8,8 +8,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
@@ -66,6 +65,14 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     getPublishedLanguageReport().get().getAsFile());
             String independent = optionalText(getIndependentCleanBuildReport());
             String differential = optionalText(getDifferentialReport());
+            Map<String, Object> modernizationEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(modernization);
+            Map<String, Object> publishedEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(published);
+            Map<String, Object> independentEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(independent);
+            Map<String, Object> differentialEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(differential);
             File repository = getRepositoryDirectory().get().getAsFile();
             String commit = gitText(repository, "rev-parse", "HEAD").trim();
             boolean clean = gitBytes(repository, "status", "--porcelain", "-z")
@@ -74,22 +81,21 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     repository, "tag", "--points-at", "HEAD"));
             boolean exactTag = tags.contains(getExpectedReleaseTag().get());
 
-            boolean modernizationReady = booleanField(
-                    modernization, "modernizationReady");
-            boolean conformanceReleaseReady = booleanField(
-                    modernization, "conformanceReleaseReady");
-            boolean publishedReady = "passed".equals(
-                    stringField(published, "status"));
-            boolean independentReady = "passed".equals(
-                    stringField(independent, "status"))
-                    && sectionPassed(independent, "standalonePublished")
-                    && sectionPassed(independent, "localComposite")
-                    && commit.equals(stringField(independent, "bexCommit"));
-            boolean differentialReady = "passed".equals(
-                    stringField(differential, "status"))
-                    && fieldPassed(differential, "semanticAndGasParity")
-                    && fieldPassed(differential, "exactGasTraceParity")
-                    && commit.equals(stringField(differential, "bexCommit"));
+            boolean modernizationReady =
+                    ReleaseEvidenceJson.modernizationPassed(
+                            modernizationEvidence);
+            boolean conformanceReleaseReady =
+                    ReleaseEvidenceJson.conformanceReleasePassed(
+                            modernizationEvidence);
+            boolean publishedReady =
+                    ReleaseEvidenceJson.publishedLanguagePassed(
+                            publishedEvidence);
+            boolean independentReady =
+                    ReleaseEvidenceJson.independentBuildsPassed(
+                            independentEvidence, commit);
+            boolean differentialReady =
+                    ReleaseEvidenceJson.differentialPassed(
+                            differentialEvidence, commit);
 
             List<String> blockers = new ArrayList<>();
             addBlocker(blockers, modernizationReady,
@@ -122,7 +128,8 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     + quote(conformanceReleaseReady ? "passed" : "failed")
                     + ",\n"
                     + "  \"publishedLanguageStatus\": "
-                    + quote(stringField(published, "status")) + ",\n"
+                    + quote(ReleaseEvidenceJson.stringOrEmpty(
+                    publishedEvidence, "status")) + ",\n"
                     + "  \"independentCleanBuildStatus\": "
                     + quote(independentReady ? "passed" : "not-executed")
                     + ",\n"
@@ -185,57 +192,6 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
         return value ? "passed" : "not passed";
     }
 
-    private static boolean fieldPassed(String text, String field) {
-        return text.matches("(?s).*\\\"" + Pattern.quote(field)
-                + "\\\"\\s*:\\s*(?:\\\"passed\\\"|true).*?");
-    }
-
-    private static boolean sectionPassed(String text, String section) {
-        return "passed".equals(stringField(objectSection(text, section),
-                "status"));
-    }
-
-    private static boolean booleanField(String text, String field) {
-        return text.matches("(?s).*\\\"" + Pattern.quote(field)
-                + "\\\"\\s*:\\s*true.*");
-    }
-
-    private static String stringField(String text, String field) {
-        Matcher matcher = Pattern.compile("\\\"" + Pattern.quote(field)
-                + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"").matcher(text);
-        return matcher.find() ? matcher.group(1) : "";
-    }
-
-    private static String objectSection(String text, String name) {
-        int key = text.indexOf("\"" + name + "\"");
-        int start = key < 0 ? -1 : text.indexOf('{', key);
-        if (start < 0) {
-            return "";
-        }
-        int depth = 0;
-        boolean quoted = false;
-        boolean escaped = false;
-        for (int index = start; index < text.length(); index++) {
-            char value = text.charAt(index);
-            if (quoted) {
-                if (escaped) {
-                    escaped = false;
-                } else if (value == '\\') {
-                    escaped = true;
-                } else if (value == '"') {
-                    quoted = false;
-                }
-            } else if (value == '"') {
-                quoted = true;
-            } else if (value == '{') {
-                depth++;
-            } else if (value == '}' && --depth == 0) {
-                return text.substring(start, index + 1);
-            }
-        }
-        return "";
-    }
-
     private static List<String> lines(String text) {
         String trimmed = text.trim();
         return trimmed.isEmpty() ? new ArrayList<>()
@@ -277,7 +233,6 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
     }
 
     private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\")
-                .replace("\"", "\\\"") + "\"";
+        return StrictJson.quote(value);
     }
 }

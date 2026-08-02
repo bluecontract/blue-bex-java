@@ -17,4 +17,11 @@ public final class BexCompiledProgramRuntimeAccess {
             BexExecutionMachine machine) {
         return program.execute(machine);
     }
+
+    /** Validates the complete opaque compile/cache binding for engine use. */
+    public static boolean matchesCompilationKey(
+            BexCompiledProgram program,
+            BexCompiledProgramKey expected) {
+        return program.matchesCompilationKey(expected);
+    }
 }

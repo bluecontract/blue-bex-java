@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexCompiledIrImmutabilityTest {
     private static final CompiledExpression FIRST_EXPRESSION =
@@ -70,8 +71,11 @@ class BexCompiledIrImmutabilityTest {
         constants.put("constant", BexValues.scalar("value"));
         Set<String> intrinsicIds = new LinkedHashSet<>();
         intrinsicIds.add("intrinsic");
+        BexCompiledProgramKey compilationKey =
+                new BexCompiledProgramKey("program", "definition", "entry");
         BexCompiledProgram program = new BexCompiledProgram(function,
-                functions, constants, 1, "program", intrinsicIds);
+                functions, constants, 1, "program", intrinsicIds,
+                compilationKey);
 
         functions.clear();
         constants.clear();
@@ -79,6 +83,7 @@ class BexCompiledIrImmutabilityTest {
         assertEquals(1, program.functions().size());
         assertEquals(1, program.constants().size());
         assertEquals(1, program.requiredIntrinsicBlueIds().size());
+        assertTrue(program.matchesCompilationKey(compilationKey));
         assertThrows(UnsupportedOperationException.class,
                 () -> program.functions().clear());
         assertThrows(UnsupportedOperationException.class,

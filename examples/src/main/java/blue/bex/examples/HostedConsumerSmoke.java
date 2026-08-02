@@ -82,9 +82,14 @@ public final class HostedConsumerSmoke {
                             return BexValues.map(value);
                         })
                 .build();
-        BexEngine engine = BexEngine.builder()
+        try (BexEngine engine = BexEngine.builder()
                 .intrinsics(intrinsics)
-                .build();
+                .build()) {
+            return runSmoke(engine);
+        }
+    }
+
+    private static SmokeResult runSmoke(BexEngine engine) {
         HostedHandlerProcessor handler =
                 new HostedHandlerProcessor(engine);
 

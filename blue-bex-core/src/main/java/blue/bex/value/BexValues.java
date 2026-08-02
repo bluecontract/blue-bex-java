@@ -4,6 +4,7 @@ import blue.bex.BexException;
 import blue.language.api.BlueOperationLimits;
 import blue.language.api.BlueOperationOutcome;
 import blue.language.api.BlueOperationResult;
+import blue.language.identity.BlueIds;
 import blue.language.model.Node;
 import blue.language.model.Schema;
 import blue.bex.BexExecutionEvidenceUnavailableException;
@@ -107,9 +108,14 @@ public final class BexValues {
         }
         FrozenNode canonical = canonicalNode != null ? canonicalNode : resolvedNode;
         FrozenNode semantic = resolvedNode != null ? resolvedNode : canonicalNode;
-        String retainedBlueId = exactBlueId;
+        String retainedBlueId = exactBlueId != null
+                ? BlueIds.requireBlueIdOrCyclicMember(
+                        exactBlueId, "BEX exact value blueId")
+                : null;
         if (retainedBlueId == null && canonical.isReferenceOnly()) {
-            retainedBlueId = canonical.getReferenceBlueId();
+            retainedBlueId = BlueIds.requireBlueIdOrCyclicMember(
+                    canonical.getReferenceBlueId(),
+                    "BEX exact value reference blueId");
         }
         /*
          * A finalized cyclic member has no independently hashable body.
@@ -124,7 +130,7 @@ public final class BexValues {
                     new Node().blueId(retainedBlueId));
             semantic = canonical;
         }
-        return new FrozenNodeBexValue(canonical, semantic, exactBlueId);
+        return new FrozenNodeBexValue(canonical, semantic, retainedBlueId);
     }
 
     /**

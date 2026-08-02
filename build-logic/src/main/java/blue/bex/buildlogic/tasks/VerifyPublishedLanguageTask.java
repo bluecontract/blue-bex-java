@@ -12,10 +12,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
@@ -139,9 +139,11 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
             String differential = getDifferentialReport().isPresent()
                     && getDifferentialReport().get().getAsFile().isFile()
                     ? read(getDifferentialReport().get().getAsFile()) : "";
-            boolean differentialPassed = containsStatus(differential, "passed")
-                    && fieldPassed(differential, "semanticAndGasParity")
-                    && fieldPassed(differential, "exactGasTraceParity");
+            Map<String, Object> differentialEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(differential);
+            boolean differentialPassed =
+                    ReleaseEvidenceJson.differentialPassed(
+                            differentialEvidence, null);
             if (!differential.isEmpty() && !differentialPassed) {
                 reasons.add("local/published semantic and exact-gas differential "
                         + "did not pass");
@@ -251,16 +253,6 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
         return properties.getProperty(key, "").trim();
     }
 
-    private static boolean containsStatus(String text, String status) {
-        return text.matches("(?s).*\\\"status\\\"\\s*:\\s*\\\""
-                + Pattern.quote(status) + "\\\".*");
-    }
-
-    private static boolean fieldPassed(String text, String field) {
-        return text.matches("(?s).*\\\"" + Pattern.quote(field)
-                + "\\\"\\s*:\\s*(?:\\\"passed\\\"|true).*?");
-    }
-
     private static String artifactsJson(List<ArtifactEvidence> artifacts) {
         return artifacts.stream().map(item -> "{\"path\":"
                 + quote(unix(item.file)) + ",\"bytes\":" + item.file.length()
@@ -300,8 +292,7 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
     }
 
     private static String quote(String value) {
-        return "\"" + value.replace("\\", "\\\\")
-                .replace("\"", "\\\"") + "\"";
+        return StrictJson.quote(value);
     }
 
     private static final class ArtifactEvidence {

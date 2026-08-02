@@ -16,7 +16,7 @@ The closed vocabulary covers expression/statement/function/intrinsic work;
 document and binding reads; pointer/object/list work; collection production;
 text/numeric/comparison/sort work; patch/event append; transient construction;
 Blue output admission; and identity requests. The exact names and weights live
-in `src/main/resources/blue/bex/gas/blue-bex-gas-2.0.yaml` and are explained in
+in `blue-bex-core/src/main/resources/blue/bex/gas/blue-bex-gas-2.0.yaml` and are explained in
 [`GAS.md`](GAS.md).
 
 Changing a counter name, order, or weight is a semantic versioned change. This
