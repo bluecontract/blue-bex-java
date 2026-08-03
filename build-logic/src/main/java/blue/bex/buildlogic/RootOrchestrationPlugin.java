@@ -4,10 +4,14 @@ import blue.bex.buildlogic.tasks.GenerateModernizationReportTask;
 import blue.bex.buildlogic.tasks.GenerateReleaseReportTask;
 import blue.bex.buildlogic.tasks.GenerateWorkingReportTask;
 import blue.bex.buildlogic.tasks.VerifyPublishedLanguageTask;
+import groovy.json.JsonSlurper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -143,11 +147,14 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                     project.getLayout().getBuildDirectory().file(
                                             "reports/bex-modernization/final.md"));
                         });
+        File latestLanguageBaseline = project.getLayout().getProjectDirectory().file(
+                "gradle/verification/latest-language-baseline.json").getAsFile();
+        LanguageBaseline languageBaseline = readLanguageBaseline(
+                latestLanguageBaseline);
         TaskProvider<Copy> baselineReceipt = project.getTasks().register(
                 "writeLatestLanguageBaselineReport", Copy.class, task -> {
                     task.setGroup("verification");
-                    task.from(project.getLayout().getProjectDirectory().file(
-                            "gradle/verification/latest-language-baseline.json"));
+                    task.from(latestLanguageBaseline);
                     task.into(project.getLayout().getBuildDirectory().dir(
                             "reports/latest-language-migration"));
                     task.rename(ignored -> "baseline.json");
@@ -172,15 +179,11 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             "blueLanguageCompositePath")
                                             .orElse(""));
                             task.getExpectedLanguageCommit().set(
-                                    "9a607e584ff5dd973684d35d71eb4022d946b760");
+                                    languageBaseline.exactHead);
                             task.getVerifiedImplementationCommit().set(
-                                    "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453");
-                            task.getAllowedLanguageDeltaPaths().set(Arrays.asList(
-                                    "LICENSE",
-                                    "docs/collection-paths-and-cohesion-"
-                                            + "migration-report.md",
-                                    "reports/modernization/"
-                                            + "phase-collection-paths-final.json"));
+                                    languageBaseline.verifiedImplementationCommit);
+                            task.getAllowedLanguageDeltaPaths().set(
+                                    languageBaseline.documentationOnlyDiffPaths);
                             task.getLocalCompositeCommand().set(
                                     "./gradlew --no-daemon clean "
                                             + "bexWorkingVerification "
@@ -427,6 +430,78 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             "out/**", "**/out/**", "*.iml",
                                             "**/.DS_Store", "*.zip", "work-status.txt")));
         });
+    }
+
+    private static LanguageBaseline readLanguageBaseline(File baselineFile) {
+        final Object parsed;
+        try {
+            parsed = new JsonSlurper().parseText(
+                    Files.readString(baselineFile.toPath()));
+        } catch (IOException | RuntimeException exception) {
+            throw new GradleException(
+                    "Cannot read latest Language baseline: " + baselineFile,
+                    exception);
+        }
+
+        Map<?, ?> root = requireObject(parsed, "Language baseline root");
+        Map<?, ?> language = requireObject(
+                root.get("language"), "Language baseline language");
+        return new LanguageBaseline(
+                requireString(language, "exactHead"),
+                requireString(language, "verifiedImplementationCommit"),
+                requireStringList(language, "documentationOnlyDiffPaths"));
+    }
+
+    private static Map<?, ?> requireObject(Object value, String description) {
+        if (!(value instanceof Map)) {
+            throw new GradleException(description + " must be a JSON object");
+        }
+        return (Map<?, ?>) value;
+    }
+
+    private static String requireString(Map<?, ?> object, String field) {
+        Object value = object.get(field);
+        if (!(value instanceof String)
+                || ((String) value).trim().isEmpty()) {
+            throw new GradleException(
+                    "Language baseline " + field + " must be a non-empty string");
+        }
+        return (String) value;
+    }
+
+    private static List<String> requireStringList(
+            Map<?, ?> object, String field) {
+        Object value = object.get(field);
+        if (!(value instanceof List)) {
+            throw new GradleException(
+                    "Language baseline " + field + " must be a JSON array");
+        }
+        List<String> result = new ArrayList<>();
+        for (Object item : (List<?>) value) {
+            if (!(item instanceof String)
+                    || ((String) item).trim().isEmpty()) {
+                throw new GradleException(
+                        "Language baseline " + field
+                                + " must contain only non-empty strings");
+            }
+            result.add((String) item);
+        }
+        return result;
+    }
+
+    private static final class LanguageBaseline {
+        private final String exactHead;
+        private final String verifiedImplementationCommit;
+        private final List<String> documentationOnlyDiffPaths;
+
+        private LanguageBaseline(
+                String exactHead,
+                String verifiedImplementationCommit,
+                List<String> documentationOnlyDiffPaths) {
+            this.exactHead = exactHead;
+            this.verifiedImplementationCommit = verifiedImplementationCommit;
+            this.documentationOnlyDiffPaths = documentationOnlyDiffPaths;
+        }
     }
 
     private static TaskProvider<Task> lifecycle(

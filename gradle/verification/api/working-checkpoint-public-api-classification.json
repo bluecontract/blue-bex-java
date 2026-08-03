@@ -10,8 +10,8 @@
   "sourceState": {
     "bexBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
     "bexMigrationState": "working-tree delta rooted at bexBaselineCommit",
-    "languageExactCommit": "9a607e584ff5dd973684d35d71eb4022d946b760",
-    "languageVerifiedImplementationCommit": "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453"
+    "languageExactCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
+    "languageVerifiedImplementationCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9"
   },
   "classifications": {
     "stable API": [

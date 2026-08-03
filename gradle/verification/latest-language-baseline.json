@@ -78,17 +78,13 @@
     }
   },
   "language": {
-    "exactHead": "9a607e584ff5dd973684d35d71eb4022d946b760",
-    "verifiedImplementationCommit": "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453",
+    "exactHead": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
+    "verifiedImplementationCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
     "verifiedReleaseVersion": "3.1.0-rc.18",
     "localCompositeProjectVersion": "3.1.0-rc.18-SNAPSHOT",
     "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.19",
     "publishedCandidateStatus": "not-executed",
-    "documentationOnlyDiffPaths": [
-      "LICENSE",
-      "docs/collection-paths-and-cohesion-migration-report.md",
-      "reports/modernization/phase-collection-paths-final.json"
-    ],
+    "documentationOnlyDiffPaths": [],
     "czTomlSha256": "f6717f9a9e38df0dea4b5eeec5a0264c0490856ef4c261c053a06883ba3e69f2",
     "focusedModules": [
       {
@@ -113,7 +109,7 @@
         "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.19",
         "projectPath": ":blue-contracts-core",
         "localArtifact": "blue-contracts-core-3.1.0-rc.18-SNAPSHOT.jar",
-        "verifiedLocalArtifactSha256": "ec45224ffee3e0c47246869d89c002657c9d1f348af8c553be3b6c0874bf7bae"
+        "verifiedLocalArtifactSha256": "9fdc03c12b7da8262bddec59a7230b548a33683c211b602311a27266bc2ffcd0"
       }
     ],
     "hostingPackageIdentities": {

@@ -5,14 +5,10 @@
     "bexBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
     "bexWorkingCheckpointCommit": "169e589",
     "bexMigrationState": "modernization delta rooted at bexWorkingCheckpointCommit; the containing commit is the final target revision",
-    "languageExactCommit": "9a607e584ff5dd973684d35d71eb4022d946b760",
-    "languageVerifiedImplementationCommit": "63a9ed6a1a66d47119a80d16ed2ab0beda0d2453",
-    "languageDeltaClassification": "documentation-and-license-only",
-    "languageDeltaPaths": [
-      "LICENSE",
-      "docs/collection-paths-and-cohesion-migration-report.md",
-      "reports/modernization/phase-collection-paths-final.json"
-    ]
+    "languageExactCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
+    "languageVerifiedImplementationCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
+    "languageDeltaClassification": "none",
+    "languageDeltaPaths": []
   },
   "manifests": {
     "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
@@ -22,7 +18,7 @@
     "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
     "generatedPath": "blue-bex-conformance/build/reports/bex-release/public-api.txt",
     "workingCheckpointClassificationPath": "gradle/verification/api/working-checkpoint-public-api-classification.json",
-    "workingCheckpointClassificationSha256": "4e0738794bcf042f399ac0a15f153aa9ac5d07fd7eae95bc410ce3bf780f343e",
+    "workingCheckpointClassificationSha256": "5ff3680eaf637656f600f590c5baad39a1c9db9fc1a5e28ace7ee3300cf75840",
     "afterClassificationPath": "docs/public-api-classification.json",
     "afterClassificationSha256": "69ffe62280a4feb1eafb93cb4d26ccd730713d2ddf7f132e426016db51e92753",
     "publicTypeCount": 101,
