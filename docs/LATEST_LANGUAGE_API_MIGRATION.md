@@ -12,8 +12,8 @@ It is the human-readable companion to
 | BEX baseline | `395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8` |
 | Working compatibility checkpoint | `169e589` |
 | BEX migration | Modernization delta rooted at the working checkpoint; the commit containing this ledger is the final target revision |
-| Language target | `a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9` |
-| Language verified implementation | `a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9` |
+| Language target | `c3d58561220e6de6be6e302cb16799c1a1b5159f` |
+| Language verified implementation | `c3d58561220e6de6be6e302cb16799c1a1b5159f` |
 | Language target delta | None; the target and verified implementation commits are identical |
 | Previous API manifest SHA-256 | `830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315` |
 | Working-checkpoint API manifest SHA-256 | `43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0` |

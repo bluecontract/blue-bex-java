@@ -78,8 +78,8 @@
     }
   },
   "language": {
-    "exactHead": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
-    "verifiedImplementationCommit": "a3b38ca9a1d0b9ca8527b26d23b05cfdbc6af7d9",
+    "exactHead": "c3d58561220e6de6be6e302cb16799c1a1b5159f",
+    "verifiedImplementationCommit": "c3d58561220e6de6be6e302cb16799c1a1b5159f",
     "verifiedReleaseVersion": "3.1.0-rc.18",
     "localCompositeProjectVersion": "3.1.0-rc.18-SNAPSHOT",
     "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.19",
@@ -97,7 +97,7 @@
         "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.19",
         "projectPath": ":blue-language-core",
         "localArtifact": "blue-language-core-3.1.0-rc.18-SNAPSHOT.jar",
-        "verifiedLocalArtifactSha256": "a7d3c72640ab8ac5832feaad576cd1a56457cb87eaf07323fe04a88ae5730740"
+        "verifiedLocalArtifactSha256": "916d5e6315f34d25ad4a2ddbc5587a209506871ea70dd2daa7aa69dbdbe1263d"
       },
       {
         "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.19",
@@ -109,7 +109,7 @@
         "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.19",
         "projectPath": ":blue-contracts-core",
         "localArtifact": "blue-contracts-core-3.1.0-rc.18-SNAPSHOT.jar",
-        "verifiedLocalArtifactSha256": "9fdc03c12b7da8262bddec59a7230b548a33683c211b602311a27266bc2ffcd0"
+        "verifiedLocalArtifactSha256": "5845c6bead274dffd8d22afcb323f7cdf6e53b5656e0070bd241a1a660516280"
       }
     ],
     "hostingPackageIdentities": {
