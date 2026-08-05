@@ -8,8 +8,9 @@ import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
+import blue.language.registry.BlueCoreTypeRegistry;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
@@ -31,21 +32,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexBlueTypeSupportTest {
-    private static final Blue YAML_BLUE = new Blue();
-    private final Blue blue = new Blue(blueId -> {
-        if ("HotelOrderType".equals(blueId)) {
-            return Collections.singletonList(YAML_BLUE.yamlToNode(yaml(
-                    "status:",
-                    "  type: Text")));
+    private static final String INTEGER_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Integer");
+    private static final TestBlue YAML_BLUE = new TestBlue();
+    private static final Node HOTEL_ORDER_TYPE = YAML_BLUE.yamlToNode(yaml(
+            "status:",
+            "  type: Text"));
+    private static final Node RESTAURANT_ORDER_TYPE = YAML_BLUE.yamlToNode(yaml(
+            "restaurantStatus:",
+            "  type: Text"));
+    private static final String HOTEL_ORDER_TYPE_ID =
+            FrozenNode.fromNode(HOTEL_ORDER_TYPE).blueId();
+    private static final String RESTAURANT_ORDER_TYPE_ID =
+            FrozenNode.fromNode(RESTAURANT_ORDER_TYPE).blueId();
+    private final TestBlue blue = new TestBlue(blueId -> {
+        if (HOTEL_ORDER_TYPE_ID.equals(blueId)) {
+            return Collections.singletonList(HOTEL_ORDER_TYPE.clone());
         }
-        if ("RestaurantOrderType".equals(blueId)) {
-            return Collections.singletonList(YAML_BLUE.yamlToNode(yaml(
-                    "restaurantStatus:",
-                    "  type: Text")));
+        if (RESTAURANT_ORDER_TYPE_ID.equals(blueId)) {
+            return Collections.singletonList(
+                    RESTAURANT_ORDER_TYPE.clone());
         }
         return Collections.emptyList();
     });
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
+    private final BexEngine engine = BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void functionArgAcceptsMatchingPrimitiveType() {
@@ -369,7 +379,7 @@ class BexBlueTypeSupportTest {
 
     @Test
     void functionArgAcceptsMatchingBlueIdPattern() {
-        Node hotelOrderPattern = pattern("blueId: HotelOrderBlueId");
+        Node hotelOrderPattern = reference(HOTEL_ORDER_TYPE_ID);
         BexExecutionResult result = run(obj(
                 "type", "Blue/BEX Program",
                 "functions", obj("f", obj(
@@ -386,7 +396,7 @@ class BexBlueTypeSupportTest {
 
     @Test
     void isReturnsTrueForComputedTypedObjectWithBlueIdPattern() {
-        Node hotelOrderPattern = pattern("blueId: HotelOrderType");
+        Node hotelOrderPattern = reference(HOTEL_ORDER_TYPE_ID);
         BexExecutionResult result = run(stepExpr(op("$is", obj(
                 "node", obj(
                         "type", hotelOrderPattern,
@@ -400,16 +410,16 @@ class BexBlueTypeSupportTest {
     void isReturnsFalseForComputedTypedObjectWithDifferentBlueIdPattern() {
         BexExecutionResult result = run(stepExpr(op("$is", obj(
                 "node", obj(
-                        "type", pattern("blueId: RestaurantOrderType"),
+                        "type", reference(RESTAURANT_ORDER_TYPE_ID),
                         "status", op("$literal", "confirmed")),
-                "pattern", pattern("blueId: HotelOrderType")))));
+                "pattern", reference(HOTEL_ORDER_TYPE_ID)))));
 
         assertEquals(false, simple(result.value()));
     }
 
     @Test
     void functionArgAcceptsComputedTypedObjectMatchingBlueIdPattern() {
-        Node hotelOrderPattern = pattern("blueId: HotelOrderType");
+        Node hotelOrderPattern = reference(HOTEL_ORDER_TYPE_ID);
         BexExecutionResult result = run(obj(
                 "type", "Blue/BEX Program",
                 "functions", obj("f", obj(
@@ -431,12 +441,14 @@ class BexBlueTypeSupportTest {
         BexCompiledProgram program = engine.compile(BexProgramSource.inline(FrozenNode.fromResolvedNode(obj(
                 "type", "Blue/BEX Program",
                 "functions", obj("f", obj(
-                        "args", obj("hotelOrder", pattern("blueId: HotelOrderType")),
+                        "args", obj("hotelOrder",
+                                reference(HOTEL_ORDER_TYPE_ID)),
                         "expr", op("$var", "hotelOrder"))),
                 "expr", op("$call", obj(
                         "function", "f",
                         "args", obj("hotelOrder", obj(
-                                "type", pattern("blueId: RestaurantOrderType"),
+                                "type", reference(
+                                        RESTAURANT_ORDER_TYPE_ID),
                                 "status", op("$literal", "confirmed")))))))));
 
         assertThrows(BexException.class, () -> engine.execute(program, defaultContext()));
@@ -446,9 +458,9 @@ class BexBlueTypeSupportTest {
     void isReturnsFalseForBlueIdReferenceWithSiblingFields() {
         BexExecutionResult result = run(stepExpr(op("$is", obj(
                 "node", obj(
-                        "blueId", "HotelOrderType",
+                        "blueId", HOTEL_ORDER_TYPE_ID,
                         "status", op("$literal", "confirmed")),
-                "pattern", pattern("blueId: HotelOrderType")))));
+                "pattern", reference(HOTEL_ORDER_TYPE_ID)))));
 
         assertEquals(false, simple(result.value()));
     }
@@ -724,12 +736,12 @@ class BexBlueTypeSupportTest {
     @Test
     void nodeWriterMapsComputedObjectLanguageKeysToBlueNodeFields() {
         BexValue value = BexValues.fromSimple(m(
-                "type", m("blueId", "HotelOrderType"),
+                "type", m("blueId", HOTEL_ORDER_TYPE_ID),
                 "status", "confirmed"));
 
         Node node = BexNodeWriter.toNode(value);
 
-        assertEquals("HotelOrderType", node.getType().getBlueId());
+        assertEquals(HOTEL_ORDER_TYPE_ID, node.getType().getBlueId());
         assertEquals("confirmed", node.getProperties().get("status").getValue());
         assertFalse(node.getProperties().containsKey("type"));
     }
@@ -737,12 +749,13 @@ class BexBlueTypeSupportTest {
     @Test
     void frozenWriterMapsComputedObjectLanguageKeysToBlueNodeFields() {
         BexValue value = BexValues.fromSimple(m(
-                "type", m("blueId", "HotelOrderType"),
+                "type", m("blueId", HOTEL_ORDER_TYPE_ID),
                 "status", "confirmed"));
 
         FrozenNode node = BexFrozenWriter.toFrozen(value);
 
-        assertEquals("HotelOrderType", node.getType().getReferenceBlueId());
+        assertEquals(HOTEL_ORDER_TYPE_ID,
+                node.getType().getReferenceBlueId());
         assertEquals("confirmed", node.property("status").getValue());
         assertNull(node.property("type"));
     }
@@ -751,14 +764,14 @@ class BexBlueTypeSupportTest {
     void nodeWriterMapsSchemaAndValueLanguageKeysToBlueNodeFields() {
         BexValue value = BexValues.fromSimple(m(
                 "name", "Amount",
-                "type", m("blueId", "Integer"),
+                "type", m("blueId", INTEGER_TYPE_BLUE_ID),
                 "schema", m("required", true),
                 "value", bi(10)));
 
         Node node = BexNodeWriter.toNode(value);
 
         assertEquals("Amount", node.getName());
-        assertEquals("Integer", node.getType().getBlueId());
+        assertEquals(INTEGER_TYPE_BLUE_ID, node.getType().getBlueId());
         assertTrue(node.getSchema().getRequiredValue());
         assertEquals(bi(10), node.getValue());
         assertNull(node.getProperties());
@@ -767,7 +780,7 @@ class BexBlueTypeSupportTest {
     @Test
     void nodeWriterRejectsBlueIdReferenceWithSiblingFields() {
         BexValue value = BexValues.fromSimple(m(
-                "blueId", "HotelOrderType",
+                "blueId", HOTEL_ORDER_TYPE_ID,
                 "status", "confirmed"));
 
         assertThrows(BexException.class, () -> BexNodeWriter.toNode(value));
@@ -858,5 +871,9 @@ class BexBlueTypeSupportTest {
 
     private Node pattern(String... lines) {
         return blue.yamlToNode(yaml(lines));
+    }
+
+    private static Node reference(String blueId) {
+        return new Node().blueId(blueId);
     }
 }

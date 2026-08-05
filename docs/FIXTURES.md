@@ -1,187 +1,193 @@
-# BEX Rich Fixture Format
+# Blue BEX 2.0 Fixture Format
 
-Rich fixtures are portable YAML test cases for BEX implementations. They live
+The normative fixtures use the closed `blue-bex-fixture/2.0` schema and live
 under:
 
 ```text
-src/test/resources/rich-fixtures/
+src/test/resources/conformance/bex/fixtures/
 ```
 
-The Java runner rejects unknown fixture fields so typos do not silently weaken a
-conformance test.
-
-## Root Fields
-
-Allowed root fields:
-
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `fixtureId` | yes | Stable fixture identifier. |
-| `title` | yes | Human-readable fixture title. |
-| `targetStatus` | no | Informational status used while migrating fixtures. |
-| `tags` | no | List of grouping tags. |
-| `context` | no | Execution context data. |
-| `blueDefinitions` | no | Fixture-local BlueId provider definitions. |
-| `gasSchedule` | no | Per-fixture gas schedule overrides. |
-| `programSource` | yes | Blue YAML source for the BEX program. |
-| `expectation` | yes | Expected outcome and assertions. |
-
-Example:
-
-```yaml
-fixtureId: BEX-EXAMPLE-001
-title: Const returns declared value
-tags:
-  - constants
-programSource: |
-  type: Blue/BEX Program
-  constants:
-    amount: 400
-  expr:
-    $const: amount
-expectation:
-  outcome: success
-  resultSimple: 400
-```
-
-`tags` must be a list of non-empty text values. `targetStatus`, when present,
-must be one of:
+The authoritative files are:
 
 ```text
-current-pass
-current-compile-error
-current-runtime-error
-current-output-conversion-error
-current-parse-error
-current-parse-error-or-output-conversion-error
-current-gas-property
+fixture-schema.yaml
+HARNESS.md
+manifest.yaml
+operator-coverage.yaml
+projection-catalog.yaml
+vector-coverage.yaml
 ```
+
+Unknown fixture fields, context bindings, operators, assertion projections, or
+intrinsic types fail closed. No normative fixture may be skipped.
+
+## Root Shape
+
+Every fixture requires:
+
+```yaml
+schema: blue-bex-fixture/2.0
+id: example-id
+vectors:
+- BEX-E-01
+category: e
+program:
+  expr: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: 1
+```
+
+The closed categories are `c`, `e`, `g`, `gas`, `h`, `operator`, `r`, and `s`.
+`vectors` binds the fixture to one or more normative specification vectors.
 
 ## Context
 
-Allowed `context` fields:
-
-| Field | Meaning |
-| --- | --- |
-| `documentScope` | Current document scope path. Defaults to `/`. |
-| `rootDocumentSource` | Blue YAML for the canonical/resolved root document. Defaults to `{}`. |
-| `eventSource` | Blue YAML for the event binding. Defaults to `{}`. |
-| `currentContractSource` | Blue YAML for the current contract binding. Defaults to `{}`. |
-| `stepsBinding` | Map of step names to simple step-result values. |
-| `gasLimit` | Execution gas limit. Defaults to `1000000`. |
-| `bindings` | Additional host bindings as simple YAML values. |
-
-Document pointers are resolved using `documentScope`. Value-local pointers such
-as `$event`, `$currentContract`, `$steps`, `$binding`, `$pointerGet`, and
-`$pointerSet` are resolved inside the selected value.
-
-## Blue Definitions
-
-Use `blueDefinitions` when a fixture references custom BlueIds:
-
-```yaml
-blueDefinitions:
-  HotelOrderType: |
-    status:
-      type: Text
-```
-
-The fixture runner exposes each key as a Blue provider entry. This keeps
-fixtures portable and avoids Java-only hardcoded provider behavior.
-
-## Gas Schedule
-
-Allowed `gasSchedule` override fields:
+The context may supply exact values for:
 
 ```text
-expressionBase
-statementBase
-documentRead
-eventRead
-stepsRead
-currentContractRead
-varRead
-resultValueRead
-pointerGetBase
-pointerSetBase
-objectSetBase
-appendChangeBase
-appendEventBase
-forEachItem
-functionCall
+rootDocument
+event
+processingEvent
+currentContract
+steps
+bindings
 ```
 
-Any omitted field uses the default schedule documented in
-[GAS.md](GAS.md).
+It may also supply:
 
-## Outcomes
+- `documentScope`, the current Contracts scope;
+- `provider`, verified exact BlueId entries;
+- `parentRemainingGas`, the live host budget;
+- `gasLimit`, a BEX-local limit that may only reduce that budget;
+- `directCounterFixture`, used only by exact named-counter microfixtures.
 
-Allowed `expectation.outcome` values:
+Context values can be inline or reference-backed. Representation, cache state,
+and provider segmentation must not change result or gas.
 
-| Outcome | Meaning |
-| --- | --- |
-| `success` | Program compiles and executes successfully. |
-| `compile-error` | Program parses but BEX compilation fails. |
-| `runtime-error` | Program compiles but execution fails. |
-| `parse-error` | Blue YAML parsing fails. |
-| `output-conversion-error` | Execution succeeds, but converting the output to a Blue node/frozen node fails. |
-| `parse-error-or-output-conversion-error` | Either parse or output conversion failure is acceptable for strict Blue authoring edge cases. |
-| `gas-property` | Fixture asserts a named gas property rather than exact output. |
+## Expected Results
 
-For `success`, allowed expectation fields are:
+The closed expected-result fields include:
 
 ```text
-outcome
-resultSimple
-changeset
+compileStatus
+result
+changes
 events
-gasUsed
+errorClass
+gasTrace
+totalGas
+assertions
+variants
+cases
+additionalCase
+reason
 ```
 
-For `compile-error`, `runtime-error`, `parse-error`,
-`output-conversion-error`, and `parse-error-or-output-conversion-error`, allowed
-fields are:
+`expected.cases` contains complete executable subcases. Metadata such as
+`additionalCase` is not executable.
+
+Assertions use a path from `projection-catalog.yaml` and one of:
 
 ```text
-outcome
-errorContains
+equals
+notEquals
+absent
+present
+contains
+notContains
+lessThan
+greaterThan
+sameAcrossVariants
+all
+none
 ```
 
-For `gas-property`, allowed fields are:
+A missing or unknown projection is a harness error unless the fixture
+explicitly asserts `absent`.
 
-```text
-outcome
-property
-```
+## Representation Variants
 
-## Exact Gas
+Each variant is an explicit independent transformation. Supported axes include:
 
-Success fixtures may assert exact gas:
+- root form: inline, reference, eager, lazy, or materialized;
+- cache: warm or cold;
+- provider batching: batched or unbatched;
+- exact raw root JSON;
+- internal delivery classification.
+
+`sameAcrossVariants` compares the semantic result and requested canonical trace
+projections. Variant labels alone do not imply behavior.
+
+## Exact Named Gas
+
+Gas expectations use the ordered named ledger, never an opaque aggregate
+accepted from the implementation:
 
 ```yaml
-expectation:
-  outcome: success
-  gasUsed: 10
+expected:
+  gasTrace:
+  - sequence: 0
+    counter: expressionEvaluated
+    quantity: 3
+    weight: 1
+    gas: 3
+  totalGas: 3
 ```
 
-Runtime gas exhaustion fixtures usually set a low context limit:
+A gas microfixture supplies one `directCounterFixture`:
 
 ```yaml
 context:
-  gasLimit: 2
-expectation:
-  outcome: runtime-error
-  errorContains: BEX gas exhausted
+  directCounterFixture:
+    counter: expressionEvaluated
+    quantity: 3
 ```
 
-## Manifest
+The harness verifies namespace, counter name, sequence, quantity, manifest
+weight, subtotal, reason, and the trace-derived total. The 30 microfixtures
+cover every counter in the exact BEX 2.0 gas manifest.
 
-The fixture suite has a machine-readable manifest at:
+For exhaustion fixtures, `parentRemainingGas` is the host budget and
+`gasLimit` is an optional lowering sub-limit. The failed charge must be absent,
+the admitted trace prefix must remain exact, and buffered effects must not
+commit.
+
+## Output and Error Phases
+
+The harness distinguishes compile, runtime, gas, representation, and Blue
+boundary failures. Compile errors occur before runtime counters or effects.
+Output admission validates Blue Language 1.0 before identity calculation,
+including numeric-kind preservation and rejection of undefined list slots.
+
+## Package Integrity
+
+`manifest.yaml` inventories every fixture and support file with its normalized
+byte length and SHA-256 digest. It binds the exact BEX runtime registry, gas
+manifest, vector map, and operator map.
+
+The implementation-baseline inventory and identities are:
 
 ```text
-src/test/resources/rich-fixtures/manifest.yaml
+normative vectors: 60
+behavior fixtures: 105
+gas microfixtures: 30
+normative operators: 86
+runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
+fixture package: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
 ```
 
-The manifest records the suite name, version, fixture root, required
-directories, gas-model document, fixture-format document, and fixture counts.
-It is not itself executed as a fixture.
+Run the complete package and generate machine-readable evidence with:
+
+```text
+./gradlew bexConformanceReport \
+  -PblueLanguageCompositePath=../blue-language-java
+```

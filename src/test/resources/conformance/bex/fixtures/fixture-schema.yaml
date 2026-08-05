@@ -1,0 +1,112 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: blue-bex-fixture/2.0
+title: Blue BEX 2.0 conformance fixture
+type: object
+additionalProperties: false
+required: [schema, id, vectors, category, program, context, expected]
+properties:
+  schema: {const: blue-bex-fixture/2.0}
+  id:
+    type: string
+    pattern: '^[A-Za-z0-9][A-Za-z0-9-]*$'
+  vectors:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: '^BEX-[A-Z]+-[0-9]{2}$'
+  category:
+    enum: [c, e, g, gas, h, operator, r, s]
+  description: {type: string}
+  program: {}
+  context:
+    $ref: '#/$defs/context'
+  expected:
+    $ref: '#/$defs/expected'
+$defs:
+  context:
+    type: object
+    additionalProperties: false
+    properties:
+      rootDocument: {}
+      event: {}
+      processingEvent: {}
+      currentContract: {}
+      steps: {type: object}
+      bindings: {type: object}
+      documentScope: {type: string}
+      provider:
+        type: object
+        additionalProperties: {}
+      gasLimit: {type: integer, minimum: 0}
+      parentRemainingGas: {type: integer, minimum: 0}
+      directCounterFixture:
+        type: object
+        additionalProperties: false
+        required: [counter, quantity]
+        properties:
+          namespace: {enum: [runtime, semantic, processor]}
+          counter: {type: string}
+          quantity: {type: integer, minimum: 0}
+          weightManifest: {type: string}
+  assertion:
+    type: object
+    additionalProperties: false
+    required: [actual, op]
+    properties:
+      actual: {type: string}
+      op:
+        enum: [equals, notEquals, absent, present, contains, notContains, lessThan, greaterThan, sameAcrossVariants, all, none]
+      expected: {}
+  variant:
+    type: object
+    additionalProperties: false
+    required: [name]
+    properties:
+      name: {type: string}
+      rootForm: {enum: [inline, reference, eager, lazy, materialized]}
+      cache: {enum: [warm, cold]}
+      batching: {enum: [batched, unbatched]}
+      rawRootDocumentJson: {type: string}
+      deliveryKind: {enum: [document-update, triggered, lifecycle, embedded]}
+  case:
+    type: object
+    additionalProperties: false
+    required: [name, program, errorClass]
+    properties:
+      name: {type: string}
+      program: {}
+      context: {$ref: '#/$defs/context'}
+      errorClass: {type: string}
+      reason: {type: string}
+  expected:
+    type: object
+    additionalProperties: false
+    properties:
+      compileStatus: {type: string}
+      result: {}
+      changes:
+        type: array
+        items: {}
+      events:
+        type: array
+        items: {}
+      errorClass: {type: string}
+      gasTrace:
+        type: array
+        items: {}
+      totalGas: {type: integer, minimum: 0}
+      assertions:
+        type: array
+        items: {$ref: '#/$defs/assertion'}
+      additionalCase: {}
+      variants:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/variant'}
+      cases:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/case'}
+      reason: {type: string}

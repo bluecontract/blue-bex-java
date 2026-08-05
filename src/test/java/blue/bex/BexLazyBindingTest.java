@@ -7,13 +7,13 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
-import blue.bex.result.BexMetrics;
+import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -765,11 +765,11 @@ class BexLazyBindingTest {
                 .build();
         BexCompiledProgram program = BexEngine.builder().build()
                 .compile(BexProgramSource.inline(frozen(stepExpr(op("$binding", "broken")))));
-        BexRuntime runtime = new BexRuntime(program, context, new Blue(), schedule,
-                new BexMetrics(), new BexPointerCache());
+        BexRuntime runtime = new BexRuntime(program, context, new TestBlue().runtime(), schedule,
+                new BexMetricsRecorder(), new BexPointerCache());
 
         assertThrows(IllegalStateException.class, () -> runtime.readBinding("broken", Collections.<String>emptyList()));
-        assertEquals(schedule.varRead, runtime.gas().used());
+        assertEquals(schedule.bindingRead, runtime.gas().used());
     }
 
     private static BexExecutionContext.Builder contextBuilder() {

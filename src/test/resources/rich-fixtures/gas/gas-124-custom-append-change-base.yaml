@@ -1,8 +1,8 @@
 fixtureId: GAS-124
-title: Custom appendChangeBase schedule applies
+title: Custom patchAppended schedule applies
 tags: [gas]
 gasSchedule:
-  appendChangeBase: 10
+  patchAppended: 10
 programSource: |
   type: Blue/BEX Program
   do:

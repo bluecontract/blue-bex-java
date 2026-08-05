@@ -6,7 +6,7 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BexUseCaseConformanceTest {
-    private final Blue blue = new Blue();
-    private final BexEngine engine = BexEngine.builder().blue(blue).build();
+    private final TestBlue blue = new TestBlue();
+    private final BexEngine engine = BexEngine.builder().language(blue.runtime()).build();
 
     @Test
     void existsDistinguishesMissingFromPresentFalsyValues() {
@@ -248,12 +248,18 @@ class BexUseCaseConformanceTest {
 
     @Test
     void resultValueListIndexRemoveIsNonShiftingOverlayBehavior() {
+        Node orders = op("$resultValue", "/orders");
         BexExecutionResult result = run(stepDo(list(
                 op("$appendChange", obj("op", "remove", "path", "/orders/1")),
-                op("$return", obj("orders", op("$resultValue", "/orders")))
+                op("$return", obj(
+                        "first", op("$listGet", obj("list", orders, "index", 0)),
+                        "removedExists", op("$exists", op("$listGet", obj("list", orders, "index", 1))),
+                        "size", op("$size", orders),
+                        "third", op("$listGet", obj("list", orders, "index", 2))))
         )), documentContext(obj("orders", list("a", "b", "c"))));
 
-        assertEquals(m("orders", l("a", null, "c")), simple(result.value()));
+        assertEquals(m("first", "a", "removedExists", false, "size", bi(3), "third", "c"),
+                simple(result.value()));
     }
 
     @Test

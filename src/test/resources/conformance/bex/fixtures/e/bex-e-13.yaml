@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-13
+vectors:
+- BEX-E-13
+category: e
+description: Function frames isolate locals and validate static argument patterns.
+program:
+  functions:
+    f:
+      args:
+        x:
+          type:
+            blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+      do:
+      - $let:
+          name: local
+          expr: 1
+      - $return:
+          $var: x
+  entry: f
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: compile-error
+  reason: entry-function-has-args

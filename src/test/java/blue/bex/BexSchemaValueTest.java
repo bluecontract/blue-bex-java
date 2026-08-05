@@ -1,13 +1,10 @@
 package blue.bex;
 
-import blue.bex.gas.BexSizeEstimator;
-import blue.bex.result.BexMetrics;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
 import blue.language.model.Schema;
-import blue.language.utils.NodeToMapListOrValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -19,12 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexSchemaValueTest {
     @Test
-    void frozenSchemaIsExposedAsFiniteObjectWithDeterministicSize() {
+    void frozenSchemaIsExposedAsFiniteObject() {
         assertFiniteSchemaValue(BexValues.nodeSnapshot(schemaBearingObject()));
     }
 
     @Test
-    void trustedCursorSchemaIsExposedAsFiniteObjectWithDeterministicSize() {
+    void trustedCursorSchemaIsExposedAsFiniteObject() {
         assertFiniteSchemaValue(BexValues.nodeCursorTrustedImmutable(schemaBearingObject()));
     }
 
@@ -54,11 +51,13 @@ class BexSchemaValueTest {
         assertTrue(schema.get("required").asBoolean());
         assertEquals(BigInteger.valueOf(2), schema.get("multipleOf").asInteger());
         assertEquals("draft", schema.get("enum").get("0").asText());
-        assertEquals("Active option", schema.get("enum").get("1").get("name").asText());
+        assertEquals("Active option",
+                schema.get("enum").get("1").get("type").get("name").asText());
         assertEquals("active", schema.get("enum").get("1").get("value").asText());
 
         Node roundTripped = BexNodeWriter.toNode(BexValues.fromSimple(sourceValue.toSimple()));
-        assertEquals(NodeToMapListOrValue.get(source), NodeToMapListOrValue.get(roundTripped));
+        assertEquals(sourceValue.toSimple(),
+                BexValues.nodeSnapshot(roundTripped).toSimple());
     }
 
     private static void assertFiniteSchemaValue(BexValue value) {
@@ -66,12 +65,6 @@ class BexSchemaValueTest {
         assertEquals(m("required", true), schema.toSimple());
         assertTrue(schema.get("required").asBoolean());
         assertTrue(schema.get("schema").isUndefined());
-
-        BexMetrics metrics = new BexMetrics();
-        BexSizeEstimator estimator = new BexSizeEstimator(metrics);
-        assertEquals(29L, estimator.estimate(value));
-        assertEquals(29L, estimator.estimate(value));
-        assertTrue(metrics.sizeEstimateCacheHits() > 0L);
 
         assertEquals(m("payload", "x", "schema", m("required", true)), value.toSimple());
         assertTrue(value.isObject());
@@ -100,7 +93,9 @@ class BexSchemaValueTest {
                 .maxFields(integer(5))
                 .enumValues(Arrays.asList(
                         new Node().value("draft"),
-                        new Node().name("Active option").value("active")));
+                        new Node()
+                                .type(new Node().name("Active option"))
+                                .value("active")));
     }
 
     private static Node integer(long value) {

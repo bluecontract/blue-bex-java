@@ -1,0 +1,20 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-emptyobject
+vectors:
+- BEX-E-06
+category: operator
+description: Direct executable coverage for `$emptyObject`.
+program:
+  expr:
+    $emptyObject: null
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: {}
+  assertions: []

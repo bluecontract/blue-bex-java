@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-03
+vectors:
+- BEX-E-03
+category: e
+description: Dynamic null/undefined pointers and dynamic null/undefined key/name operands fail.
+program:
+  expr:
+    $pointerGet:
+      object: {}
+      path:
+        $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: runtime-error

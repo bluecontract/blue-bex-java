@@ -73,8 +73,10 @@ public final class BexTestFixtures {
         return obj(name, body);
     }
 
-    public static Node emptyStatement() {
-        return obj("$empty", true);
+    public static Node noOpStatement() {
+        return obj("$returnIf", obj(
+                "cond", false,
+                "expr", null));
     }
 
     public static Node obj(Object... keysAndValues) {

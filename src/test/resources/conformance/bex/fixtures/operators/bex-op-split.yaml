@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-split
+vectors:
+- BEX-E-08
+category: operator
+description: Direct executable coverage for `$split`.
+program:
+  expr:
+    $split:
+      text: a,b,c
+      separator: ','
+      limit: 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - a
+  - b,c
+  assertions: []

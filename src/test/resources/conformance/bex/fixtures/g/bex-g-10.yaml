@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-10
+vectors:
+- BEX-G-10
+category: g
+description: '`$pointerSet`, `$objectSet`, `$appendChange(s)`, and `$appendEvent(s)` contain no recursive `estimatedSize` term.'
+program:
+  do:
+  - $appendEvent:
+      a: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.estimatedSize
+    op: absent

@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-04
+vectors:
+- BEX-S-04
+category: s
+description: '`$appendEvent(s)` preserves order and multiplicity and rejects `undefined`.'
+program:
+  do:
+  - $appendEvent:
+      id: A
+  - $appendEvent:
+      id: A
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  events:
+  - id: A
+  - id: A

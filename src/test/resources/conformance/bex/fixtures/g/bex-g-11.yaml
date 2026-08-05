@@ -1,0 +1,33 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-11
+vectors:
+- BEX-G-11
+category: g
+description: Exact values and transient values differ only by actual construction/identity-boundary work, not by serialization shape.
+program:
+  expr:
+    exact:
+      $document: /x
+    transient:
+      a: 1
+context:
+  rootDocument:
+    x:
+      blueId: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2:
+      a: 1
+expected:
+  assertions:
+  - actual: gas.exact.recursiveConstruction
+    op: equals
+    expected: 0
+  - actual: gas.transient.transientObjectMemberProduced
+    op: equals
+    expected: 1

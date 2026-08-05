@@ -1,0 +1,32 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-06
+vectors:
+- BEX-E-06
+category: e
+description: Numeric zero is truthy; empty object/list and null are falsy.
+program:
+  expr:
+    zero:
+      $truthy: 0
+    object:
+      $truthy: {}
+    list:
+      $truthy: []
+    'null':
+      $truthy:
+        $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    zero: true
+    object: false
+    list: false
+    'null': false

@@ -108,7 +108,9 @@ contracts:
               $empty:
                 $var: sessionId
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $let:
             name: pkg
             expr:
@@ -136,7 +138,9 @@ contracts:
                     args:
                       sessionId:
                         $var: sessionId
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       orderFieldRelativePath:
         args:
           key:
@@ -199,7 +203,9 @@ contracts:
               $empty:
                 $var: sessionId
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $call:
             function: ensureOrderLedger
             args:
@@ -227,7 +233,9 @@ contracts:
                   $var: pathText
                 val:
                   $var: val
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       setOrderField:
         args:
           sessionId:
@@ -260,7 +268,9 @@ contracts:
                     $var: relativePath
                   val:
                     $var: val
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       mergeOrderObjectField:
         args:
           sessionId:
@@ -319,7 +329,9 @@ contracts:
                           object:
                             $var: entry
                           path: /val
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       markPackagePayNoteSecured:
         args:
           packageOrderSessionId:
@@ -348,7 +360,9 @@ contracts:
                 - $var: normalizedAmount
                 - $const: expectedPackageAmount
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $call:
             function: setOrderField
             args:
@@ -369,7 +383,9 @@ contracts:
             args:
               sessionId:
                 $var: packageOrderSessionId
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       markPackagePayNoteSecuredFromSnapshot:
         args:
           snapshot:
@@ -384,7 +400,9 @@ contracts:
                     snapshot:
                       $var: snapshot
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $let:
             name: context
             expr:
@@ -437,7 +455,9 @@ contracts:
                       $var: amount
                     path: /secured
                     default: 0
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       processCustomerPayNoteInitialSnapshot:
         args:
           payNoteSessionId:
@@ -467,7 +487,9 @@ contracts:
                       snapshot:
                         $var: snapshot
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $let:
             name: context
             expr:
@@ -501,7 +523,9 @@ contracts:
               $empty:
                 $var: packageOrderSessionId
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $call:
             function: ensureOrderLedger
             args:
@@ -575,7 +599,9 @@ contracts:
                     - $var: packageOrderSessionId
                     - /customerPayNote/attachedToPackageOrder
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $call:
             function: setOrderField
             args:
@@ -597,7 +623,9 @@ contracts:
                     $var: snapshot
               key: type
               val: MyOS/Call Operation Requested
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       placeResaleOrdersForOrder:
         args:
           sessionId:
@@ -646,7 +674,9 @@ contracts:
                         - $var: sessionId
                         - /customerPayNote/secured
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $call:
             function: placeOneResaleOrder
             args:
@@ -675,7 +705,9 @@ contracts:
               entitlement:
                 title: Two-dish dinner with selected wines
                 description: Dinner menu with selected wines.
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       placeOneResaleOrder:
         args:
           sessionId:
@@ -734,7 +766,9 @@ contracts:
                           - $var: requestId
                           - /kind
             then:
-            - $empty: true
+            - $returnIf:
+                cond: false
+                expr: null
         - $appendChange:
             op: add
             path:
@@ -810,7 +844,9 @@ contracts:
                     $var: entitlement
               key: type
               val: MyOS/Call Operation Requested
-        - $empty: true
+        - $returnIf:
+            cond: false
+            expr: null
       processCustomerPayNoteSnapshotResolved:
         do:
         - $let:

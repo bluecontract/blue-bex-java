@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-05
+vectors:
+- BEX-G-05
+category: g
+description: Text uses 64-code-point blocks, never UTF-16 units.
+program:
+  expr:
+    $concat:
+    - xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.textBlockExamined
+    op: equals
+    expected: 2
+  - actual: gas.utf16Counter
+    op: absent

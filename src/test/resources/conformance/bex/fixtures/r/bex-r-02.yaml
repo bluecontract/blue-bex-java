@@ -1,0 +1,85 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-02
+vectors:
+- BEX-R-02
+category: r
+description: '`$kind`, `$exists`, `$keys`, `$entries`, `$size`, truthiness, exact/deep equality, matching, iteration, pointer reads, and explicit identity do not reveal reference state.'
+program:
+  expr:
+    kind:
+      $kind:
+        $document: /x
+    exists:
+      $exists:
+        $document: /x/a
+    keys:
+      $keys:
+        $document: /x
+    entries:
+      $entries:
+        $document: /x
+    size:
+      $size:
+        $document: /x
+    truthiness:
+      $boolean:
+        $document: /x
+    identity:
+      $nodeBlueId:
+        $document: /x
+    exactEquality:
+      $eq:
+      - $document: /x
+      - $document: /same
+    deepEquality:
+      $eq:
+      - $document: /x
+      - a: 1
+        values:
+        - 1
+        - 2
+    matching:
+      $is:
+        node:
+          $document: /x/a
+        pattern:
+          type: Integer
+    iteration:
+      $map:
+        in:
+          $document: /x/values
+        item: item
+        expr:
+          $var: item
+    pointerRead:
+      $pointerGet:
+        object:
+          $document: /x
+        path: /a
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+    same:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions:
+  - actual: result
+    op: sameAcrossVariants
+  variants:
+  - name: inline
+    rootForm: inline
+  - name: reference
+    rootForm: reference

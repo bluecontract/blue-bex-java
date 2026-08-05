@@ -1,0 +1,197 @@
+specification: blue-bex/2.0
+vectors:
+  BEX-C-01:
+  - c/bex-c-01.yaml
+  BEX-C-02:
+  - c/bex-c-02.yaml
+  BEX-C-03:
+  - c/bex-c-03.yaml
+  BEX-C-04:
+  - c/bex-c-04.yaml
+  BEX-C-05:
+  - c/bex-c-05.yaml
+  BEX-C-06:
+  - c/bex-c-06.yaml
+  BEX-C-07:
+  - c/bex-c-07.yaml
+  BEX-C-08:
+  - c/bex-c-08.yaml
+  BEX-C-09:
+  - c/bex-c-09.yaml
+  BEX-E-01:
+  - e/bex-e-01.yaml
+  BEX-E-02:
+  - e/bex-e-02.yaml
+  - operators/bex-op-get.yaml
+  BEX-E-03:
+  - e/bex-e-03.yaml
+  BEX-E-04:
+  - e/bex-e-04.yaml
+  BEX-E-05:
+  - e/bex-e-05.yaml
+  BEX-E-06:
+  - e/bex-e-06.yaml
+  - operators/bex-op-empty.yaml
+  - operators/bex-op-emptylist.yaml
+  - operators/bex-op-emptyobject.yaml
+  - operators/bex-op-isempty.yaml
+  - operators/bex-op-not.yaml
+  BEX-E-07:
+  - e/bex-e-07.yaml
+  - operators/bex-op-and.yaml
+  - operators/bex-op-choose.yaml
+  - operators/bex-op-coalesce.yaml
+  - operators/bex-op-default.yaml
+  BEX-E-08:
+  - e/bex-e-08.yaml
+  - operators/bex-op-add.yaml
+  - operators/bex-op-boolean.yaml
+  - operators/bex-op-gt.yaml
+  - operators/bex-op-gte.yaml
+  - operators/bex-op-join.yaml
+  - operators/bex-op-list.yaml
+  - operators/bex-op-lt.yaml
+  - operators/bex-op-lte.yaml
+  - operators/bex-op-object.yaml
+  - operators/bex-op-sliceafter.yaml
+  - operators/bex-op-split.yaml
+  - operators/bex-op-startswith.yaml
+  - operators/bex-op-subtract.yaml
+  - operators/bex-op-unwrap.yaml
+  BEX-E-09:
+  - e/bex-e-09.yaml
+  - operators/bex-op-entries.yaml
+  BEX-E-10:
+  - e/bex-e-10.yaml
+  - operators/bex-op-iskind.yaml
+  BEX-E-11:
+  - e/bex-e-11.yaml
+  - operators/bex-op-filter.yaml
+  - operators/bex-op-find.yaml
+  - operators/bex-op-findentry.yaml
+  - operators/bex-op-flatmap.yaml
+  - operators/bex-op-haskey.yaml
+  - operators/bex-op-includes.yaml
+  - operators/bex-op-listconcat.yaml
+  - operators/bex-op-listget.yaml
+  - operators/bex-op-merge.yaml
+  - operators/bex-op-objectfromentries.yaml
+  - operators/bex-op-reduce.yaml
+  - operators/bex-op-some.yaml
+  BEX-E-12:
+  - e/bex-e-12.yaml
+  - operators/bex-op-objectset.yaml
+  BEX-E-13:
+  - e/bex-e-13.yaml
+  BEX-E-14:
+  - e/bex-e-14.yaml
+  - operators/bex-op-ne.yaml
+  BEX-G-01:
+  - g/bex-g-01.yaml
+  - gas-micro/bindingRead.yaml
+  - gas-micro/blueOutputBoundary.yaml
+  - gas-micro/collectionItemProduced.yaml
+  - gas-micro/collectionItemVisited.yaml
+  - gas-micro/comparisonNodeVisited.yaml
+  - gas-micro/constantRead.yaml
+  - gas-micro/currentContractRead.yaml
+  - gas-micro/documentRead.yaml
+  - gas-micro/eventAppended.yaml
+  - gas-micro/eventRead.yaml
+  - gas-micro/expressionEvaluated.yaml
+  - gas-micro/functionCalled.yaml
+  - gas-micro/integerLimbOperation.yaml
+  - gas-micro/intrinsicCalled.yaml
+  - gas-micro/listItemRead.yaml
+  - gas-micro/nodeIdentityRequested.yaml
+  - gas-micro/objectMemberRead.yaml
+  - gas-micro/patchAppended.yaml
+  - gas-micro/pointerSegmentRead.yaml
+  - gas-micro/pointerSegmentWritten.yaml
+  - gas-micro/processingEventRead.yaml
+  - gas-micro/resultValueRead.yaml
+  - gas-micro/sortComparison.yaml
+  - gas-micro/statementExecuted.yaml
+  - gas-micro/stepsRead.yaml
+  - gas-micro/textBlockConstructed.yaml
+  - gas-micro/textBlockExamined.yaml
+  - gas-micro/transientListItemProduced.yaml
+  - gas-micro/transientObjectMemberProduced.yaml
+  - gas-micro/variableRead.yaml
+  BEX-G-02:
+  - g/bex-g-02.yaml
+  BEX-G-03:
+  - g/bex-g-03.yaml
+  BEX-G-04:
+  - g/bex-g-04.yaml
+  BEX-G-05:
+  - g/bex-g-05.yaml
+  BEX-G-06:
+  - g/bex-g-06.yaml
+  BEX-G-07:
+  - g/bex-g-07.yaml
+  BEX-G-08:
+  - g/bex-g-08.yaml
+  BEX-G-09:
+  - g/bex-g-09.yaml
+  BEX-G-10:
+  - g/bex-g-10.yaml
+  BEX-G-11:
+  - g/bex-g-11.yaml
+  BEX-G-12:
+  - g/bex-g-12.yaml
+  BEX-G-13:
+  - g/bex-g-13.yaml
+  BEX-G-14:
+  - g/bex-g-14.yaml
+  BEX-G-15:
+  - g/bex-g-15.yaml
+  BEX-H-01:
+  - h/bex-h-01.yaml
+  BEX-H-02:
+  - h/bex-h-02.yaml
+  BEX-H-03:
+  - h/bex-h-03.yaml
+  BEX-H-04:
+  - h/bex-h-04.yaml
+  BEX-H-05:
+  - h/bex-h-05.yaml
+  BEX-H-06:
+  - h/bex-h-06.yaml
+  BEX-R-01:
+  - r/bex-r-01.yaml
+  BEX-R-02:
+  - r/bex-r-02.yaml
+  BEX-R-03:
+  - r/bex-r-03.yaml
+  BEX-R-04:
+  - r/bex-r-04.yaml
+  BEX-R-05:
+  - r/bex-r-05.yaml
+  BEX-R-06:
+  - r/bex-r-06.yaml
+  BEX-R-07:
+  - r/bex-r-07.yaml
+  BEX-R-08:
+  - r/bex-r-08.yaml
+  BEX-R-09:
+  - r/bex-r-09.yaml
+  BEX-S-01:
+  - s/bex-s-01.yaml
+  BEX-S-02:
+  - operators/bex-op-appendchanges.yaml
+  - s/bex-s-02.yaml
+  BEX-S-03:
+  - s/bex-s-03.yaml
+  BEX-S-04:
+  - operators/bex-op-appendevents.yaml
+  - operators/bex-op-events.yaml
+  - s/bex-s-04.yaml
+  BEX-S-05:
+  - operators/bex-op-changeset.yaml
+  - s/bex-s-05.yaml
+  BEX-S-06:
+  - operators/bex-op-failif.yaml
+  - s/bex-s-06.yaml
+  BEX-S-07:
+  - s/bex-s-07.yaml

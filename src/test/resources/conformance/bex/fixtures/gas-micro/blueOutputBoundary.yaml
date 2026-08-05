@@ -1,0 +1,19 @@
+schema: blue-bex-fixture/2.0
+id: gas-blueOutputBoundary
+vectors:
+- BEX-G-01
+category: gas
+program:
+  expr: 0
+context:
+  directCounterFixture:
+    counter: blueOutputBoundary
+    quantity: 3
+expected:
+  gasTrace:
+  - sequence: 0
+    counter: blueOutputBoundary
+    quantity: 3
+    weight: 5
+    gas: 15
+  totalGas: 15

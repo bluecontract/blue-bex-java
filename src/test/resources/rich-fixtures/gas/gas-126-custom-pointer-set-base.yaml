@@ -1,8 +1,8 @@
 fixtureId: GAS-126
-title: Custom pointerSetBase schedule applies
+title: Custom pointerSegmentWritten schedule applies
 tags: [gas]
 gasSchedule:
-  pointerSetBase: 10
+  pointerSegmentWritten: 10
 programSource: |
   type: Blue/BEX Program
   expr:

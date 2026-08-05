@@ -1,0 +1,28 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-09
+vectors:
+- BEX-G-09
+category: g
+description: Sorting reports canonical stable merge-sort comparisons.
+program:
+  expr:
+    $intrinsic:
+      type:
+        blueId: 2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG
+      values:
+      - 3
+      - 1
+      - 2
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.sortComparison
+    op: equals
+    expected: canonical-merge-sort

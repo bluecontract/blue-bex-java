@@ -87,7 +87,7 @@ class BexStatementTest {
                         obj("op", "replace", "path", "/status", "val", "first"),
                         obj("op", "replace", "path", "/status", "val", "second")
                 )),
-                emptyStatement()
+                noOpStatement()
         )), defaultContext());
 
         assertEquals("first", simple(result.changeset().entries().get(0).val()));
@@ -95,10 +95,10 @@ class BexStatementTest {
     }
 
     @Test
-    void emptyPlaceholderStatementReturnsDefaultResult() {
+    void falseReturnIfNoOpReturnsDefaultResult() {
         BexExecutionResult result = runStep(stepDo(list(
                 op("$appendEvent", obj("kind", "Calculated")),
-                emptyStatement()
+                noOpStatement()
         )), defaultContext());
 
         assertEquals(l(m("kind", "Calculated")), simple(result.events().asValue()));
@@ -369,7 +369,7 @@ class BexGasTest {
     void gasIsDeterministicAndExhaustionFailsClosed() {
         assertEquals(runExpr(op("$add", list(1, 2))).gasUsed(), runExpr(op("$add", list(1, 2))).gasUsed());
 
-        BexEngine engine = BexEngine.builder().gasSchedule(BexGasSchedule.builder().expressionBase(100).build()).build();
+        BexEngine engine = BexEngine.builder().gasSchedule(BexGasSchedule.builder().expressionEvaluated(100).build()).build();
         BexExecutionContext context = BexExecutionContext.builder().document(defaultDocumentView()).gasLimit(1).build();
         assertThrows(BexException.class, () -> engine.compileAndExecute(BexProgramSource.inline(frozen(stepExpr(op("$add", list(1, 2))))), context));
     }

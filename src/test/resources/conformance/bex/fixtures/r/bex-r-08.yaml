@@ -1,0 +1,40 @@
+schema: blue-bex-fixture/2.0
+id: bex-r-08
+vectors:
+- BEX-R-08
+category: r
+description: Warm/cold cache, provider batching, and physical segmentation do not change result or gas.
+program:
+  expr:
+    $document: /x/a
+context:
+  rootDocument:
+    x:
+      blueId: FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    FbqPSGFDzJtRSYfjogURf8wkzdDdoWJ7oaLVmTYKWE6v:
+      a: 1
+      values:
+      - 1
+      - 2
+expected:
+  assertions:
+  - actual: result
+    op: sameAcrossVariants
+  - actual: gasTrace
+    op: sameAcrossVariants
+  variants:
+  - name: cold-unbatched
+    rootForm: reference
+    cache: cold
+    batching: unbatched
+  - name: warm-batched
+    rootForm: reference
+    cache: warm
+    batching: batched

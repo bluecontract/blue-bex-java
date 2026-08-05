@@ -6,7 +6,7 @@ tags:
 - $is
 - blueId
 blueDefinitions:
-  HotelOrderType: |
+  HWdLVeUryPB57JejjKSeNUQ7Un2FmVwZn6pTaGRitRKk: |
     status:
       type: Text
 context:
@@ -69,10 +69,10 @@ programSource: |
     $is:
       node:
         type:
-          blueId: HotelOrderType
+          blueId: HWdLVeUryPB57JejjKSeNUQ7Un2FmVwZn6pTaGRitRKk
         status: confirmed
       pattern:
-        blueId: HotelOrderType
+        blueId: HWdLVeUryPB57JejjKSeNUQ7Un2FmVwZn6pTaGRitRKk
 expectation:
   outcome: success
   resultSimple: true

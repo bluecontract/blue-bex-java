@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-reduce
+vectors:
+- BEX-E-11
+category: operator
+description: Direct executable coverage for `$reduce`.
+program:
+  expr:
+    $reduce:
+      in:
+      - 1
+      - 2
+      - 3
+      acc: sum
+      init: 0
+      item: x
+      expr:
+        $add:
+        - $var: sum
+        - $var: x
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: 6
+  assertions: []

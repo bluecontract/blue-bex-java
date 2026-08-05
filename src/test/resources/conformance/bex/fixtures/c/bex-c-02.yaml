@@ -1,0 +1,20 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-02
+vectors:
+- BEX-C-02
+category: c
+description: Unknown expression and statement operators fail compilation.
+program:
+  expr:
+    $unknown: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: compile-error

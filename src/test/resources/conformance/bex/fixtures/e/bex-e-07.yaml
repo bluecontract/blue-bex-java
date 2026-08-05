@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-07
+vectors:
+- BEX-E-07
+category: e
+description: '`$and`, `$or`, `$coalesce`, `$choose`, `$if`, and collection search short-circuit.'
+program:
+  expr:
+    $or:
+    - true
+    - $fail: 'no'
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.skippedOperandCharges
+    op: equals
+    expected: 0
+  result: true

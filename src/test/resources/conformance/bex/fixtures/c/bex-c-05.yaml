@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-05
+vectors:
+- BEX-C-05
+category: c
+description: Reserved names in plain name containers fail.
+program:
+  functions:
+    f:
+      args:
+        type: {}
+      expr: 1
+  entry: f
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: compile-error

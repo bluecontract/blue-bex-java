@@ -9,10 +9,10 @@ import blue.bex.result.BexPatchEntry;
 import blue.bex.result.BexMetrics;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
-import blue.language.utils.JsonPointer;
+import blue.language.model.wire.JsonPointer;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -32,9 +32,9 @@ class ExternalCustomerPayNoteBexFunctionTest {
 
     @Test
     void executesSnapshotResolvedFunctionFromFixtureWithAttachedEvent() throws IOException {
-        Blue blue = new Blue();
-        Node programDocument = blue.yamlToNode(readResource(BEX_FIXTURE));
-        Node eventEnvelope = blue.yamlToNode(readResource(EVENT_FIXTURE));
+        TestBlue blue = new TestBlue();
+        Node programDocument = blue.yamlToBexSource(readResource(BEX_FIXTURE));
+        Node eventEnvelope = blue.parseSourceYaml(readResource(EVENT_FIXTURE));
 
         Node programNode = requiredNode(programDocument, "/contracts/processPackageCustomerPayNoteSnapshotResolved/steps/0");
         Node definitionNode = requiredNode(programDocument, "/contracts/packageFulfillmentBexDefinition");

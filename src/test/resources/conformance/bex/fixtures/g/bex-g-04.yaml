@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-04
+vectors:
+- BEX-G-04
+category: g
+description: Pointer reads/writes charge exact segment and member/item work.
+program:
+  expr:
+    $pointerSet:
+      object: {}
+      path: /a/b
+      val: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.pointerSegmentWritten
+    op: equals
+    expected: 2

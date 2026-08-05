@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-03
+vectors:
+- BEX-H-03
+category: h
+description: Computed Blue language fields retain their reserved meaning.
+program:
+  expr:
+    type:
+      blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+    value: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: output.type.blueId
+    op: equals
+    expected: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq

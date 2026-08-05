@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-failif
+vectors:
+- BEX-S-06
+category: operator
+description: Direct executable coverage for `$failIf`.
+program:
+  do:
+  - $failIf:
+      cond: true
+      message: expected
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  errorClass: runtime-error
+  reason: expected
+  assertions: []

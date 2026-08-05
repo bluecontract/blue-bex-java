@@ -1,0 +1,19 @@
+schema: blue-bex-fixture/2.0
+id: gas-stepsRead
+vectors:
+- BEX-G-01
+category: gas
+program:
+  expr: 0
+context:
+  directCounterFixture:
+    counter: stepsRead
+    quantity: 3
+expected:
+  gasTrace:
+  - sequence: 0
+    counter: stepsRead
+    quantity: 3
+    weight: 1
+    gas: 3
+  totalGas: 3

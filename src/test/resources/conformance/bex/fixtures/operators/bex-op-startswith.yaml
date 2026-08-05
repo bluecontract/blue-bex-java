@@ -1,0 +1,22 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-startswith
+vectors:
+- BEX-E-08
+category: operator
+description: Direct executable coverage for `$startsWith`.
+program:
+  expr:
+    $startsWith:
+    - prefix-value
+    - prefix-
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: true
+  assertions: []

@@ -1,8 +1,8 @@
 fixtureId: GAS-121
-title: Custom functionCall schedule applies
+title: Custom functionCalled schedule applies
 tags: [gas]
 gasSchedule:
-  functionCall: 10
+  functionCalled: 10
 programSource: |
   type: Blue/BEX Program
   expr: 1

@@ -1,298 +1,228 @@
-# BEX Gas Model
+# BEX 2.0 Gas Model
 
-BEX gas is deterministic execution accounting. It is intended to make one
-implementation's runtime behavior portable enough for conformance tests, not to
-model every CPU or memory cost.
+BEX 2.0 meters deterministic logical work. It does not meter serialized bytes,
+recursive value size, cache state, or physical Blue representation.
 
-Compilation does not consume gas. Every execution starts at `0`. Each runtime
-charge adds to the total. If `gasLimit >= 0` and the total becomes greater than
-the limit, execution throws:
+The normative sources are:
 
 ```text
-BEX gas exhausted at <used> gas units
+specifications/blue-bex-specification-2.0.md
+src/test/resources/conformance/bex/gas-manifest.yaml
 ```
 
-## Default Schedule
+The schedule identifier is `blue-bex/gas/2.0`. The implementation-baseline
+manifest identity is:
 
-| Field | Default |
+```text
+sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
+```
+
+## Closed Counter Vocabulary
+
+The portable BEX child ledger contains exactly these 30 counters:
+
+| Counter | Weight | Logical work |
+| --- | ---: | --- |
+| `expressionEvaluated` | 1 | One executed expression. |
+| `statementExecuted` | 1 | One executed statement. |
+| `functionCalled` | 2 | The root invocation or one user-function invocation. |
+| `intrinsicCalled` | 5 | One registry-bound intrinsic invocation. |
+| `documentRead` | 2 | One document read operation. |
+| `eventRead` | 1 | One event read operation. |
+| `processingEventRead` | 1 | One processing-event read operation. |
+| `currentContractRead` | 1 | One current-contract read operation. |
+| `stepsRead` | 1 | One steps read operation. |
+| `bindingRead` | 1 | One host-binding read operation. |
+| `variableRead` | 1 | One local-variable read operation. |
+| `constantRead` | 1 | One program-constant read operation. |
+| `resultValueRead` | 2 | One accumulated-result-overlay read. |
+| `pointerSegmentRead` | 1 | One examined pointer segment. |
+| `pointerSegmentWritten` | 1 | One traversed or created write segment. |
+| `objectMemberRead` | 1 | One direct object-member read. |
+| `listItemRead` | 1 | One direct list-position read. |
+| `collectionItemVisited` | 1 | One input item evaluated by collection work. |
+| `collectionItemProduced` | 1 | One result item produced by collection work. |
+| `textBlockExamined` | 1 | One examined block of up to 64 Unicode code points. |
+| `textBlockConstructed` | 1 | One constructed block of up to 64 Unicode code points. |
+| `integerLimbOperation` | 1 | One canonical base-`2^32` limb-work unit. |
+| `comparisonNodeVisited` | 1 | One semantic node occurrence compared or matched. |
+| `sortComparison` | 1 | One canonical stable-merge-sort comparator call. |
+| `patchAppended` | 5 | One validated patch appended. |
+| `eventAppended` | 5 | One non-undefined event appended. |
+| `transientObjectMemberProduced` | 1 | One retained transient object member. |
+| `transientListItemProduced` | 1 | One transient list item. |
+| `blueOutputBoundary` | 5 | One value admitted at a Blue output boundary. |
+| `nodeIdentityRequested` | 5 | One explicit `$nodeBlueId` request. |
+
+`BexGasCounter` is the closed Java vocabulary. `BexGasSchedule` exposes the
+manifest weights and supports deterministic overrides by these same names.
+
+## Live Parent-Bounded Ledger
+
+Before execution, the host supplies a child ledger bounded by its exact
+remaining budget. Every charge is admitted before the associated work. A
+charge that would exceed the effective budget is absent from the trace and the
+work does not begin.
+
+A BEX-local `gasLimit` may only lower the available parent budget:
+
+```text
+effectiveBudget = min(parentRemainingGas, localGasLimit)
+```
+
+The child ledger is merged into the parent exactly once and in trace order.
+Already admitted charges remain observable on deterministic failure. Buffered
+patches, events, and output are discarded when execution fails or exhausts gas.
+Transient provider unavailability suspends outside completed execution and
+does not commit a child ledger.
+
+Portable evidence is the ordered named trace. `gasUsed()` and `totalGas()` are
+convenience projections derived from that trace; no API accepts an opaque
+aggregate gas integer as portable evidence.
+
+## Evaluation and Lazy Work
+
+Every executed expression charges `expressionEvaluated`. Every executed
+statement charges `statementExecuted`. The root program and each called user
+function charge `functionCalled`.
+
+Skipped work charges nothing. This includes:
+
+- unselected branches;
+- operands skipped by lazy boolean/coalescing operators;
+- collection items after a short circuit;
+- `val` for a `remove` patch;
+- unused lazy expressions.
+
+A statically compiled constant is not reconstructed on each read. Its read
+still charges `constantRead`, in addition to the expression charge.
+
+## Reads and Pointers
+
+Context reads charge their corresponding named read counter. Each examined
+pointer segment charges `pointerSegmentRead`, and the semantic member or
+position examined also charges `objectMemberRead` or `listItemRead`.
+
+`$pointerSet` charges `pointerSegmentWritten` for every traversed or created
+segment. It charges transient production only for structure it actually
+creates. The assigned value is never recursively sized, cloned, or rehashed.
+
+BEX owns the access it requests. The same logical member read is not charged
+again as Contracts semantic work; Blue validation and identity establishment
+remain host semantic work.
+
+## Text and Numeric Work
+
+Text work uses Unicode code points, not UTF-16 code units. A block contains up
+to 64 code points:
+
+```text
+fullScan(t) = ceil(codePointLength(t) / 64)
+construction(t) = ceil(constructedCodePointLength(t) / 64)
+```
+
+Comparisons charge only the blocks actually read through the first difference
+or the end of the shorter operand.
+
+Integer work uses an unsigned base-`2^32` magnitude with a separate sign. Let
+`L(x)` be at least one and otherwise the magnitude limb count:
+
+| Operation | `integerLimbOperation` quantity |
 | --- | ---: |
-| `expressionBase` | 1 |
-| `statementBase` | 1 |
-| `documentRead` | 2 |
-| `eventRead` | 1 |
-| `stepsRead` | 1 |
-| `currentContractRead` | 1 |
-| `varRead` | 1 |
-| `resultValueRead` | 2 |
-| `pointerGetBase` | 1 |
-| `pointerSetBase` | 3 |
-| `objectSetBase` | 2 |
-| `appendChangeBase` | 5 |
-| `appendEventBase` | 5 |
-| `forEachItem` | 1 |
-| `functionCall` | 2 |
+| equality or ordering | `L(a) + L(b)` |
+| addition or subtraction | `max(L(a), L(b)) + 1` |
+| multiplication | `L(a) * L(b)` |
+| division or remainder | `L(a) * L(b)` |
 
-Every function invocation charges `functionCall`. This includes the root program
-function, so a trivial root expression costs at least `2 + expressionBase`.
+Exact decimal operations use the same formula over unscaled Integer magnitudes
+and add one operation for scale alignment.
 
-Every evaluated expression charges `expressionBase`. Every executed statement
-charges `statementBase`. Source-path wrappers and other diagnostics wrappers do
-not charge gas.
+## Collections, Equality, and Sorting
 
-## Reads
+Collection operators charge `collectionItemVisited` once per evaluated input
+item. Output-producing operators additionally charge
+`collectionItemProduced` once per produced item. Constructing a new object or
+list charges the corresponding transient production counter. A single logical
+iteration is not double-counted.
 
-Read operators charge their read cost in addition to `expressionBase`:
+Deep equality and pattern matching charge `comparisonNodeVisited` once per
+semantic node occurrence. Known exact Node BlueIds may conclude equality after
+one visited comparison node. Text and numeric content add their corresponding
+block or limb work.
 
-| Operator | Cost |
-| --- | --- |
-| `$document` | `expressionBase + documentRead` |
-| `$event` | `expressionBase + eventRead` |
-| `$currentContract` | `expressionBase + currentContractRead` |
-| `$steps` | `expressionBase + stepsRead` |
-| `$binding` | `expressionBase + varRead` |
-| `$var` | `expressionBase + varRead` |
-| `$resultValue` | `expressionBase + resultValueRead` |
+Sorting uses the canonical trace of a stable bottom-up merge sort: initial run
+width one, left-to-right merges, doubled width after each pass, and left
+selection on equality. Every comparator call charges `sortComparison`,
+`comparisonNodeVisited`, and any scalar-content work.
 
-Canonical and resolved document reads currently cost the same.
+## Patches, Events, Output, and Identity
 
-Path-aware `$var` and `$const` object forms do not add a separate read charge
-for static paths. If the `path` operand is dynamic, the path expression consumes
-its normal expression gas before the value-local pointer read.
+`$appendChange` charges `patchAppended` once after validation and required
+operand evaluation. `$appendChanges` applies the same rule per entry.
+`$appendEvent` charges `eventAppended` once after evaluating a non-undefined
+event, and `$appendEvents` applies it per event.
 
-`$kind` and `$isKind` charge their normal expression tree costs only:
+Every value crossing a Blue boundary charges `blueOutputBoundary` once.
+Existing exact nodes retain their exact identity and incur no recursive
+construction or size charge. Transient values pay the logical construction,
+validation, and host identity work they actually require.
 
-```text
-$kind = expressionBase + gas for value expression
-$isKind = expressionBase + gas for val expression
-```
+`$nodeBlueId` charges `nodeIdentityRequested`. For a transient operand it also
+crosses the Blue boundary and performs Contracts semantic identity
+establishment. That identity work is merged once.
 
-`$isKind.kind` is static authored data and does not consume expression gas.
+There is deliberately no `estimatedSize` counter or replacement based on
+serialized payload bytes. Passing a large exact value through a variable,
+function, patch, event, or output does not scan it. Content is charged only
+when it is inspected, compared, constructed, iterated, sorted, validated, or
+identified.
 
-## Pointer And Object Updates
+## Intrinsics
 
-`$pointerGet` charges:
+`$intrinsic` charges `intrinsicCalled` plus normal payload-expression work.
+Each intrinsic registration binds:
 
-```text
-expressionBase
-+ gas for object expression
-+ pointerGetBase
-+ numberOfPathSegments
-+ gas for default expression only if default is used
-```
+- an exact intrinsic registry identity;
+- a disjoint namespace;
+- a closed name-to-weight map;
+- its deterministic processor.
 
-`$pointerSet` charges:
+The processor calls `BexIntrinsicInvocation.charge(counter, quantity, reason)`.
+Unknown counter names fail. An intrinsic cannot return arbitrary aggregate gas
+or hide unnamed portable work.
 
-```text
-expressionBase
-+ gas for val expression, unless op is remove
-+ gas for object expression
-+ pointerSetBase
-+ numberOfPathSegments
-+ estimatedSize(val)
-```
+Hosted execution opens each statically required intrinsic namespace as its own
+runtime-session child. Intrinsic counters are never flattened into `bex`, and
+`/` is reserved as the physical namespace separator.
 
-For `remove`, `val` is not evaluated and `estimatedSize(undefined) = 0`.
+## Trace and Conformance
 
-`$objectSet` charges:
+Each admitted `BexGasCharge` records:
 
 ```text
-expressionBase
-+ gas for val expression
-+ objectSetBase
-+ estimatedSize(val)
-+ gas for object expression
+sequence
+namespace
+counter
+quantity
+weight
+gas
+sourcePath?
+operator?
+reason
 ```
 
-Static keys and paths do not consume expression gas. Dynamic keys and paths do,
-because their expressions are evaluated.
+Sequence starts at zero, and `gas` is exactly `quantity * weight`. The ledger
+total is the sum of the ordered trace.
 
-## Append And Output
-
-`$appendChange` charges:
+The exact counter microfixtures live in:
 
 ```text
-statementBase
-+ gas for val expression if op is add or replace
-+ appendChangeBase
-+ estimatedSize(val)
+src/test/resources/conformance/bex/fixtures/gas-micro/
 ```
 
-For `remove`, `val` is not evaluated and size is `0`.
-
-`$appendChanges` charges:
+Run the complete BEX 2.0 fixture, integrity, and report workflow with:
 
 ```text
-statementBase
-+ gas for list expression
-+ for each patch: appendChangeBase + estimatedSize(val)
-```
-
-`$appendEvent` charges:
-
-```text
-statementBase
-+ gas for event expression
-+ appendEventBase
-+ estimatedSize(event)
-```
-
-`$appendEvents` charges:
-
-```text
-statementBase
-+ gas for list expression
-+ for each event: appendEventBase + estimatedSize(event)
-```
-
-## Control Flow
-
-`$if` charges `statementBase`, then the condition expression, then only the
-selected branch.
-
-`$forEach` charges `statementBase`, the input expression, `forEachItem` for each
-iterated item, then the body statements for each iteration.
-
-`$returnIf` charges `statementBase`, then the condition expression. Its `expr`
-operand is evaluated only when the condition is truthy.
-
-`$failIf` charges `statementBase`, then the condition expression. Its `message`
-operand is evaluated only when the condition is truthy.
-
-`$let.vars` charges `statementBase`. In unordered form, all binding expressions
-are evaluated before any slot is assigned. In ordered form, each binding
-expression is evaluated and assigned in the explicit order.
-
-Collection query bindings are restored after `$map`, `$filter`, `$flatMap`,
-`$some`, `$find`, `$findEntry`, and `$reduce` finish. Capturing and restoring
-slots is deterministic bookkeeping and does not add gas beyond the expression
-and item charges below.
-
-`$and`, `$or`, `$coalesce`, `$some`, `$find`, `$findEntry`, and `$includes`
-short-circuit. Unevaluated operands or collection items consume no gas.
-
-Collection expressions `$map`, `$filter`, `$flatMap`, `$reduce`, `$some`,
-`$find`, and `$findEntry` charge:
-
-```text
-expressionBase
-+ gas for input expression
-+ forEachItem for each evaluated item
-+ gas for the query/body expression for each evaluated item
-```
-
-`$reduce` also charges the initializer expression once after the input
-expression.
-
-`$objectFromEntries` charges:
-
-```text
-expressionBase
-+ gas for entries expression
-+ forEachItem for each input entry
-```
-
-`$includes` charges:
-
-```text
-expressionBase
-+ gas for list expression
-+ gas for val expression
-+ forEachItem for each compared list item
-```
-
-`$hasKey` charges:
-
-```text
-expressionBase
-+ gas for object expression
-+ gas for key expression only when key is dynamic
-```
-
-`$intrinsic` charges:
-
-```text
-expressionBase
-+ gas for each evaluated payload field expression
-+ gas charged explicitly by the registered intrinsic processor
-```
-
-`$intrinsic.type` is static authored Blue data and does not consume expression
-gas. Unsupported intrinsic BlueIds fail during compilation before execution
-starts. Payload fields that evaluate to `undefined` are omitted after their
-normal expression gas has been charged.
-
-Function calls charge the caller expression or statement normally, then the
-called function invocation charges `functionCall`. Argument expressions are
-charged before entering the callee.
-
-## Size Estimator
-
-`estimatedSize(value)` is:
-
-| Value | Size |
-| --- | ---: |
-| `undefined` | 0 |
-| `null` | 0 |
-| scalar | `max(1, length(value.asText()))` |
-| list | `list.size + sum(estimatedSize(item))` |
-| object | `numberOfKeys + sum(length(key)) + sum(estimatedSize(valueForKey))` |
-
-Examples:
-
-```text
-estimatedSize("x") = 1
-estimatedSize("") = 1
-estimatedSize(null) = 0
-estimatedSize("hello") = 5
-estimatedSize(12345) = 5
-estimatedSize(true) = 4
-estimatedSize(["a", "bb"]) = 2 + 1 + 2 = 5
-estimatedSize({ a: "x", bb: "yy" }) = 2 + 1 + 1 + 2 + 2 = 8
-```
-
-Frozen values may be cached by BlueId and runtime values may be cached by
-identity, but caching does not change gas used. It only affects metrics and
-performance.
-
-## Known Limit
-
-Large values returned by pure expressions are not directly size-charged unless
-they are later appended or inserted through charged output/update operators.
-For example, `$concat`, `$join`, `$split`, `$keys`, `$entries`, `$merge`,
-`$listConcat`, object literals, and list literals pay expression and operand gas
-but not `estimatedSize(result)`.
-
-This is the current specified model: simple execution and output accounting.
-
-## Conformance Fixtures
-
-Exact gas conformance fixtures live under:
-
-```text
-src/test/resources/rich-fixtures/gas/
-```
-
-Success fixtures may assert:
-
-```yaml
-expectation:
-  outcome: success
-  gasUsed: 10
-```
-
-Fixtures may set execution limits:
-
-```yaml
-context:
-  gasLimit: 2
-expectation:
-  outcome: runtime-error
-  errorContains: BEX gas exhausted
-```
-
-Fixtures may override individual schedule fields:
-
-```yaml
-gasSchedule:
-  expressionBase: 10
+./gradlew bexConformanceReport \
+  -PblueLanguageCompositePath=../blue-language-java
 ```

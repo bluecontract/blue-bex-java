@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-02
+vectors:
+- BEX-G-02
+category: g
+description: Charges are admitted before work; the failing charge is absent on exhaustion.
+program:
+  expr:
+    $concat:
+    - a
+    - b
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  gasLimit: 3
+expected:
+  assertions:
+  - actual: gas.failedChargePresent
+    op: equals
+    expected: false
+  errorClass: gas-exhaustion

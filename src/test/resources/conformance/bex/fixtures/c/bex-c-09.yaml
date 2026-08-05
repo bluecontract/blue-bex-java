@@ -1,0 +1,37 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-09
+vectors:
+- BEX-C-09
+category: c
+description: The compiler rejects mutual recursion from the static function-call graph before runtime execution.
+program:
+  functions:
+    f:
+      args: []
+      expr:
+        $call:
+          function: g
+          args: []
+    g:
+      args: []
+      expr:
+        $call:
+          function: f
+          args: []
+  entry: f
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  compileStatus: rejected
+  errorClass: compile-error
+  reason: recursive-call-graph
+  assertions:
+  - actual: runtime.started
+    op: equals
+    expected: false

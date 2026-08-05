@@ -37,11 +37,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
 
-      - name: Execute Gradle build
-        run: ./gradlew clean build
+      - name: Prove full BEX publication readiness
+        env:
+          BLUE_LANGUAGE_REPOSITORY_URL: https://github.com/bluecontract/blue-language-java.git
+        run: bash .github/scripts/run-final-publication-gates.sh
 
       - name: Execute Gradle publish
-        run: ./gradlew publish
+        run: >-
+          ./gradlew publish
+          -PblueLanguageCompositePath="$BLUE_LANGUAGE_COMPOSITE_PATH"
 
       - name: Execute Gradle release
         env:
@@ -51,7 +55,9 @@ jobs:
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
-        run: ./gradlew jreleaserFullRelease
+        run: >-
+          ./gradlew jreleaserFullRelease
+          -PblueLanguageCompositePath="$BLUE_LANGUAGE_COMPOSITE_PATH"
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
@@ -59,6 +65,14 @@ jobs:
         with:
           name: artifacts
           path: |
-            build/libs
-            build/publications
+            build/distributions
+            blue-bex-core/build/libs
+            blue-bex-contracts/build/libs
+            blue-bex-java/build/libs
+            blue-bex-core/build/publications
+            blue-bex-contracts/build/publications
+            blue-bex-java/build/publications
+            build/reports
+            **/build/reports
+            **/build/test-results
             build/jreleaser

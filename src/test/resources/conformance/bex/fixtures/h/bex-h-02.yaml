@@ -1,0 +1,30 @@
+schema: blue-bex-fixture/2.0
+id: bex-h-02
+vectors:
+- BEX-H-02
+category: h
+description: Existing exact nodes cross output by identity; transient aggregates convert deterministically.
+program:
+  expr:
+    $document: /x
+context:
+  rootDocument:
+    x:
+      blueId: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2:
+      a: 1
+expected:
+  assertions:
+  - actual: output.nodeBlueId
+    op: equals
+    expected: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+  - actual: output.reconstructed
+    op: equals
+    expected: false

@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-08
+vectors:
+- BEX-C-08
+category: c
+description: Compiler diagnostics include class, source path, and operator when known.
+program:
+  expr:
+    $unknown: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: diagnostic.errorClass
+    op: equals
+    expected: compile-error
+  - actual: diagnostic.sourcePath
+    op: present
+  - actual: diagnostic.operator
+    op: equals
+    expected: $unknown

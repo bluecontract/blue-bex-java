@@ -1,0 +1,30 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-05
+vectors:
+- BEX-E-05
+category: e
+description: '`$exists` is false only for semantic `undefined`; incomplete access is not absence.'
+program:
+  expr:
+    missing:
+      $exists:
+        $document: /missing
+    'null':
+      $exists:
+        $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    missing: false
+    'null': true
+  additionalCase:
+    providerUnavailableAt: /x
+    mustNotReturn: false

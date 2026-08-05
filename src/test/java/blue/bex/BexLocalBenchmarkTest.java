@@ -1,14 +1,14 @@
 package blue.bex;
 
 import blue.bex.result.BexExecutionResult;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 
 import static blue.bex.test.BexTestFixtures.*;
 
-@Disabled("local benchmark; prints counters and avoids CI timing thresholds")
+/**
+ * Compile-only local benchmark corpus. The release benchmark gate compiles
+ * this class under Java 8 but deliberately does not execute timing.
+ */
 class BexLocalBenchmarkTest {
-    @Test
     void largeStaticLiteralAndDocumentReads() {
         long startCompileAndExecute = System.nanoTime();
         BexExecutionResult result = runStep(stepExpr(obj(

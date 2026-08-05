@@ -1,0 +1,28 @@
+schema: blue-bex-fixture/2.0
+id: bex-c-04
+vectors:
+- BEX-C-04
+category: c
+description: Unknown constants/functions, missing/extra arguments, recursive calls, and entry functions with arguments fail.
+program:
+  entry: f
+  functions:
+    f:
+      args:
+        x: {}
+      expr:
+        $call:
+          function: f
+          args:
+            x: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: compile-error

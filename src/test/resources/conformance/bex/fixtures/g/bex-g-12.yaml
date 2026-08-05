@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-12
+vectors:
+- BEX-G-12
+category: g
+description: The BEX child ledger is live-bounded and merged into Contracts exactly once.
+program:
+  expr: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: host.runtimeChildMergeCount
+    op: equals
+    expected: 1
+  - actual: host.liveBounded
+    op: equals
+    expected: true

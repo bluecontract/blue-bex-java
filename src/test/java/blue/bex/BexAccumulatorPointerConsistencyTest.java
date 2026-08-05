@@ -5,6 +5,7 @@ import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexProgramSource;
 import blue.bex.api.BexStepResults;
 import blue.bex.api.FrozenBexDocumentView;
+import blue.bex.gas.BexGasCounter;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
@@ -69,8 +70,7 @@ class BexAccumulatorPointerConsistencyTest {
 
         BexExecutionResult result = runStep(stepDo(list(
                 op("$appendChange", obj("op", "replace", "path", "status", "val", "done")),
-                op("$appendChanges", list(obj("op", "replace", "path", "status", "val", "batch"))),
-                emptyStatement()
+                op("$appendChanges", list(obj("op", "replace", "path", "status", "val", "batch")))
         )), context);
 
         assertEquals("/contracts/current/status", result.changeset().entries().get(0).absolutePath());
@@ -114,8 +114,7 @@ class BexAccumulatorPointerConsistencyTest {
                         "op", "replace",
                         "path", op("$pointerJoin", list("orders", op("$var", "id"), "status")),
                         "val", "confirmed"
-                )),
-                emptyStatement()
+                ))
         )), defaultContext());
 
         assertEquals("/orders/abc~1def~0ghi/status", result.changeset().entries().get(0).absolutePath());
@@ -143,12 +142,10 @@ class BexAccumulatorPointerConsistencyTest {
     @Test
     void removePatchesDoNotRequireValuesAndSingleRemoveDoesNotEvaluateVal() {
         BexExecutionResult single = runStep(stepDo(list(
-                op("$appendChange", obj("op", "remove", "path", "/x", "val", op("$divide", list(1, 0)))),
-                emptyStatement()
+                op("$appendChange", obj("op", "remove", "path", "/x", "val", op("$divide", list(1, 0))))
         )), defaultContext());
         BexExecutionResult batch = runStep(stepDo(list(
-                op("$appendChanges", list(obj("op", "remove", "path", "/x"))),
-                emptyStatement()
+                op("$appendChanges", list(obj("op", "remove", "path", "/x")))
         )), defaultContext());
 
         assertEquals("remove", single.changeset().entries().get(0).op());
@@ -169,37 +166,36 @@ class BexAccumulatorPointerConsistencyTest {
         )), defaultContext()));
 
         BexExecutionResult result = runStep(stepDo(list(
-                op("$appendEvents", list(obj("kind", "A"), obj("kind", "B"))),
-                emptyStatement()
+                op("$appendEvents", list(obj("kind", "A"), obj("kind", "B")))
         )), defaultContext());
 
         assertEquals(l(m("kind", "A"), m("kind", "B")), simple(result.events().asValue()));
     }
 
     @Test
-    void appendOutputGasScalesWithValueSizeAndEntryCount() {
-        long smallEventGas = runStep(stepDo(list(
-                op("$appendEvents", list(obj("kind", "A"))),
-                emptyStatement()
-        )), defaultContext()).gasUsed();
-        long largeEventGas = runStep(stepDo(list(
-                op("$appendEvents", list(largeObject(150))),
-                emptyStatement()
-        )), defaultContext()).gasUsed();
-        long onePatchGas = runStep(stepDo(list(
-                op("$appendChanges", list(obj("op", "replace", "path", "/a", "val", "x"))),
-                emptyStatement()
-        )), defaultContext()).gasUsed();
-        long twoPatchGas = runStep(stepDo(list(
+    void appendOutputGasUsesPortablePerEntryCounters() {
+        BexExecutionResult oneEvent = runStep(stepDo(list(
+                op("$appendEvents", list(obj("kind", "A")))
+        )), defaultContext());
+        BexExecutionResult twoEvents = runStep(stepDo(list(
+                op("$appendEvents", list(obj("kind", "A"), obj("kind", "B")))
+        )), defaultContext());
+        BexExecutionResult onePatch = runStep(stepDo(list(
+                op("$appendChanges", list(obj("op", "replace", "path", "/a", "val", "x")))
+        )), defaultContext());
+        BexExecutionResult twoPatches = runStep(stepDo(list(
                 op("$appendChanges", list(
                         obj("op", "replace", "path", "/a", "val", "x"),
                         obj("op", "replace", "path", "/b", "val", "x")
-                )),
-                emptyStatement()
-        )), defaultContext()).gasUsed();
+                ))
+        )), defaultContext());
 
-        assertTrue(largeEventGas > smallEventGas);
-        assertTrue(twoPatchGas > onePatchGas);
+        assertEquals(1L, oneEvent.gasLedger().quantity(BexGasCounter.EVENT_APPENDED));
+        assertEquals(2L, twoEvents.gasLedger().quantity(BexGasCounter.EVENT_APPENDED));
+        assertEquals(1L, onePatch.gasLedger().quantity(BexGasCounter.PATCH_APPENDED));
+        assertEquals(2L, twoPatches.gasLedger().quantity(BexGasCounter.PATCH_APPENDED));
+        assertTrue(twoEvents.gasUsed() > oneEvent.gasUsed());
+        assertTrue(twoPatches.gasUsed() > onePatch.gasUsed());
     }
 
     private static void compile(Node step) {

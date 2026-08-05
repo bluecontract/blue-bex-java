@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-08
+vectors:
+- BEX-G-08
+category: g
+description: Equality/matching charges comparison nodes and examined scalar work.
+program:
+  expr:
+    $eq:
+    - a: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    - a: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.comparisonNodeVisited
+    op: greaterThan
+    expected: 0
+  - actual: gas.textBlockExamined
+    op: greaterThan
+    expected: 0

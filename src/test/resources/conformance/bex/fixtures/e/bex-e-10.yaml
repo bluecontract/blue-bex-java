@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-10
+vectors:
+- BEX-E-10
+category: e
+description: '`$kind` and `$isKind` report semantic kinds, never reference/cursor classes.'
+program:
+  expr:
+    $kind:
+      $document: /x
+context:
+  rootDocument:
+    x:
+      blueId: BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+  provider:
+    BUCEaEysDw5JAAm62NMYi5bdKZK4JnEcJzZbXxkN3Dw2:
+      a: 1
+expected:
+  assertions: []
+  result: object
+  variants:
+  - name: reference
+    rootForm: reference
+  - name: materialized
+    rootForm: materialized

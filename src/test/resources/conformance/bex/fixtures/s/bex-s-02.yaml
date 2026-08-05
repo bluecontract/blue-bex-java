@@ -1,0 +1,26 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-02
+vectors:
+- BEX-S-02
+category: s
+description: '`$appendChange(s)` validates operations, requires `val` for add/replace, and does not evaluate remove `val`.'
+program:
+  do:
+  - $appendChange:
+      op: remove
+      path: /x
+      val:
+        $fail: must-not-evaluate
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  changes:
+  - op: remove
+    path: /x

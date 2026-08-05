@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-e-12
+vectors:
+- BEX-E-12
+category: e
+description: '`$objectSet`/`$pointerSet` use value-local semantics and create only permitted transient intermediates.'
+program:
+  expr:
+    $pointerSet:
+      object: {}
+      path: /a/b
+      val: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result:
+    a:
+      b: 1

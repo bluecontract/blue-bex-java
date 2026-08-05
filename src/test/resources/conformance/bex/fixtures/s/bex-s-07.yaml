@@ -1,0 +1,35 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-07
+vectors:
+- BEX-S-07
+category: s
+description: Parallel and ordered `$let` semantics are distinct and deterministic.
+program:
+  do:
+  - $let:
+      vars:
+        a: 1
+        b:
+          $var: a
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  errorClass: runtime-error
+  additionalCase:
+    ordered:
+      $let:
+        order:
+        - a
+        - b
+        vars:
+          a: 1
+          b:
+            $var: a
+    result: 1

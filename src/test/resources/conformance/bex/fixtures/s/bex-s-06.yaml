@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-s-06
+vectors:
+- BEX-S-06
+category: s
+description: '`$return`, `$returnIf`, `$fail`, and `$failIf` have deterministic lazy exit behavior.'
+program:
+  do:
+  - $returnIf:
+      cond: true
+      expr: 1
+  - $fail: must-not-run
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions: []
+  result: 1

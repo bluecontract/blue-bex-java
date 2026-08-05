@@ -1,0 +1,331 @@
+schema: blue-bex-operator-coverage/2.0
+operatorCount: 86
+operators:
+- operator: $add
+  fixtures:
+  - operators/bex-op-add.yaml
+  - operators/bex-op-reduce.yaml
+- operator: $and
+  fixtures:
+  - operators/bex-op-and.yaml
+- operator: $appendChange
+  fixtures:
+  - h/bex-h-04.yaml
+  - operators/bex-op-changeset.yaml
+  - s/bex-s-02.yaml
+  - s/bex-s-03.yaml
+  - s/bex-s-05.yaml
+- operator: $appendChanges
+  fixtures:
+  - operators/bex-op-appendchanges.yaml
+- operator: $appendEvent
+  fixtures:
+  - g/bex-g-10.yaml
+  - operators/bex-op-events.yaml
+  - r/bex-r-06.yaml
+  - s/bex-s-01.yaml
+  - s/bex-s-04.yaml
+- operator: $appendEvents
+  fixtures:
+  - operators/bex-op-appendevents.yaml
+- operator: $binding
+  fixtures:
+  - e/bex-e-02.yaml
+- operator: $boolean
+  fixtures:
+  - operators/bex-op-boolean.yaml
+- operator: $call
+  fixtures:
+  - c/bex-c-04.yaml
+- operator: $changeset
+  fixtures:
+  - operators/bex-op-changeset.yaml
+- operator: $choose
+  fixtures:
+  - operators/bex-op-choose.yaml
+- operator: $coalesce
+  fixtures:
+  - operators/bex-op-coalesce.yaml
+- operator: $concat
+  fixtures:
+  - g/bex-g-02.yaml
+  - g/bex-g-05.yaml
+  - r/bex-r-07.yaml
+- operator: $const
+  fixtures:
+  - c/bex-c-06.yaml
+  - e/bex-e-02.yaml
+- operator: $currentContract
+  fixtures:
+  - e/bex-e-02.yaml
+- operator: $default
+  fixtures:
+  - operators/bex-op-default.yaml
+- operator: $divide
+  fixtures:
+  - e/bex-e-08.yaml
+- operator: $document
+  fixtures:
+  - e/bex-e-01.yaml
+  - e/bex-e-05.yaml
+  - e/bex-e-10.yaml
+  - g/bex-g-11.yaml
+  - h/bex-h-01.yaml
+  - h/bex-h-02.yaml
+  - h/bex-h-05.yaml
+  - operators/bex-op-coalesce.yaml
+  - operators/bex-op-default.yaml
+  - r/bex-r-01.yaml
+  - r/bex-r-02.yaml
+  - r/bex-r-03.yaml
+  - r/bex-r-04.yaml
+  - r/bex-r-06.yaml
+  - r/bex-r-08.yaml
+- operator: $empty
+  fixtures:
+  - operators/bex-op-empty.yaml
+- operator: $emptyList
+  fixtures:
+  - operators/bex-op-emptylist.yaml
+- operator: $emptyObject
+  fixtures:
+  - operators/bex-op-emptyobject.yaml
+- operator: $entries
+  fixtures:
+  - operators/bex-op-entries.yaml
+- operator: $eq
+  fixtures:
+  - e/bex-e-14.yaml
+  - g/bex-g-08.yaml
+- operator: $event
+  fixtures:
+  - e/bex-e-02.yaml
+  - h/bex-h-06.yaml
+- operator: $events
+  fixtures:
+  - operators/bex-op-events.yaml
+- operator: $exists
+  fixtures:
+  - e/bex-e-05.yaml
+  - r/bex-r-02.yaml
+  - r/bex-r-03.yaml
+- operator: $fail
+  fixtures:
+  - e/bex-e-07.yaml
+  - g/bex-g-03.yaml
+  - operators/bex-op-and.yaml
+  - operators/bex-op-choose.yaml
+  - operators/bex-op-coalesce.yaml
+  - s/bex-s-02.yaml
+  - s/bex-s-06.yaml
+- operator: $failIf
+  fixtures:
+  - operators/bex-op-failif.yaml
+- operator: $filter
+  fixtures:
+  - operators/bex-op-filter.yaml
+- operator: $find
+  fixtures:
+  - operators/bex-op-find.yaml
+- operator: $findEntry
+  fixtures:
+  - operators/bex-op-findentry.yaml
+- operator: $flatMap
+  fixtures:
+  - operators/bex-op-flatmap.yaml
+- operator: $forEach
+  fixtures:
+  - s/bex-s-01.yaml
+- operator: $get
+  fixtures:
+  - operators/bex-op-get.yaml
+- operator: $gt
+  fixtures:
+  - operators/bex-op-filter.yaml
+  - operators/bex-op-find.yaml
+  - operators/bex-op-findentry.yaml
+  - operators/bex-op-gt.yaml
+  - operators/bex-op-some.yaml
+- operator: $gte
+  fixtures:
+  - operators/bex-op-gte.yaml
+- operator: $hasKey
+  fixtures:
+  - operators/bex-op-haskey.yaml
+- operator: $if
+  fixtures:
+  - s/bex-s-01.yaml
+- operator: $includes
+  fixtures:
+  - operators/bex-op-includes.yaml
+- operator: $integer
+  fixtures:
+  - e/bex-e-08.yaml
+- operator: $intrinsic
+  fixtures:
+  - g/bex-g-09.yaml
+  - g/bex-g-14.yaml
+- operator: $is
+  fixtures:
+  - c/bex-c-06.yaml
+- operator: $isEmpty
+  fixtures:
+  - operators/bex-op-isempty.yaml
+- operator: $isKind
+  fixtures:
+  - operators/bex-op-iskind.yaml
+- operator: $join
+  fixtures:
+  - operators/bex-op-join.yaml
+- operator: $keys
+  fixtures:
+  - e/bex-e-09.yaml
+  - r/bex-r-02.yaml
+- operator: $kind
+  fixtures:
+  - e/bex-e-10.yaml
+  - r/bex-r-02.yaml
+- operator: $let
+  fixtures:
+  - e/bex-e-02.yaml
+  - e/bex-e-13.yaml
+  - s/bex-s-07.yaml
+- operator: $list
+  fixtures:
+  - operators/bex-op-list.yaml
+- operator: $listConcat
+  fixtures:
+  - operators/bex-op-listconcat.yaml
+- operator: $listGet
+  fixtures:
+  - operators/bex-op-listget.yaml
+- operator: $literal
+  fixtures:
+  - c/bex-c-03.yaml
+- operator: $lt
+  fixtures:
+  - operators/bex-op-lt.yaml
+- operator: $lte
+  fixtures:
+  - operators/bex-op-lte.yaml
+- operator: $map
+  fixtures:
+  - e/bex-e-11.yaml
+  - g/bex-g-07.yaml
+- operator: $merge
+  fixtures:
+  - operators/bex-op-merge.yaml
+- operator: $multiply
+  fixtures:
+  - g/bex-g-06.yaml
+- operator: $ne
+  fixtures:
+  - operators/bex-op-ne.yaml
+- operator: $nodeBlueId
+  fixtures:
+  - e/bex-e-14.yaml
+  - r/bex-r-04.yaml
+  - r/bex-r-05.yaml
+- operator: $not
+  fixtures:
+  - operators/bex-op-not.yaml
+- operator: $null
+  fixtures:
+  - e/bex-e-03.yaml
+  - e/bex-e-05.yaml
+  - e/bex-e-06.yaml
+- operator: $number
+  fixtures:
+  - h/bex-h-05.yaml
+- operator: $object
+  fixtures:
+  - operators/bex-op-object.yaml
+- operator: $objectFromEntries
+  fixtures:
+  - operators/bex-op-objectfromentries.yaml
+- operator: $objectSet
+  fixtures:
+  - operators/bex-op-objectset.yaml
+- operator: $or
+  fixtures:
+  - e/bex-e-07.yaml
+  - g/bex-g-03.yaml
+- operator: $pointerGet
+  fixtures:
+  - e/bex-e-03.yaml
+- operator: $pointerJoin
+  fixtures:
+  - e/bex-e-04.yaml
+- operator: $pointerSet
+  fixtures:
+  - e/bex-e-12.yaml
+  - g/bex-g-04.yaml
+- operator: $processingEvent
+  fixtures:
+  - e/bex-e-02.yaml
+  - h/bex-h-06.yaml
+- operator: $reduce
+  fixtures:
+  - operators/bex-op-reduce.yaml
+- operator: $resultValue
+  fixtures:
+  - h/bex-h-04.yaml
+  - s/bex-s-05.yaml
+- operator: $return
+  fixtures:
+  - e/bex-e-02.yaml
+  - e/bex-e-13.yaml
+  - h/bex-h-04.yaml
+  - operators/bex-op-changeset.yaml
+  - operators/bex-op-events.yaml
+  - s/bex-s-05.yaml
+- operator: $returnIf
+  fixtures:
+  - s/bex-s-06.yaml
+- operator: $set
+  fixtures:
+  - c/bex-c-07.yaml
+- operator: $size
+  fixtures:
+  - r/bex-r-02.yaml
+- operator: $sliceAfter
+  fixtures:
+  - operators/bex-op-sliceafter.yaml
+- operator: $some
+  fixtures:
+  - operators/bex-op-some.yaml
+- operator: $split
+  fixtures:
+  - operators/bex-op-split.yaml
+- operator: $startsWith
+  fixtures:
+  - operators/bex-op-startswith.yaml
+- operator: $steps
+  fixtures:
+  - e/bex-e-02.yaml
+- operator: $subtract
+  fixtures:
+  - operators/bex-op-subtract.yaml
+- operator: $text
+  fixtures:
+  - e/bex-e-08.yaml
+- operator: $truthy
+  fixtures:
+  - e/bex-e-06.yaml
+- operator: $unwrap
+  fixtures:
+  - operators/bex-op-unwrap.yaml
+- operator: $var
+  fixtures:
+  - e/bex-e-02.yaml
+  - e/bex-e-11.yaml
+  - e/bex-e-13.yaml
+  - g/bex-g-07.yaml
+  - operators/bex-op-filter.yaml
+  - operators/bex-op-find.yaml
+  - operators/bex-op-findentry.yaml
+  - operators/bex-op-flatmap.yaml
+  - operators/bex-op-reduce.yaml
+  - operators/bex-op-some.yaml
+  - s/bex-s-01.yaml
+  - s/bex-s-07.yaml

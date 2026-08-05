@@ -1,0 +1,80 @@
+schema: blue-bex-projection-catalog/2.0
+entries:
+- path: demands
+  definition: Ordered logical semantic demands made by BEX.
+- path: diagnostic.errorClass
+  definition: Portable compile/runtime diagnostic field.
+- path: diagnostic.operator
+  definition: Portable compile/runtime diagnostic field.
+- path: diagnostic.sourcePath
+  definition: Portable compile/runtime diagnostic field.
+- path: effectiveRuntimeBudget
+  definition: Minimum of parent remaining gas and optional BEX-local sub-limit.
+- path: gas.collectionItemProduced
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.collectionItemVisited
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.comparisonNodeVisited
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.estimatedSize
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.exact.recursiveConstruction
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.failedChargePresent
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.integerLimbOperation
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.pointerSegmentWritten
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.recursiveSizeCounter
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.semanticIdentityMergeCount
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.skippedOperandCharges
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.sortComparison
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.textBlockConstructed
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.textBlockExamined
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.totalAdmitted
+  definition: Total gas admitted before the failing charge.
+- path: gas.trace
+  definition: Canonical ordered gas trace prefix available on exhaustion.
+- path: gas.transient.transientObjectMemberProduced
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.utf16Counter
+  definition: Exact quantity of the named BEX or semantic counter.
+- path: gasTrace
+  definition: Canonical ordered BEX child-ledger trace.
+- path: host.liveBounded
+  definition: Generic host-ledger integration invariant.
+- path: host.runtimeChildMergeCount
+  definition: Generic host-ledger integration invariant.
+- path: intrinsic.ledger.namedCounters
+  definition: Registered intrinsic child-ledger conformance projection.
+- path: intrinsic.opaqueGas
+  definition: Registered intrinsic child-ledger conformance projection.
+- path: locals.restored
+  definition: Function or iterator local-frame restoration projection.
+- path: manifest.counterCoverage.complete
+  definition: Bound package-manifest coverage projection.
+- path: output.nodeBlueId
+  definition: Blue output-admission result projection.
+- path: output.reconstructed
+  definition: Blue output-admission result projection.
+- path: output.type.blueId
+  definition: Blue output-admission result projection.
+- path: parentBudgetAfter
+  definition: Parent remaining budget after one exact child-ledger merge.
+- path: result
+  definition: Exact BEX semantic result before or after the declared Blue output boundary, as specified by the fixture.
+- path: result.identityA
+  definition: Closed BEX conformance projection.
+- path: result.semantic
+  definition: Closed BEX conformance projection.
+- path: runtime.bufferedEffectsCommitted
+  definition: Whether buffered BEX changes/events crossed the successful result boundary.
+- path: runtime.started
+  definition: Whether runtime execution began after compilation.

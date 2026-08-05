@@ -1,0 +1,153 @@
+{
+  "schema": "blue-bex-latest-language-baseline/1.0",
+  "captureProvenance": {
+    "status": "reconstructed-from-immutable-git-objects-and-supplied-current-state",
+    "baselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
+    "executionLogRetained": false,
+    "note": "Static source facts and hashes are exact at the baseline commit. The original failing Gradle stdout was not retained and is not represented as a same-run command log."
+  },
+  "verificationEnvironment": {
+    "capturePhase": "post-checkpoint verification host",
+    "java": "OpenJDK 26.0.1+8-34",
+    "gradleWrapper": "9.6.0",
+    "os": "macOS 26.5.2 (Darwin 25.5.0)",
+    "architecture": "arm64",
+    "productionBytecodeTarget": "Java 8 / class major 52"
+  },
+  "bex": {
+    "migrationBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
+    "czTomlSha256": "2dd317fbe362561f0e9827c705ff6260fd6df26c16518e0acce99ecba595a4b1",
+    "workingTreeAtBaseline": "recorded-by-supplied-current-state; exact porcelain bytes unavailable",
+    "projectLayout": [
+      ":"
+    ],
+    "sourceShape": {
+      "productionJavaFiles": 85,
+      "productionJavaLines": 16066,
+      "productionPackages": 10,
+      "publicTopLevelTypes": 61,
+      "publicMethodsApproximate": 583,
+      "testJavaFiles": 49,
+      "testJavaLines": 23652,
+      "testAnnotationOccurrences": 359,
+      "packageSccsLargerThanOne": 1,
+      "packagesInLargestScc": 8,
+      "rootBuildGradleKtsLines": 2233
+    },
+    "largestSources": {
+      "BexCompiler.java": 1628,
+      "BexExpressions.java": 1676,
+      "BexBlueTypeMatcher.java": 967,
+      "BexGasMeter.java": 905,
+      "BexExecutionContext.java": 639,
+      "BexRuntime.java": 511,
+      "README.md": 929
+    },
+    "packageGraph": {
+      "source": "supplied-current-state static analysis",
+      "stronglyConnectedPackages": 8
+    },
+    "publicApiInventory": {
+      "source": "supplied-current-state static analysis",
+      "publicTopLevelTypes": 61,
+      "publicMethodsApproximate": 583
+    }
+  },
+  "knownFailingComposite": {
+    "outcome": "failed-before-migration",
+    "reproducedSourceFact": "blue.language:blue-language-java was substituted with included-build project ':'",
+    "actualAggregateProject": ":blue-language-java",
+    "rootProjectRole": "empty orchestration project",
+    "exactStdoutRetained": false,
+    "reason": "The invalid substitution selected the empty Language root rather than the aggregate library."
+  },
+  "normativePackageAtBaseline": {
+    "runtimeRegistryIdentity": "sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1",
+    "gasManifestIdentity": "sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d",
+    "fixturePackageIdentity": "sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e",
+    "sourceFileSha256": {
+      "specifications/blue-bex-specification-2.0.md": "b25d6d255f84c584ed7a484411430fab50c18142a1bb6c08cfb104acf09d6f69",
+      "src/test/resources/conformance/bex/fixtures/manifest.yaml": "b31e6f483bb8f16a6ce94db5aa99fa3db355b592ef669616ecb64189ea4d7f60",
+      "src/test/resources/conformance/bex/gas-manifest.yaml": "1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d",
+      "src/test/resources/conformance/bex/registry/manifest.yaml": "1e6456aaa848a637107280de9135b4ddbdaa951436810f202be0b1cadd41ccfc",
+      "docs/FIXTURES.md": "1431a489a3fdad58ff3bdd001f8946672376fbd829a70f51943fb81e9ce93ce4"
+    },
+    "retainedTestEvidence": {
+      "tests": 741,
+      "status": "older-Language-only; not accepted as latest-Language evidence"
+    }
+  },
+  "language": {
+    "exactHead": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "verifiedImplementationCommit": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "verifiedReleaseVersion": "3.1.0-rc.20",
+    "localCompositeProjectVersion": "3.1.0-rc.20",
+    "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.20",
+    "publishedCandidateStatus": "passed",
+    "documentationOnlyDiffPaths": [],
+    "czTomlSha256": "32b6457085126ec8b2701840c3a8da6a4c6714509c867ecfb4cace3632cf13f6",
+    "focusedModules": [
+      {
+        "declaredPublishedCoordinate": "blue.language:blue-language-model:3.1.0-rc.20",
+        "projectPath": ":blue-language-model",
+        "localArtifact": "blue-language-model-3.1.0-rc.20.jar",
+        "verifiedLocalArtifactSha256": "ef55be8331147442b858474add4782489d993568effe30202a9c4a8b014d5bd8"
+      },
+      {
+        "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.20",
+        "projectPath": ":blue-language-core",
+        "localArtifact": "blue-language-core-3.1.0-rc.20.jar",
+        "verifiedLocalArtifactSha256": "916d5e6315f34d25ad4a2ddbc5587a209506871ea70dd2daa7aa69dbdbe1263d"
+      },
+      {
+        "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.20",
+        "projectPath": ":blue-language-mapping",
+        "localArtifact": "blue-language-mapping-3.1.0-rc.20.jar",
+        "verifiedLocalArtifactSha256": "d9141d5c611bde7eb6a21bce3dc4bc0df7d8167f013eeaef2a365dd0a6af329b"
+      },
+      {
+        "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.20",
+        "projectPath": ":blue-contracts-core",
+        "localArtifact": "blue-contracts-core-3.1.0-rc.20.jar",
+        "verifiedLocalArtifactSha256": "5845c6bead274dffd8d22afcb323f7cdf6e53b5656e0070bd241a1a660516280"
+      }
+    ],
+    "hostingPackageIdentities": {
+      "languageRegistry": "sha256:b705171a6ca62c990792bcb78db9d921caf5b0ed06370648b9a81769d69dd71e",
+      "contractsRegistry": "sha256:46a7744c1cbfa4b00e1d8a99f6ca3f0089ef697de968fee08547894ab02b0ca1",
+      "contractsGas": "sha256:88c7bbe77d531c9e973cae13002c3464a2c14568833adf5d804d13b7b3d26af5"
+    }
+  },
+  "migration": {
+    "legacyUtilsImports": {
+      "production": {
+        "lines": 37,
+        "files": 23
+      },
+      "test": {
+        "lines": 14,
+        "files": 13
+      }
+    },
+    "allForbiddenLegacyImports": {
+      "production": {
+        "lines": 42,
+        "files": 24
+      },
+      "test": {
+        "lines": 26,
+        "files": 15
+      }
+    },
+    "languageImportInventory": {
+      "production": {
+        "lines": 139,
+        "files": 43
+      },
+      "test": {
+        "lines": 150,
+        "files": 34
+      }
+    }
+  }
+}

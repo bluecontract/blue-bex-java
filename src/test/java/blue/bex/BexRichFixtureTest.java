@@ -6,15 +6,17 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.BexStepResults;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.compile.BexCompiledProgram;
+import blue.bex.gas.BexGasCharge;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexFrozenWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
-import blue.language.Blue;
+import blue.bex.test.TestBlue;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
+import blue.language.merge.ResolvedSnapshot;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -47,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class BexRichFixtureTest {
     private static final String FIXTURE_ROOT = "rich-fixtures";
-    private static final Blue YAML_BLUE = new Blue();
+    private static final TestBlue YAML_BLUE = new TestBlue();
     private static final String TINY_EVENT_PROGRAM = String.join("\n",
             "type: Blue/BEX Program",
             "do:",
@@ -70,7 +72,7 @@ class BexRichFixtureTest {
     private void runFixture(Path path) throws Exception {
         Map<String, Object> fixture = readFixture(path);
         validateFixtureShape(fixture, path);
-        Blue blue = blueForFixture(fixture);
+        TestBlue blue = blueForFixture(fixture);
         Map<String, Object> expectation = map(fixture.get("expectation"));
         String outcome = string(expectation.get("outcome"));
         assertNotNull(outcome, "Fixture outcome is required: " + path);
@@ -116,10 +118,11 @@ class BexRichFixtureTest {
         }
 
         BexExecutionResult result = engine.execute(compiled, context);
-        assertSuccessExpectations(result, expectation);
+        assertSuccessExpectations(
+                result, expectation, isLegacyGasFixture(path));
     }
 
-    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation, Blue blue) {
+    private void assertParseOrOutputConversionError(Map<String, Object> fixture, Map<String, Object> expectation, TestBlue blue) {
         Node program;
         try {
             program = parseProgram(fixture, blue);
@@ -149,7 +152,7 @@ class BexRichFixtureTest {
         assertErrorContains(thrown, expectation);
     }
 
-    private void assertGasProperty(BexEngine engine, BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation, Blue blue) {
+    private void assertGasProperty(BexEngine engine, BexCompiledProgram compiled, BexExecutionContext context, Map<String, Object> expectation, TestBlue blue) {
         String property = string(expectation.get("property"));
         if (!"gasUsedGreaterThanEquivalentTinyEvent".equals(property)) {
             fail("Unsupported gas property: " + property);
@@ -159,7 +162,10 @@ class BexRichFixtureTest {
         assertTrue(large > tiny, "Expected large output gas " + large + " to be greater than tiny output gas " + tiny);
     }
 
-    private void assertSuccessExpectations(BexExecutionResult result, Map<String, Object> expectation) {
+    private void assertSuccessExpectations(
+            BexExecutionResult result,
+            Map<String, Object> expectation,
+            boolean legacyGasFixture) {
         if (expectation.containsKey("resultSimple")) {
             assertEquals(normalize(expectation.get("resultSimple")), normalize(result.value().toSimple()));
         }
@@ -169,12 +175,41 @@ class BexRichFixtureTest {
         if (expectation.containsKey("events")) {
             assertEquals(normalize(expectation.get("events")), normalize(result.events().asValue().toSimple()));
         }
-        if (expectation.containsKey("gasUsed")) {
+        if (expectation.containsKey("gasUsed") && !legacyGasFixture) {
             assertEquals(longValue(expectation.get("gasUsed")), result.gasUsed(), "gasUsed mismatch");
+        }
+        if (legacyGasFixture) {
+            /*
+             * These repository-local fixtures predate the final BEX 2.0
+             * counter manifest and encode aggregate BEX 1.x totals. Keep
+             * executing every program and its semantic assertions, but
+             * validate the 2.0 named ledger rather than preserving obsolete
+             * aggregate totals. Exact 2.0 quantities/weights are covered by
+             * the normative gas-micro fixture matrix.
+             */
+            long total = 0L;
+            List<BexGasCharge> trace = result.gasLedger().trace();
+            for (int index = 0; index < trace.size(); index++) {
+                BexGasCharge charge = trace.get(index);
+                assertEquals(index, charge.sequence(),
+                        "gas sequence mismatch");
+                assertTrue(!"estimatedSize".equals(charge.counterName()),
+                        "BEX 1.x recursive size gas leaked into the trace");
+                total = Math.addExact(total, charge.gas());
+            }
+            assertEquals(total, result.gasUsed(),
+                    "named gas trace must derive the total");
         }
     }
 
-    private BexExecutionContext context(Map<String, Object> fixture, Blue blue) {
+    private boolean isLegacyGasFixture(Path path) {
+        Path parent = path.getParent();
+        return parent != null
+                && parent.getFileName() != null
+                && "gas".equals(parent.getFileName().toString());
+    }
+
+    private BexExecutionContext context(Map<String, Object> fixture, TestBlue blue) {
         Map<String, Object> context = map(fixture.get("context"));
         String scope = string(context.get("documentScope"));
         if (scope == null) {
@@ -183,12 +218,23 @@ class BexRichFixtureTest {
         Node root = parseNodeSource(string(context.get("rootDocumentSource")), blue);
         Node event = parseNodeSource(string(context.get("eventSource")), blue);
         Node currentContract = parseNodeSource(string(context.get("currentContractSource")), blue);
+        ResolvedSnapshot rootSnapshot = blue.resolveToSnapshot(root);
+        ResolvedSnapshot eventSnapshot = blue.resolveToSnapshot(event);
+        ResolvedSnapshot contractSnapshot =
+                blue.resolveToSnapshot(currentContract);
         long gasLimit = context.containsKey("gasLimit") ? longValue(context.get("gasLimit")) : 1_000_000L;
 
         BexExecutionContext.Builder builder = BexExecutionContext.builder()
-                .document(new FrozenBexDocumentView(FrozenNode.fromResolvedNode(root), FrozenNode.fromResolvedNode(root), scope))
-                .event(BexValues.nodeSnapshot(event))
-                .currentContract(BexValues.nodeSnapshot(currentContract))
+                .document(new FrozenBexDocumentView(
+                        rootSnapshot.frozenCanonicalRoot(),
+                        rootSnapshot.frozenResolvedRoot(),
+                        scope))
+                .event(BexValues.exact(
+                        eventSnapshot.frozenCanonicalRoot(),
+                        eventSnapshot.frozenResolvedRoot()))
+                .currentContract(BexValues.exact(
+                        contractSnapshot.frozenCanonicalRoot(),
+                        contractSnapshot.frozenResolvedRoot()))
                 .steps(steps(context.get("stepsBinding")))
                 .gasLimit(gasLimit);
         for (Map.Entry<String, Object> entry : map(context.get("bindings")).entrySet()) {
@@ -197,9 +243,9 @@ class BexRichFixtureTest {
         return builder.build();
     }
 
-    private BexEngine engineForFixture(Map<String, Object> fixture, Blue blue) {
+    private BexEngine engineForFixture(Map<String, Object> fixture, TestBlue blue) {
         return BexEngine.builder()
-                .blue(blue)
+                .language(blue.runtime())
                 .gasSchedule(gasSchedule(fixture))
                 .build();
     }
@@ -213,11 +259,11 @@ class BexRichFixtureTest {
         for (Map.Entry<String, Object> entry : overrides.entrySet()) {
             long value = longValue(entry.getValue());
             switch (entry.getKey()) {
-                case "expressionBase":
-                    builder.expressionBase(value);
+                case "expressionEvaluated":
+                    builder.expressionEvaluated(value);
                     break;
-                case "statementBase":
-                    builder.statementBase(value);
+                case "statementExecuted":
+                    builder.statementExecuted(value);
                     break;
                 case "documentRead":
                     builder.documentRead(value);
@@ -231,32 +277,32 @@ class BexRichFixtureTest {
                 case "currentContractRead":
                     builder.currentContractRead(value);
                     break;
-                case "varRead":
-                    builder.varRead(value);
+                case "variableRead":
+                    builder.variableRead(value);
                     break;
                 case "resultValueRead":
                     builder.resultValueRead(value);
                     break;
-                case "pointerGetBase":
-                    builder.pointerGetBase(value);
+                case "pointerSegmentRead":
+                    builder.pointerSegmentRead(value);
                     break;
-                case "pointerSetBase":
-                    builder.pointerSetBase(value);
+                case "pointerSegmentWritten":
+                    builder.pointerSegmentWritten(value);
                     break;
-                case "objectSetBase":
-                    builder.objectSetBase(value);
+                case "transientObjectMemberProduced":
+                    builder.transientObjectMemberProduced(value);
                     break;
-                case "appendChangeBase":
-                    builder.appendChangeBase(value);
+                case "patchAppended":
+                    builder.patchAppended(value);
                     break;
-                case "appendEventBase":
-                    builder.appendEventBase(value);
+                case "eventAppended":
+                    builder.eventAppended(value);
                     break;
-                case "forEachItem":
-                    builder.forEachItem(value);
+                case "collectionItemVisited":
+                    builder.collectionItemVisited(value);
                     break;
-                case "functionCall":
-                    builder.functionCall(value);
+                case "functionCalled":
+                    builder.functionCalled(value);
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported gasSchedule field: " + entry.getKey());
@@ -274,35 +320,37 @@ class BexRichFixtureTest {
         return builder.build();
     }
 
-    private Blue blueForFixture(Map<String, Object> fixture) {
+    private TestBlue blueForFixture(Map<String, Object> fixture) {
         Map<String, Object> definitions = map(fixture.get("blueDefinitions"));
         if (definitions.isEmpty()) {
-            return new Blue();
+            return new TestBlue();
         }
         Map<String, List<Node>> parsed = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : definitions.entrySet()) {
             parsed.put(entry.getKey(), Collections.singletonList(YAML_BLUE.yamlToNode(requiredString(entry.getValue(),
                     "blueDefinitions." + entry.getKey()))));
         }
-        return new Blue(blueId -> {
+        return new TestBlue(blueId -> {
             List<Node> nodes = parsed.get(blueId);
             return nodes != null ? nodes : Collections.emptyList();
         });
     }
 
-    private Node parseProgram(Map<String, Object> fixture, Blue blue) {
-        return blue.yamlToNode(requiredString(fixture.get("programSource"), "programSource"));
+    private Node parseProgram(Map<String, Object> fixture, TestBlue blue) {
+        return blue.yamlToBexSource(requiredString(
+                fixture.get("programSource"), "programSource"));
     }
 
-    private Node parseNodeSource(String source, Blue blue) {
+    private Node parseNodeSource(String source, TestBlue blue) {
         if (source == null || source.trim().isEmpty()) {
             return blue.yamlToNode("{}");
         }
         return blue.yamlToNode(source);
     }
 
-    private BexProgramSource source(String source, Blue blue) {
-        return BexProgramSource.inline(FrozenNode.fromResolvedNode(blue.yamlToNode(source)));
+    private BexProgramSource source(String source, TestBlue blue) {
+        return BexProgramSource.inline(FrozenNode.fromResolvedNode(
+                blue.yamlToBexSource(source)));
     }
 
     @SuppressWarnings("unchecked")
@@ -420,10 +468,10 @@ class BexRichFixtureTest {
     }
 
     private Set<String> gasScheduleFields() {
-        return set("expressionBase", "statementBase", "documentRead", "eventRead", "stepsRead",
-                "currentContractRead", "varRead", "resultValueRead", "pointerGetBase",
-                "pointerSetBase", "objectSetBase", "appendChangeBase", "appendEventBase",
-                "forEachItem", "functionCall");
+        return set("expressionEvaluated", "statementExecuted", "documentRead", "eventRead", "stepsRead",
+                "currentContractRead", "variableRead", "resultValueRead", "pointerSegmentRead",
+                "pointerSegmentWritten", "transientObjectMemberProduced", "patchAppended", "eventAppended",
+                "collectionItemVisited", "functionCalled");
     }
 
     private Set<String> targetStatuses() {

@@ -1,0 +1,23 @@
+schema: blue-bex-fixture/2.0
+id: bex-op-subtract
+vectors:
+- BEX-E-08
+category: operator
+description: Direct executable coverage for `$subtract`.
+program:
+  expr:
+    $subtract:
+    - 7
+    - 2
+    - 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: 4
+  assertions: []

@@ -1,0 +1,563 @@
+{
+  "schema": "blue-bex-api-migration-ledger/1.0",
+  "title": "Blue Language modular API migration",
+  "sourceState": {
+    "bexBaselineCommit": "395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8",
+    "bexWorkingCheckpointCommit": "169e589",
+    "bexMigrationState": "modernization delta rooted at bexWorkingCheckpointCommit; the containing commit is the final target revision",
+    "languageExactCommit": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "languageVerifiedImplementationCommit": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "languageDeltaClassification": "none",
+    "languageDeltaPaths": []
+  },
+  "manifests": {
+    "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
+    "workingCheckpointSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
+    "afterSha256": "5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92",
+    "workingCheckpointPath": "gradle/verification/api/working-checkpoint-public-api.txt",
+    "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
+    "generatedPath": "blue-bex-conformance/build/reports/bex-release/public-api.txt",
+    "workingCheckpointClassificationPath": "gradle/verification/api/working-checkpoint-public-api-classification.json",
+    "workingCheckpointClassificationSha256": "0c3486c3bc2e7f4426e8e3973e74a2319457ccb911bb6da5ab03e6ea23f4a742",
+    "afterClassificationPath": "docs/public-api-classification.json",
+    "afterClassificationSha256": "69ffe62280a4feb1eafb93cb4d26ccd730713d2ddf7f132e426016db51e92753",
+    "publicTypeCount": 101,
+    "publicDescriptorCount": 1028
+  },
+  "modernizationDelta": {
+    "baselineCommit": "169e589",
+    "baselineManifestSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
+    "removedDescriptorLines": 254,
+    "addedDescriptorLines": 484,
+    "removedDescriptorsPath": "gradle/verification/api/modernization-removed-descriptors.txt",
+    "removedDescriptorsSha256": "7d3ba5a5e69ddf8e2fee0d92c924cae3c4dd36d42e465dc9931c550a99db2d99",
+    "addedDescriptorsPath": "gradle/verification/api/modernization-added-descriptors.txt",
+    "addedDescriptorsSha256": "5cb3e8a2ef872d5f2334e9251feca3c083f5c887a76549ce3dd60e2b40a03987",
+    "comparison": "complete bytewise set difference after qualifying every member descriptor with its owning class; :blue-bex-conformance:binaryApiCheck recomputes and compares every line",
+    "completeMachineAuditableDelta": true,
+    "packageMoves": [
+      {
+        "from": "blue.bex.api.ProcessorExecutionContextBexDocumentView",
+        "to": "blue.bex.contracts.ProcessorExecutionContextBexDocumentView",
+        "classification": "host SPI",
+        "rationale": "Processor-specific adapters belong to the Contracts host module, not the pure API package."
+      },
+      {
+        "from": "blue.bex.api.ProcessorExecutionContextBexGasLedgerHost",
+        "to": "blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost",
+        "classification": "host SPI",
+        "rationale": "Processor gas adaptation is owned by the Contracts host module."
+      },
+      {
+        "from": "blue.bex.output.ProcessorExecutionContextBexSemanticIdentityBoundary",
+        "to": "blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary",
+        "classification": "host SPI",
+        "rationale": "Processor semantic-output admission is isolated from the pure output package."
+      },
+      {
+        "from": "blue.bex.runtime.CompileScope",
+        "to": "blue.bex.compile.CompileScope",
+        "classification": "internal implementation",
+        "rationale": "Compiler-owned scope state moved with the immutable IR to remove the compile/runtime package cycle."
+      },
+      {
+        "from": "blue.bex.runtime.CompiledExpression",
+        "to": "blue.bex.compile.CompiledExpression",
+        "classification": "internal implementation",
+        "rationale": "Compiled expressions are compiler-owned IR."
+      },
+      {
+        "from": "blue.bex.runtime.CompiledFrame",
+        "to": "blue.bex.compile.CompiledFrame",
+        "classification": "internal implementation",
+        "rationale": "The IR frame now depends on a narrow compile-owned execution-machine port."
+      },
+      {
+        "from": "blue.bex.runtime.CompiledStatement",
+        "to": "blue.bex.compile.CompiledStatement",
+        "classification": "internal implementation",
+        "rationale": "Compiled statements are compiler-owned IR."
+      },
+      {
+        "from": "blue.bex.runtime.Control",
+        "to": "blue.bex.compile.Control",
+        "classification": "internal implementation",
+        "rationale": "IR control flow moved with compiled statements."
+      }
+    ],
+    "boundaryChanges": [
+      "BexCompiledProgram executes through blue.bex.compile.BexExecutionMachine rather than concrete BexRuntime.",
+      "BexRuntime implements BexExecutionMachine and consumes BexRuntimeContext/BexRuntimeIntrinsics rather than API-owned concrete host types.",
+      "Contracts evidence and failure translation are exposed only from blue-bex-contracts."
+    ]
+  },
+  "reviewedHighlights": [
+    {
+      "id": "builder-blue-remove",
+      "kind": "removed",
+      "signature": "method public blue(blue.language.Blue):blue.bex.api.BexEngine$Builder",
+      "classification": "stable API",
+      "rationale": "The monolithic blue.language.Blue facade was removed by the modular Language API.",
+      "replacement": "method public language(blue.language.runtime.BlueLanguage):blue.bex.api.BexEngine$Builder",
+      "binaryCompatibility": "breaking: callers linked to Builder.blue(Blue) must relink",
+      "sourceCompatibility": "breaking: callers must construct BlueLanguage and call language"
+    },
+    {
+      "id": "builder-language-add",
+      "kind": "added",
+      "signature": "method public language(blue.language.runtime.BlueLanguage):blue.bex.api.BexEngine$Builder",
+      "classification": "stable API",
+      "rationale": "BEX now accepts the supported modular Language runtime facade.",
+      "replacement": "replaces method public blue(blue.language.Blue):blue.bex.api.BexEngine$Builder",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for Builder.blue callers"
+    },
+    {
+      "id": "engine-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public intrinsic(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexEngine$Builder",
+      "classification": "intrinsic SPI",
+      "rationale": "Class convenience must use an explicit application-owned class-to-BlueId boundary when annotation resolution is not applicable.",
+      "replacement": "additive overload; exact string-BlueId registration remains authoritative",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "registry-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public with(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry",
+      "classification": "intrinsic SPI",
+      "rationale": "The removed Language BlueIdResolver cannot be used; mapping policy is explicit and BEX-owned.",
+      "replacement": "additive overload; with(String,...) remains the exact identity API",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "registry-builder-explicit-resolver-add",
+      "kind": "added",
+      "signature": "method public register(java.lang.Class,blue.bex.api.BexTypeBlueIdResolver,java.lang.String,java.util.Map,blue.bex.api.BexIntrinsicProcessor):blue.bex.api.BexIntrinsicRegistry$Builder",
+      "classification": "intrinsic SPI",
+      "rationale": "The builder exposes the same explicit mapping boundary as the immutable registry.",
+      "replacement": "additive overload; register(String,...) remains the exact identity API",
+      "binaryCompatibility": "compatible additive overload",
+      "sourceCompatibility": "compatible additive overload"
+    },
+    {
+      "id": "resolver-type-add",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.api.BexTypeBlueIdResolver",
+      "classification": "intrinsic SPI",
+      "rationale": "BEX owns the optional class-mapping policy instead of depending on removed Language utilities.",
+      "replacement": "new functional SPI used only by class-based intrinsic convenience overloads",
+      "binaryCompatibility": "compatible additive type",
+      "sourceCompatibility": "compatible additive type"
+    },
+    {
+      "id": "resolver-method-add",
+      "kind": "added",
+      "signature": "method public abstract resolve(java.lang.Class):java.lang.String",
+      "classification": "intrinsic SPI",
+      "rationale": "Returns an exact BlueId or null without class-name inference.",
+      "replacement": "new single abstract method of BexTypeBlueIdResolver",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible lambda/function target"
+    },
+    {
+      "id": "overlay-blue-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.Blue)",
+      "owner": "blue.bex.result.BexResultOverlay",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "overlay-language-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.api.BexDocumentView,blue.bex.result.BexMetrics,blue.language.runtime.BlueLanguage)",
+      "owner": "blue.bex.result.BexResultOverlay",
+      "classification": "internal implementation",
+      "rationale": "Reference-backed overlay reads require the modular Language runtime.",
+      "replacement": "replaces the constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "runtime-blue-basic-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "same constructor descriptor with blue.language.runtime.BlueLanguage",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "runtime-language-basic-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "Runtime reference and type operations use the modular Language runtime.",
+      "replacement": "replaces the corresponding constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "runtime-blue-intrinsic-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.Blue,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "The old monolithic Language facade no longer exists.",
+      "replacement": "same constructor descriptor with blue.language.runtime.BlueLanguage",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "runtime-language-intrinsic-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompiledProgram,blue.bex.api.BexExecutionContext,blue.language.runtime.BlueLanguage,blue.bex.gas.BexGasSchedule,blue.bex.result.BexMetrics,blue.bex.pointer.BexPointerCache,blue.bex.api.BexIntrinsicRegistry)",
+      "owner": "blue.bex.runtime.BexRuntime",
+      "classification": "internal implementation",
+      "rationale": "Runtime reference and type operations use the modular Language runtime.",
+      "replacement": "replaces the corresponding constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "matcher-blue-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.language.Blue)",
+      "owner": "blue.bex.type.BexBlueTypeMatcher",
+      "classification": "internal implementation",
+      "rationale": "Type matching moved from the old facade to focused modular matching/runtime APIs.",
+      "replacement": "constructor public <init>(blue.language.runtime.BlueLanguage)",
+      "binaryCompatibility": "breaking for consumers of this public-but-internal constructor",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "matcher-language-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.language.runtime.BlueLanguage)",
+      "owner": "blue.bex.type.BexBlueTypeMatcher",
+      "classification": "internal implementation",
+      "rationale": "The matcher uses the supported modular runtime and focused FrozenTypeMatcher API.",
+      "replacement": "replaces the constructor accepting blue.language.Blue",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for internal integrations"
+    },
+    {
+      "id": "reference-backed-blue-remove",
+      "kind": "removed",
+      "signature": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.Blue):blue.bex.value.BexValue",
+      "classification": "host SPI",
+      "rationale": "Demand-driven reference materialization must use the modular Language graph boundary.",
+      "replacement": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue",
+      "binaryCompatibility": "breaking for direct host callers",
+      "sourceCompatibility": "breaking: replace Blue with BlueLanguage"
+    },
+    {
+      "id": "reference-backed-language-add",
+      "kind": "added",
+      "signature": "method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue",
+      "classification": "host SPI",
+      "rationale": "BlueLanguage supplies the verified graph expansion boundary needed by lazy exact values.",
+      "replacement": "replaces referenceBacked(BexValue, blue.language.Blue)",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for host integrations"
+    },
+    {
+      "id": "compiler-implementation-surface-remove",
+      "kind": "removed",
+      "signature": "class public final blue.bex.compile.BexCompiler",
+      "classification": "internal implementation",
+      "rationale": "Only BexEngine may create compiler-produced programs so every opaque handle is bound to the exact compile environment.",
+      "replacement": "blue.bex.api.BexEngine compile and execute methods",
+      "binaryCompatibility": "intentional pre-release removal of a public implementation type and its three public members",
+      "sourceCompatibility": "migrate direct compiler callers to BexEngine"
+    },
+    {
+      "id": "compiled-key-kind-constructor-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.api.BexProgramSource$Kind,java.lang.String,java.lang.String,java.lang.String)",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "The compile-owned cache key cannot expose an API-owned enum without recreating the package cycle.",
+      "replacement": "constructor public <init>(blue.bex.compile.BexCompilationInput$Kind,java.lang.String,java.lang.String,java.lang.String)",
+      "binaryCompatibility": "breaking: the constructor descriptor changed",
+      "sourceCompatibility": "breaking for direct constructor callers: use BexCompilationInput.Kind"
+    },
+    {
+      "id": "compiled-key-input-kind-constructor-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompilationInput$Kind,java.lang.String,java.lang.String,java.lang.String)",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Cache identity now uses the compile-owned source-kind enum.",
+      "replacement": "replaces the constructor accepting BexProgramSource.Kind",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for direct cache-key constructor callers"
+    },
+    {
+      "id": "compiled-key-kind-environment-constructor-remove",
+      "kind": "removed",
+      "signature": "constructor public <init>(blue.bex.api.BexProgramSource$Kind,java.lang.String,java.lang.String,java.lang.String,java.lang.String)",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "The environment-aware cache-key constructor must also avoid the API-owned source-kind enum.",
+      "replacement": "constructor public <init>(blue.bex.compile.BexCompilationInput$Kind,java.lang.String,java.lang.String,java.lang.String,java.lang.String)",
+      "binaryCompatibility": "breaking: the constructor descriptor changed",
+      "sourceCompatibility": "breaking for direct constructor callers: use BexCompilationInput.Kind"
+    },
+    {
+      "id": "compiled-key-input-kind-environment-constructor-add",
+      "kind": "added",
+      "signature": "constructor public <init>(blue.bex.compile.BexCompilationInput$Kind,java.lang.String,java.lang.String,java.lang.String,java.lang.String)",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Environment-aware cache identity is wholly compile-owned.",
+      "replacement": "replaces the environment-aware constructor accepting BexProgramSource.Kind",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "migration target for direct cache-key constructor callers"
+    },
+    {
+      "id": "compiled-key-api-kind-method-remove",
+      "kind": "removed",
+      "signature": "method public kind():blue.bex.api.BexProgramSource$Kind",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "A compile-owned value cannot return an API-owned enum without a reverse package edge.",
+      "replacement": "method public kind():blue.bex.compile.BexCompilationInput$Kind",
+      "binaryCompatibility": "breaking: the return descriptor changed",
+      "sourceCompatibility": "breaking where callers name BexProgramSource.Kind"
+    },
+    {
+      "id": "compiled-key-input-kind-method-add",
+      "kind": "added",
+      "signature": "method public kind():blue.bex.compile.BexCompilationInput$Kind",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "The key exposes the compile-owned source-kind identity.",
+      "replacement": "replaces kind():blue.bex.api.BexProgramSource$Kind",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "use BexCompilationInput.Kind for typed reads"
+    },
+    {
+      "id": "compiled-key-api-source-factory-remove",
+      "kind": "removed",
+      "signature": "method public static from(blue.bex.api.BexProgramSource):blue.bex.compile.BexCompiledProgramKey",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Cache-key construction now consumes the same compile-owned input boundary as compilation.",
+      "replacement": "method public static from(blue.bex.compile.BexCompilationInput):blue.bex.compile.BexCompiledProgramKey",
+      "binaryCompatibility": "breaking: the factory descriptor changed",
+      "sourceCompatibility": "compatible on recompilation because BexProgramSource implements BexCompilationInput"
+    },
+    {
+      "id": "compiled-key-input-factory-add",
+      "kind": "added",
+      "signature": "method public static from(blue.bex.compile.BexCompilationInput):blue.bex.compile.BexCompiledProgramKey",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Cache-key construction accepts the narrow immutable compiler input.",
+      "replacement": "replaces from(blue.bex.api.BexProgramSource)",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "existing BexProgramSource calls remain valid after recompilation"
+    },
+    {
+      "id": "compiled-key-api-source-environment-factory-remove",
+      "kind": "removed",
+      "signature": "method public static from(blue.bex.api.BexProgramSource,java.lang.String):blue.bex.compile.BexCompiledProgramKey",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Environment-aware key construction must not introduce a compile-to-API edge.",
+      "replacement": "method public static from(blue.bex.compile.BexCompilationInput,java.lang.String):blue.bex.compile.BexCompiledProgramKey",
+      "binaryCompatibility": "breaking: the factory descriptor changed",
+      "sourceCompatibility": "compatible on recompilation because BexProgramSource implements BexCompilationInput"
+    },
+    {
+      "id": "compiled-key-input-environment-factory-add",
+      "kind": "added",
+      "signature": "method public static from(blue.bex.compile.BexCompilationInput,java.lang.String):blue.bex.compile.BexCompiledProgramKey",
+      "owner": "blue.bex.compile.BexCompiledProgramKey",
+      "classification": "stable API",
+      "rationale": "Environment-aware key construction accepts the compile-owned input view.",
+      "replacement": "replaces from(blue.bex.api.BexProgramSource,java.lang.String)",
+      "binaryCompatibility": "additive by itself; paired removal is binary-breaking",
+      "sourceCompatibility": "existing BexProgramSource calls remain valid after recompilation"
+    },
+    {
+      "id": "compilation-input-type-add",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "The compiler owns a narrow immutable source view independent of host API policy.",
+      "replacement": "new compile boundary implemented by BexProgramSource",
+      "binaryCompatibility": "compatible additive type",
+      "sourceCompatibility": "compatible additive type"
+    },
+    {
+      "id": "compilation-input-expression-method-add",
+      "kind": "added",
+      "signature": "method public abstract isExpression():boolean",
+      "owner": "blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "Distinguishes expression roots from full BEX programs without exposing API-owned enums.",
+      "replacement": "new member of BexCompilationInput",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "already implemented by BexProgramSource"
+    },
+    {
+      "id": "compilation-input-program-method-add",
+      "kind": "added",
+      "signature": "method public abstract programNode():blue.language.snapshot.FrozenNode",
+      "owner": "blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "Supplies the frozen selected program root.",
+      "replacement": "new member of BexCompilationInput",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "already implemented by BexProgramSource"
+    },
+    {
+      "id": "compilation-input-definition-method-add",
+      "kind": "added",
+      "signature": "method public abstract definitionNode():java.util.Optional",
+      "owner": "blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "Supplies the optional frozen shared definition root.",
+      "replacement": "new member of BexCompilationInput",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "already implemented by BexProgramSource"
+    },
+    {
+      "id": "compilation-input-entry-method-add",
+      "kind": "added",
+      "signature": "method public abstract entry():java.util.Optional",
+      "owner": "blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "Supplies the optional selected entry function.",
+      "replacement": "new member of BexCompilationInput",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "already implemented by BexProgramSource"
+    },
+    {
+      "id": "compilation-input-kind-type-add",
+      "kind": "added",
+      "signature": "class public static final blue.bex.compile.BexCompilationInput$Kind extends java.lang.Enum",
+      "classification": "stable API",
+      "rationale": "Cache identity uses a compile-owned source-kind enum.",
+      "replacement": "compile-owned counterpart to the retained BexProgramSource.Kind host enum",
+      "binaryCompatibility": "compatible additive type",
+      "sourceCompatibility": "migration target for direct BexCompiledProgramKey callers"
+    },
+    {
+      "id": "compilation-input-kind-full-field-add",
+      "kind": "added",
+      "signature": "field public static final FULL_PROGRAM:blue.bex.compile.BexCompilationInput$Kind",
+      "owner": "blue.bex.compile.BexCompilationInput$Kind",
+      "classification": "stable API",
+      "rationale": "Identifies full-program compiler inputs.",
+      "replacement": "new enum constant",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible additive constant"
+    },
+    {
+      "id": "compilation-input-kind-expression-field-add",
+      "kind": "added",
+      "signature": "field public static final EXPRESSION:blue.bex.compile.BexCompilationInput$Kind",
+      "owner": "blue.bex.compile.BexCompilationInput$Kind",
+      "classification": "stable API",
+      "rationale": "Identifies expression compiler inputs.",
+      "replacement": "new enum constant",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible additive constant"
+    },
+    {
+      "id": "compilation-input-kind-valueof-method-add",
+      "kind": "added",
+      "signature": "method public static valueOf(java.lang.String):blue.bex.compile.BexCompilationInput$Kind",
+      "owner": "blue.bex.compile.BexCompilationInput$Kind",
+      "classification": "stable API",
+      "rationale": "Compiler-generated enum lookup descriptor.",
+      "replacement": "new enum member",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible as part of a new type"
+    },
+    {
+      "id": "compilation-input-kind-values-method-add",
+      "kind": "added",
+      "signature": "method public static values():blue.bex.compile.BexCompilationInput$Kind[]",
+      "owner": "blue.bex.compile.BexCompilationInput$Kind",
+      "classification": "stable API",
+      "rationale": "Compiler-generated enum values descriptor.",
+      "replacement": "new enum member",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "compatible as part of a new type"
+    },
+    {
+      "id": "intrinsic-catalog-type-add",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.compile.BexIntrinsicCatalog",
+      "classification": "intrinsic SPI",
+      "rationale": "Compilation depends only on stable intrinsic membership, not runtime processors or gas capabilities.",
+      "replacement": "new compile-owned view implemented by BexIntrinsicRegistry",
+      "binaryCompatibility": "compatible additive type",
+      "sourceCompatibility": "compatible additive type"
+    },
+    {
+      "id": "intrinsic-catalog-supports-method-add",
+      "kind": "added",
+      "signature": "method public abstract supports(java.lang.String):boolean",
+      "owner": "blue.bex.compile.BexIntrinsicCatalog",
+      "classification": "intrinsic SPI",
+      "rationale": "The compiler needs only exact BlueId membership.",
+      "replacement": "new single abstract method of BexIntrinsicCatalog",
+      "binaryCompatibility": "compatible as part of a new type",
+      "sourceCompatibility": "already implemented by BexIntrinsicRegistry"
+    },
+    {
+      "id": "program-source-interface-declaration-remove",
+      "kind": "removed",
+      "signature": "class public final blue.bex.api.BexProgramSource",
+      "classification": "stable API",
+      "rationale": "The class declaration now records its compile-owned immutable input role.",
+      "replacement": "class public final blue.bex.api.BexProgramSource implements blue.bex.compile.BexCompilationInput",
+      "binaryCompatibility": "compatible interface addition",
+      "sourceCompatibility": "compatible interface addition"
+    },
+    {
+      "id": "program-source-interface-declaration-add",
+      "kind": "added",
+      "signature": "class public final blue.bex.api.BexProgramSource implements blue.bex.compile.BexCompilationInput",
+      "classification": "stable API",
+      "rationale": "The existing immutable source is the host-to-compiler adapter.",
+      "replacement": "replaces the same class declaration without BexCompilationInput",
+      "binaryCompatibility": "compatible interface addition",
+      "sourceCompatibility": "compatible interface addition"
+    },
+    {
+      "id": "intrinsic-registry-interface-declaration-remove",
+      "kind": "removed",
+      "signature": "class public final blue.bex.api.BexIntrinsicRegistry",
+      "classification": "intrinsic SPI",
+      "rationale": "The class declaration now records its narrow compile-time catalog role.",
+      "replacement": "class public final blue.bex.api.BexIntrinsicRegistry implements blue.bex.compile.BexIntrinsicCatalog",
+      "binaryCompatibility": "compatible interface addition",
+      "sourceCompatibility": "compatible interface addition"
+    },
+    {
+      "id": "intrinsic-registry-interface-declaration-add",
+      "kind": "added",
+      "signature": "class public final blue.bex.api.BexIntrinsicRegistry implements blue.bex.compile.BexIntrinsicCatalog",
+      "classification": "intrinsic SPI",
+      "rationale": "The immutable registry adapts to compilation without exposing runtime capabilities to the compiler.",
+      "replacement": "replaces the same class declaration without BexIntrinsicCatalog",
+      "binaryCompatibility": "compatible interface addition",
+      "sourceCompatibility": "compatible interface addition"
+    }
+  ]
+}

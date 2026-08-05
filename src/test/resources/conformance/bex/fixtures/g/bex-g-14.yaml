@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-14
+vectors:
+- BEX-G-14
+category: g
+description: Intrinsics return named deterministic child counters rather than opaque gas.
+program:
+  expr:
+    $intrinsic:
+      type:
+        blueId: 5Zbnaiu1hzRNEpuQmKNHuSmkiq5VqdZ5ros49gwGB674
+      x: 1
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: intrinsic.ledger.namedCounters
+    op: equals
+    expected: true
+  - actual: intrinsic.opaqueGas
+    op: absent

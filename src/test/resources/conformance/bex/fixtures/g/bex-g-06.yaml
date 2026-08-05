@@ -1,0 +1,24 @@
+schema: blue-bex-fixture/2.0
+id: bex-g-06
+vectors:
+- BEX-G-06
+category: g
+description: Integer operations use the portable limb formulas.
+program:
+  expr:
+    $multiply:
+    - 4294967296
+    - 4294967296
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: gas.integerLimbOperation
+    op: equals
+    expected: 4

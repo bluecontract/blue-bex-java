@@ -13,7 +13,6 @@ class BexContextReadTest {
         FrozenBexDocumentView document = new FrozenBexDocumentView(frozen(defaultDocument()), frozen(defaultDocument()), "/nested");
         BexExecutionContext context = BexExecutionContext.builder()
                 .document(document)
-                .currentScopePath("/ignored")
                 .gasLimit(1_000_000)
                 .build();
 
