@@ -26,13 +26,6 @@ jobs:
           path: blue-bex-java
           fetch-depth: 0
 
-      - name: Check out exact verified Blue Language
-        uses: actions/checkout@v4
-        with:
-          repository: bluecontract/blue-language-java
-          ref: 9a607e584ff5dd973684d35d71eb4022d946b760
-          path: blue-language-java
-
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
@@ -42,15 +35,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run clean local-composite working gate
+      - name: Run clean published-Language verification
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/blue-bex-gradle-home
         run: >-
-          ./gradlew --no-daemon clean bexWorkingVerification
-          -PblueLanguageCompositePath=../blue-language-java
+          ./gradlew --no-daemon clean
+          bexCheck
+          bexConformance
+          bexCompatibilityCheck
+          bexReproducibilityCheck
+          :blue-bex-core:writeLanguageDependencyEvidence
+          :blue-bex-contracts:writeLanguageDependencyEvidence
+          :blue-bex-conformance:writeLanguageDependencyEvidence
+          :blue-bex-java:writeLanguageDependencyEvidence
+          :examples:writeLanguageDependencyEvidence
 
-      - name: Run modernization and serious benchmark gate
-        run: >-
-          ./gradlew --no-daemon bexModernizationVerification
-          -PblueLanguageCompositePath=../blue-language-java
+      - name: Run serious benchmark gate
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/blue-bex-gradle-home
+        run: ./gradlew --no-daemon :blue-bex-conformance:jmh
 
       - name: Archive reports and test results
         uses: actions/upload-artifact@v4

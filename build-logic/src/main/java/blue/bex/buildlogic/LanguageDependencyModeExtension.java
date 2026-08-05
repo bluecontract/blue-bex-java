@@ -6,7 +6,7 @@ import org.gradle.api.provider.Property;
 /** Typed coordinates and dependency mode shared by BEX module builds. */
 public abstract class LanguageDependencyModeExtension {
     public LanguageDependencyModeExtension(ObjectFactory objects) {
-        getVersion().convention("3.1.0-rc.19");
+        getVersion().convention("3.1.0-rc.20");
         getCompositePropertyName().convention("blueLanguageCompositePath");
     }
 

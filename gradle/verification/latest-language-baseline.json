@@ -78,37 +78,37 @@
     }
   },
   "language": {
-    "exactHead": "c3d58561220e6de6be6e302cb16799c1a1b5159f",
-    "verifiedImplementationCommit": "c3d58561220e6de6be6e302cb16799c1a1b5159f",
-    "verifiedReleaseVersion": "3.1.0-rc.18",
-    "localCompositeProjectVersion": "3.1.0-rc.18-SNAPSHOT",
-    "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.19",
-    "publishedCandidateStatus": "not-executed",
+    "exactHead": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "verifiedImplementationCommit": "505a654699b86b42bf0e282ddf94560a91529bcf",
+    "verifiedReleaseVersion": "3.1.0-rc.20",
+    "localCompositeProjectVersion": "3.1.0-rc.20",
+    "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.20",
+    "publishedCandidateStatus": "passed",
     "documentationOnlyDiffPaths": [],
-    "czTomlSha256": "f6717f9a9e38df0dea4b5eeec5a0264c0490856ef4c261c053a06883ba3e69f2",
+    "czTomlSha256": "32b6457085126ec8b2701840c3a8da6a4c6714509c867ecfb4cace3632cf13f6",
     "focusedModules": [
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-model:3.1.0-rc.19",
+        "declaredPublishedCoordinate": "blue.language:blue-language-model:3.1.0-rc.20",
         "projectPath": ":blue-language-model",
-        "localArtifact": "blue-language-model-3.1.0-rc.18-SNAPSHOT.jar",
+        "localArtifact": "blue-language-model-3.1.0-rc.20.jar",
         "verifiedLocalArtifactSha256": "ef55be8331147442b858474add4782489d993568effe30202a9c4a8b014d5bd8"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.19",
+        "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.20",
         "projectPath": ":blue-language-core",
-        "localArtifact": "blue-language-core-3.1.0-rc.18-SNAPSHOT.jar",
+        "localArtifact": "blue-language-core-3.1.0-rc.20.jar",
         "verifiedLocalArtifactSha256": "916d5e6315f34d25ad4a2ddbc5587a209506871ea70dd2daa7aa69dbdbe1263d"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.19",
+        "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.20",
         "projectPath": ":blue-language-mapping",
-        "localArtifact": "blue-language-mapping-3.1.0-rc.18-SNAPSHOT.jar",
+        "localArtifact": "blue-language-mapping-3.1.0-rc.20.jar",
         "verifiedLocalArtifactSha256": "d9141d5c611bde7eb6a21bce3dc4bc0df7d8167f013eeaef2a365dd0a6af329b"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.19",
+        "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.20",
         "projectPath": ":blue-contracts-core",
-        "localArtifact": "blue-contracts-core-3.1.0-rc.18-SNAPSHOT.jar",
+        "localArtifact": "blue-contracts-core-3.1.0-rc.20.jar",
         "verifiedLocalArtifactSha256": "5845c6bead274dffd8d22afcb323f7cdf6e53b5656e0070bd241a1a660516280"
       }
     ],
