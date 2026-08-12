@@ -5,6 +5,8 @@ on:
     branches:
       - next
     paths:
+      - '.github/scripts/**'
+      - '.github/workflows/release-rc.yml'
       - '.cz.toml'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
