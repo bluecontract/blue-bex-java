@@ -18,6 +18,9 @@ java {
 dependencies {
     implementation("me.champeau.jmh:me.champeau.jmh.gradle.plugin:0.7.3")
     implementation("org.jreleaser:org.jreleaser.gradle.plugin:1.24.0")
+    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 gradlePlugin {
@@ -78,4 +81,8 @@ gradlePlugin {
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(17)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

@@ -191,6 +191,8 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             + project.getProviders().gradleProperty(
                                                     "blueLanguageCompositePath")
                                                     .orElse("").get());
+                            task.getProjectVersion().set(project.provider(
+                                    () -> String.valueOf(project.getVersion())));
                             task.getFailOnIncomplete().set(true);
                             task.getOutputFile().set(
                                     project.getLayout().getBuildDirectory().file(

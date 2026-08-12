@@ -85,6 +85,9 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
     public abstract Property<String> getLocalCompositeCommand();
 
     @Input
+    public abstract Property<String> getProjectVersion();
+
+    @Input
     public abstract Property<Boolean> getFailOnIncomplete();
 
     @OutputFile
@@ -170,11 +173,26 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
 
             String expectedBexCz = stringAfter(
                     baseline, "\"bex\"", "\"czTomlSha256\"");
+            String baselineBexCommit = stringAfter(
+                    baseline, "\"bex\"", "\"migrationBaselineCommit\"");
             String expectedLanguageCz = stringAfter(
                     baseline, "\"language\"", "\"czTomlSha256\"");
-            String actualBexCz = sha256(new File(bex, ".cz.toml"));
+            File bexCzFile = new File(bex, ".cz.toml");
+            String actualBexCzText = read(bexCzFile);
+            String baselineBexCzText = gitText(
+                    bex, "show", baselineBexCommit + ":.cz.toml");
+            String actualBexCz = sha256(bexCzFile);
+            String baselineBexCz = sha256(
+                    baselineBexCzText.getBytes(StandardCharsets.UTF_8));
             String actualLanguageCz = sha256(new File(language, ".cz.toml"));
-            boolean versionAutomationUntouched = actualBexCz.equals(expectedBexCz)
+            CommitizenVersionCheck.Result bexVersion =
+                    CommitizenVersionCheck.evaluate(
+                            actualBexCzText,
+                            baselineBexCzText,
+                            getProjectVersion().get());
+            boolean baselineBexCzVerified = baselineBexCz.equals(expectedBexCz);
+            boolean versionAutomationValid = baselineBexCzVerified
+                    && bexVersion.passed
                     && actualLanguageCz.equals(expectedLanguageCz);
 
             LegacyTotals legacy = legacyTotals(getProductionSources());
@@ -215,7 +233,7 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     ? "passed" : "not-executed";
             boolean workingReady = !bexState.dirty
                     && languageCodeEquivalent
-                    && versionAutomationUntouched
+                    && versionAutomationValid
                     && dependenciesPassed
                     && tests.executed > 0
                     && semanticAndGasParity
@@ -243,10 +261,24 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     + "  \"languageModuleBaseline\": "
                     + jsonOrEmpty(baseline) + ",\n"
                     + "  \"versionAutomation\": {\"status\":"
-                    + quote(versionAutomationUntouched ? "passed" : "failed")
+                    + quote(versionAutomationValid ? "passed" : "failed")
                     + ",\"bexCzTomlSha256\":" + quote(actualBexCz)
+                    + ",\"bexHistoricalBaselineSha256\":"
+                    + quote(expectedBexCz)
+                    + ",\"bexBaselineVerified\":"
+                    + baselineBexCzVerified
+                    + ",\"bexConfiguredVersion\":"
+                    + quote(bexVersion.configuredVersion)
+                    + ",\"projectVersion\":"
+                    + quote(getProjectVersion().get())
+                    + ",\"bexMatchesProjectVersion\":"
+                    + bexVersion.matchesProjectVersion
+                    + ",\"bexNonVersionConfigMatchesBaseline\":"
+                    + bexVersion.nonVersionConfigMatchesBaseline
                     + ",\"languageCzTomlSha256\":"
-                    + quote(actualLanguageCz) + "},\n"
+                    + quote(actualLanguageCz)
+                    + ",\"languageMatchesBaseline\":"
+                    + actualLanguageCz.equals(expectedLanguageCz) + "},\n"
                     + "  \"dependencyEvidence\": "
                     + jsonObjects(dependencyJson) + ",\n"
                     + "  \"legacyImports\": {\"before\":{\"lines\":"
