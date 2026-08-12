@@ -318,6 +318,44 @@ class BexConformanceReportTruthfulnessTest {
     }
 
     @Test
+    void standaloneModeReceiptUsesTheStrictValidationVocabulary() {
+        Map<String, Object> provenance =
+                new LinkedHashMap<String, Object>();
+        provenance.put("status", "passed");
+        provenance.put(
+                "resolvedHashMatchesRecordedMavenCentralHash",
+                Boolean.TRUE);
+        Map<String, Object> cache =
+                new LinkedHashMap<String, Object>();
+        cache.put("scope", "all focused and aggregate Language modules");
+
+        assertEquals(
+                "verified-against-recorded-maven-central-hash",
+                BexConformanceReportMain.modeEvidenceProvenanceStatus(
+                        "standalone-published", provenance));
+        assertEquals(
+                "standalone-published-blue-language-module-version-cache",
+                BexConformanceReportMain.modeEvidenceCacheScope(
+                        "standalone-published", cache));
+        assertEquals(
+                "passed",
+                BexConformanceReportMain.modeEvidenceProvenanceStatus(
+                        "local-composite", provenance));
+        assertEquals(
+                "all focused and aggregate Language modules",
+                BexConformanceReportMain.modeEvidenceCacheScope(
+                        "local-composite", cache));
+
+        provenance.put(
+                "resolvedHashMatchesRecordedMavenCentralHash",
+                Boolean.FALSE);
+        assertEquals(
+                "failed",
+                BexConformanceReportMain.modeEvidenceProvenanceStatus(
+                        "standalone-published", provenance));
+    }
+
+    @Test
     void localCompositeIdentityMustMatchPublishedCommitAndVersionTag() {
         String coordinate =
                 "blue.language:blue-language-java:3.1.0-rc.20";

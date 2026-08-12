@@ -1559,8 +1559,8 @@ public final class BexConformanceReportMain {
                 castMap(dependencyResolution.get("provenance"));
         values.put(
                 "dependency.provenance.status",
-                String.valueOf(
-                        dependencyProvenance.get("status")));
+                modeEvidenceProvenanceStatus(
+                        mode, dependencyProvenance));
         values.put(
                 "dependency.provenance.repositoryPolicy",
                 String.valueOf(
@@ -1590,10 +1590,10 @@ public final class BexConformanceReportMain {
                         .get("freshProofRequired")));
         values.put(
                 "dependency.cache.acceptanceScope",
-                String.valueOf(castMap(
-                        dependencyResolution.get(
-                                "cleanDependencyCacheAcceptance"))
-                        .get("scope")));
+                modeEvidenceCacheScope(
+                        mode,
+                        castMap(dependencyResolution.get(
+                                "cleanDependencyCacheAcceptance"))));
         values.put(
                 "dependency.cache.blueLanguageModuleVersionPath",
                 String.valueOf(castMap(
@@ -1700,6 +1700,28 @@ public final class BexConformanceReportMain {
                                     tagsAtHead)));
         }
         writeEvidence(modeRoot.resolve("mode.properties"), values);
+    }
+
+    static String modeEvidenceProvenanceStatus(
+            String mode,
+            Map<String, Object> provenance) {
+        String status = String.valueOf(provenance.get("status"));
+        if (!"standalone-published".equals(mode)) {
+            return status;
+        }
+        return "passed".equals(status)
+                && Boolean.TRUE.equals(provenance.get(
+                        "resolvedHashMatchesRecordedMavenCentralHash"))
+                ? "verified-against-recorded-maven-central-hash"
+                : "failed";
+    }
+
+    static String modeEvidenceCacheScope(
+            String mode,
+            Map<String, Object> cacheAcceptance) {
+        return "standalone-published".equals(mode)
+                ? "standalone-published-blue-language-module-version-cache"
+                : String.valueOf(cacheAcceptance.get("scope"));
     }
 
     private static boolean allNamedEvidencePassed(
