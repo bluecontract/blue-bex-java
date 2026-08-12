@@ -427,7 +427,8 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                     + project.getVersion()), copy -> copy.from(
                             project.getRootProject().getProjectDir(), spec ->
                                     spec.exclude(
-                                            ".git/**", ".gradle/**", "**/build/**",
+                                            ".git/**", ".gradle/**", "**/.gradle/**",
+                                            "**/build/**",
                                             ".idea/**", "**/.idea/**",
                                             "out/**", "**/out/**", "*.iml",
                                             "**/.DS_Store", "*.zip", "work-status.txt")));

@@ -180,16 +180,22 @@ artifact_manifest "${checkouts[0]}" "$STANDALONE_ONE_MANIFEST"
 artifact_manifest "${checkouts[1]}" "$STANDALONE_TWO_MANIFEST"
 artifact_manifest "${checkouts[2]}" "$LOCAL_ONE_MANIFEST"
 artifact_manifest "${checkouts[3]}" "$LOCAL_TWO_MANIFEST"
-node "$SCRIPT_DIR/compare-independent-builds.mjs" \
-  "$STANDALONE_ONE_MANIFEST" "$STANDALONE_TWO_MANIFEST" \
-  "$LOCAL_ONE_MANIFEST" "$LOCAL_TWO_MANIFEST" \
-  "${checkouts[0]}" "${checkouts[1]}" \
-  "${checkouts[2]}" "${checkouts[3]}" \
-  "$RELEASE_ROOT/gradle-standalone-one" \
-  "$RELEASE_ROOT/gradle-standalone-two" \
-  "$RELEASE_ROOT/gradle-local-one" \
-  "$RELEASE_ROOT/gradle-local-two" \
-  "$BEX_COMMIT" "$INDEPENDENT_REPORT"
+if ! node "$SCRIPT_DIR/compare-independent-builds.mjs" \
+    "$STANDALONE_ONE_MANIFEST" "$STANDALONE_TWO_MANIFEST" \
+    "$LOCAL_ONE_MANIFEST" "$LOCAL_TWO_MANIFEST" \
+    "${checkouts[0]}" "${checkouts[1]}" \
+    "${checkouts[2]}" "${checkouts[3]}" \
+    "$RELEASE_ROOT/gradle-standalone-one" \
+    "$RELEASE_ROOT/gradle-standalone-two" \
+    "$RELEASE_ROOT/gradle-local-one" \
+    "$RELEASE_ROOT/gradle-local-two" \
+    "$BEX_COMMIT" "$INDEPENDENT_REPORT"; then
+  mkdir -p "$RETAINED_INPUT_ROOT"
+  cp "$INDEPENDENT_REPORT" \
+    "$RETAINED_INPUT_ROOT/independent-clean-builds.json"
+  echo "Retained failed independent-build report under build/reports." >&2
+  exit 1
+fi
 
 node "$SCRIPT_DIR/compare-local-published-evidence.mjs" \
   "${checkouts[2]}/blue-bex-conformance/build/reports/bex-conformance/report.json" \

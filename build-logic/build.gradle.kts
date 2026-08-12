@@ -20,6 +20,7 @@ dependencies {
     implementation("org.jreleaser:org.jreleaser.gradle.plugin:1.24.0")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation(gradleTestKit())
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

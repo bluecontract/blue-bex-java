@@ -199,6 +199,20 @@ function pair(first, second) {
       artifact.bytes === secondArtifacts[index].bytes &&
       artifact.sha256 === secondArtifacts[index].sha256
     );
+  const firstByPath = new Map(firstArtifacts.map(
+    (artifact) => [artifact.path, artifact]
+  ));
+  const secondByPath = new Map(secondArtifacts.map(
+    (artifact) => [artifact.path, artifact]
+  ));
+  const artifactDifferences = [...new Set([
+    ...firstByPath.keys(), ...secondByPath.keys()
+  ])].sort().flatMap((path) => {
+    const firstArtifact = firstByPath.get(path) ?? null;
+    const secondArtifact = secondByPath.get(path) ?? null;
+    return JSON.stringify(firstArtifact) === JSON.stringify(secondArtifact)
+      ? [] : [{ path, firstArtifact, secondArtifact }];
+  });
   const requiredArtifactsPresent =
     requiredArtifactRolesPresent(firstArtifacts) &&
     requiredArtifactRolesPresent(secondArtifacts);
@@ -209,6 +223,7 @@ function pair(first, second) {
     exactManifestBytesMatch,
     exactArtifactBytesMatch,
     artifactPathSetMatch,
+    artifactDifferences,
     requiredArtifactRolesPresent: requiredArtifactsPresent,
     artifactCount: firstArtifacts.length,
     firstBuild: first.report,
@@ -258,5 +273,27 @@ const report = {
 };
 writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 if (!passed) {
+  console.error(`Independent clean-build comparison failed: ${outputPath}`);
+  for (const [label, comparison] of [
+    ['standalone-published', standalonePublished],
+    ['local-composite', localComposite]
+  ]) {
+    if (comparison.status === 'passed') {
+      continue;
+    }
+    console.error(
+      `${label}: manifestBytes=${comparison.exactManifestBytesMatch}, ` +
+        `artifactBytes=${comparison.exactArtifactBytesMatch}, ` +
+        `pathSet=${comparison.artifactPathSetMatch}, ` +
+        `requiredRoles=${comparison.requiredArtifactRolesPresent}`
+    );
+    for (const difference of comparison.artifactDifferences) {
+      console.error(
+        `${label}: ${difference.path}: ` +
+          `${difference.firstArtifact?.sha256 ?? 'missing'} != ` +
+          `${difference.secondArtifact?.sha256 ?? 'missing'}`
+      );
+    }
+  }
   process.exitCode = 1;
 }
