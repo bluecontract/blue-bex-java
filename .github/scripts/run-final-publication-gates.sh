@@ -250,7 +250,8 @@ readonly RETAINED_ARTIFACT_PATHS="$(IFS=:; echo "${retained_artifacts[*]}")"
 # detailed mode matrix observes both local-composite and published execution.
 GRADLE_USER_HOME="$RELEASE_ROOT/gradle-root-standalone" \
   ./gradlew --no-daemon bexConformance
-./gradlew --no-daemon generateBexModernizationReport
+./gradlew --no-daemon generateBexModernizationReport \
+  "-PblueLanguageCompositePath=$LANGUAGE_CHECKOUT"
 
 ./gradlew --no-daemon bexReleaseVerify \
   "-PblueLanguageCompositePath=$LANGUAGE_CHECKOUT" \
