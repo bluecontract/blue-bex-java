@@ -55,6 +55,9 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
         TaskProvider<Task> release = lifecycle(
                 project, "bexReleaseVerify",
                 "Runs the strict published/local public-release gate.");
+        TaskProvider<Task> sdkStage = lifecycle(
+                project, "bexSdkStageVerify",
+                "Runs the isolated local-only SDK staging gate.");
         TaskProvider<VerifyPublishedLanguageTask> publishedLanguage =
                 project.getTasks().named(
                         "bexPublishedLanguageVerification",
@@ -325,6 +328,36 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                     contracts.getTasks().named("verifyReproducibleArchives"),
                     aggregate.getTasks().named("verifyReproducibleArchives"),
                     verifySourceArchive));
+            sdkStage.configure(task -> {
+                task.dependsOn(
+                        compatibility,
+                        reproducibility,
+                        core.getTasks().named("verifyLanguageDependencyMode"),
+                        contracts.getTasks().named("verifyLanguageDependencyMode"),
+                        aggregate.getTasks().named("verifyLanguageDependencyMode"));
+                task.doFirst(unused -> {
+                    requireLocalStageProperty(
+                            project, "blueLanguageRepository", true);
+                    requireLocalStageProperty(
+                            project, "bexSdkStagingRepository", false);
+                    String selectedVersion = requireLocalStageProperty(
+                            project, "bexLocalStageVersion", false);
+                    if (!selectedVersion.equals(
+                            String.valueOf(project.getVersion()))) {
+                        throw new GradleException(
+                                "bexLocalStageVersion does not match project "
+                                        + "version " + project.getVersion());
+                    }
+                    Object composite = project.findProperty(
+                            "blueLanguageCompositePath");
+                    if (composite != null
+                            && !composite.toString().trim().isEmpty()) {
+                        throw new GradleException(
+                                "SDK staging forbids included-build Language "
+                                        + "substitution");
+                    }
+                });
+            });
             modernization.configure(task -> task.dependsOn(
                     working,
                     publishedLanguage,
@@ -433,6 +466,21 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             "out/**", "**/out/**", "*.iml",
                                             "**/.DS_Store", "*.zip", "work-status.txt")));
         });
+    }
+
+    private static String requireLocalStageProperty(
+            Project project, String name, boolean mustBeDirectory) {
+        Object configured = project.findProperty(name);
+        if (configured == null || configured.toString().trim().isEmpty()) {
+            throw new GradleException(
+                    "bexSdkStageVerify requires -P" + name + "=<value>");
+        }
+        String selected = configured.toString().trim();
+        if (mustBeDirectory && !project.file(selected).isDirectory()) {
+            throw new GradleException(
+                    name + " is not a directory: " + project.file(selected));
+        }
+        return selected;
     }
 
     private static LanguageBaseline readLanguageBaseline(File baselineFile) {

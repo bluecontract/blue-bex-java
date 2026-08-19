@@ -4,7 +4,9 @@ plugins {
 }
 
 group = "blue.bex"
-version = configuredVersion()
+version = configuredVersion(
+    providers.gradleProperty("bexLocalStageVersion").orNull
+)
 
 allprojects {
     group = rootProject.group
@@ -51,7 +53,15 @@ if (System.getenv("CI") != null) {
     }
 }
 
-fun configuredVersion(): String {
+fun configuredVersion(localStageVersion: String?): String {
+    if (!localStageVersion.isNullOrBlank()) {
+        val selected = localStageVersion.trim()
+        require(Regex("""\d+\.\d+\.\d+(?:-rc\.\d+)?""")
+            .matches(selected)) {
+            "bexLocalStageVersion must be a release or RC version"
+        }
+        return selected
+    }
     val configured = Regex("""version\s*=\s*"([^"]+)"""")
         .find(file(".cz.toml").readText())
         ?.groupValues

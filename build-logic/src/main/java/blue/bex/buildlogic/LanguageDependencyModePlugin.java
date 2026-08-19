@@ -17,6 +17,20 @@ public final class LanguageDependencyModePlugin implements Plugin<Project> {
                 project.getExtensions().create(
                         EXTENSION,
                         LanguageDependencyModeExtension.class);
+        String repositoryProperty =
+                extension.getRepositoryPropertyName().get();
+        Object configuredRepository = project.findProperty(
+                repositoryProperty);
+        if (configuredRepository != null
+                && !configuredRepository.toString().trim().isEmpty()) {
+            String repositoryPath = configuredRepository.toString().trim();
+            project.getRepositories().maven(repository -> {
+                repository.setName("stagedBlueLanguage");
+                repository.setUrl(project.uri(repositoryPath));
+                repository.content(content ->
+                        content.includeGroup("blue.language"));
+            });
+        }
         project.getRepositories().mavenCentral();
 
         project.getPluginManager().withPlugin("java", ignored ->
@@ -91,11 +105,31 @@ public final class LanguageDependencyModePlugin implements Plugin<Project> {
             task.doLast(ignored -> {
                 String property = extension.getCompositePropertyName().get();
                 String value = (String) project.findProperty(property);
+                String repositoryName =
+                        extension.getRepositoryPropertyName().get();
+                String repositoryValue =
+                        (String) project.findProperty(repositoryName);
                 if (value != null && !value.trim().isEmpty()) {
                     File checkout = project.file(value.trim());
                     if (!checkout.isDirectory()) {
                         throw new GradleException(
                                 property + " is not a directory: " + checkout);
+                    }
+                }
+                if (value != null && !value.trim().isEmpty()
+                        && repositoryValue != null
+                        && !repositoryValue.trim().isEmpty()) {
+                    throw new GradleException(
+                            "Choose either " + property + " or "
+                                    + repositoryName + ", not both");
+                }
+                if (repositoryValue != null
+                        && !repositoryValue.trim().isEmpty()) {
+                    File repository = project.file(repositoryValue.trim());
+                    if (!repository.isDirectory()) {
+                        throw new GradleException(
+                                repositoryName + " is not a directory: "
+                                        + repository);
                     }
                 }
                 if (project.getRepositories().stream().anyMatch(repository ->

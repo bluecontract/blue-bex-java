@@ -8,11 +8,14 @@ public abstract class LanguageDependencyModeExtension {
     public LanguageDependencyModeExtension(ObjectFactory objects) {
         getVersion().convention("3.1.0-rc.20");
         getCompositePropertyName().convention("blueLanguageCompositePath");
+        getRepositoryPropertyName().convention("blueLanguageRepository");
     }
 
     public abstract Property<String> getVersion();
 
     public abstract Property<String> getCompositePropertyName();
+
+    public abstract Property<String> getRepositoryPropertyName();
 
     public String coordinate(String artifact) {
         return "blue.language:" + artifact + ":" + getVersion().get();

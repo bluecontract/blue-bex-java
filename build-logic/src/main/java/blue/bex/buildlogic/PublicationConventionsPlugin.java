@@ -59,13 +59,28 @@ public final class PublicationConventionsPlugin implements Plugin<Project> {
                     }
                     publishing.getRepositories().maven(repository -> {
                         repository.setName("staging");
-                        repository.setUrl(project.getRootProject().getLayout()
-                                .getBuildDirectory().dir("staging-deploy"));
+                        Object configured = project.getRootProject()
+                                .findProperty("bexSdkStagingRepository");
+                        if (configured == null
+                                || configured.toString().trim().isEmpty()) {
+                            repository.setUrl(project.getRootProject()
+                                    .getLayout().getBuildDirectory()
+                                    .dir("staging-deploy"));
+                        } else {
+                            repository.setUrl(project.uri(
+                                    configured.toString().trim()));
+                        }
                     });
                 });
         project.getTasks().withType(AbstractPublishToMaven.class)
-                .configureEach(task -> task.dependsOn(
-                        project.getRootProject().getTasks()
-                                .named("bexReleaseVerify")));
+                .configureEach(task -> {
+                    Object localStage = project.getRootProject()
+                            .findProperty("bexSdkStagingRepository");
+                    String gate = localStage != null
+                            && !localStage.toString().trim().isEmpty()
+                            ? "bexSdkStageVerify" : "bexReleaseVerify";
+                    task.dependsOn(project.getRootProject().getTasks()
+                            .named(gate));
+                });
     }
 }
