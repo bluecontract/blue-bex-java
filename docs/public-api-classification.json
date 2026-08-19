@@ -2,10 +2,10 @@
   "schema": "blue-bex-public-api-classification/2.0",
   "inventory": {
     "path": "src/test/resources/hosted-release/required-public-api.txt",
-    "sha256": "5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92",
+    "sha256": "a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43",
     "manifestSchema": "blue-bex-binary-api-manifest/1.0",
-    "publicTypeCount": 101,
-    "publicDescriptorCount": 1028
+    "publicTypeCount": 103,
+    "publicDescriptorCount": 1036
   },
   "classifications": {
     "stable API": [
@@ -53,6 +53,7 @@
       "blue.bex.api.FrozenBexDocumentView",
       "blue.bex.contracts.BexContractsExecutionContext",
       "blue.bex.contracts.BexContractsFailureBoundary",
+      "blue.bex.contracts.ProcessorExactBlueValueCapability",
       "blue.bex.contracts.ProcessorExecutionContextBexDocumentView",
       "blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost",
       "blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary",
@@ -62,6 +63,7 @@
       "blue.bex.gas.BexSharedGasBudget",
       "blue.bex.output.BexAdmittedValue",
       "blue.bex.output.BexEstablishedIdentity",
+      "blue.bex.output.BexExactValueCapability",
       "blue.bex.output.BexFailurePolicy",
       "blue.bex.output.BexOutputAdmission",
       "blue.bex.output.BexOutputKind",

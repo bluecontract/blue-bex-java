@@ -55,7 +55,10 @@ public final class BexContractsExecutionContext {
                 new ProcessorExecutionContextBexSemanticIdentityBoundary(
                         exactContext));
         exactBuilder.failureBoundary(BexContractsFailureBoundary.INSTANCE);
-        exactBuilder.event(BexValues.nodeSnapshot(exactContext.event()));
+        FrozenNode exactEvent = exactContext.frozenEvent();
+        exactBuilder.event(exactEvent != null
+                ? BexValues.frozen(exactEvent)
+                : BexValues.nodeSnapshot(exactContext.event()));
         FrozenNode processEvent = exactContext.frozenProcessEvent();
         exactBuilder.processingEvent(processEvent != null
                 ? BexValues.frozen(processEvent)

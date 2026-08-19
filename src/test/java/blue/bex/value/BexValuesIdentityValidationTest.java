@@ -69,6 +69,22 @@ class BexValuesIdentityValidationTest {
                         value, "malformed", BexValues.scalar("value")));
     }
 
+    @Test
+    void frozenWriterPreservesHostAuthenticatedAdmittedRepresentation() {
+        FrozenNode established = FrozenNode.fromNode(new Node()
+                .properties("kind", new Node().value("established")));
+        BexValue admitted = BexValues.admittedExact(
+                established,
+                established.blueId(),
+                BexValues.fromSimple(java.util.Collections.singletonMap(
+                        "kind", "different-semantic-cursor")));
+
+        FrozenNode frozen = BexFrozenWriter.toFrozen(admitted);
+
+        assertSame(established, frozen);
+        assertSame(established.blueId(), frozen.blueId());
+    }
+
     private static FrozenNode frozen(String value) {
         return FrozenNode.fromResolvedNode(new Node().value(value));
     }

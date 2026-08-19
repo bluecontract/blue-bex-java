@@ -33,6 +33,15 @@ public final class BexFrozenWriter {
         if (value instanceof FrozenNodeBexValue) {
             return ((FrozenNodeBexValue) value).canonicalNode();
         }
+        if (value instanceof AdmittedExactBexValue) {
+            /*
+             * The semantic-output host has already authenticated this exact
+             * frozen representation. Re-materializing the supplied diagnostic
+             * cursor can generalize nominal types or schema fields and thereby
+             * change the identity the host established.
+             */
+            return ((AdmittedExactBexValue) value).establishedFrozenValue();
+        }
         if (metrics != null) {
             metrics.incrementFrozenWriterNodeFallbacks();
         }

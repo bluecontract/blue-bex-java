@@ -58,7 +58,10 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     }
 
     FrozenNode canonicalNode() {
-        return canonicalIdentityNode;
+        FrozenNode materialized = materializedCanonicalNode;
+        return materialized != null
+                ? materialized
+                : canonicalIdentityNode;
     }
 
     Object rawScalar() {

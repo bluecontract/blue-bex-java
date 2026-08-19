@@ -13,26 +13,26 @@
   "manifests": {
     "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
     "workingCheckpointSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
-    "afterSha256": "5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92",
+    "afterSha256": "a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43",
     "workingCheckpointPath": "gradle/verification/api/working-checkpoint-public-api.txt",
     "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
     "generatedPath": "blue-bex-conformance/build/reports/bex-release/public-api.txt",
     "workingCheckpointClassificationPath": "gradle/verification/api/working-checkpoint-public-api-classification.json",
     "workingCheckpointClassificationSha256": "0c3486c3bc2e7f4426e8e3973e74a2319457ccb911bb6da5ab03e6ea23f4a742",
     "afterClassificationPath": "docs/public-api-classification.json",
-    "afterClassificationSha256": "69ffe62280a4feb1eafb93cb4d26ccd730713d2ddf7f132e426016db51e92753",
-    "publicTypeCount": 101,
-    "publicDescriptorCount": 1028
+    "afterClassificationSha256": "e8ae8fb201704b860b6691310cc86726d94bd1242c1d301e0b6beec22b38ec16",
+    "publicTypeCount": 103,
+    "publicDescriptorCount": 1036
   },
   "modernizationDelta": {
     "baselineCommit": "169e589",
     "baselineManifestSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
     "removedDescriptorLines": 254,
-    "addedDescriptorLines": 484,
+    "addedDescriptorLines": 492,
     "removedDescriptorsPath": "gradle/verification/api/modernization-removed-descriptors.txt",
     "removedDescriptorsSha256": "7d3ba5a5e69ddf8e2fee0d92c924cae3c4dd36d42e465dc9931c550a99db2d99",
     "addedDescriptorsPath": "gradle/verification/api/modernization-added-descriptors.txt",
-    "addedDescriptorsSha256": "5cb3e8a2ef872d5f2334e9251feca3c083f5c887a76549ce3dd60e2b40a03987",
+    "addedDescriptorsSha256": "0219d20091f06783915b2a4898297e466e60c8b76944bf9c66bc514fc642a431",
     "comparison": "complete bytewise set difference after qualifying every member descriptor with its owning class; :blue-bex-conformance:binaryApiCheck recomputes and compares every line",
     "completeMachineAuditableDelta": true,
     "packageMoves": [
@@ -88,7 +88,8 @@
     "boundaryChanges": [
       "BexCompiledProgram executes through blue.bex.compile.BexExecutionMachine rather than concrete BexRuntime.",
       "BexRuntime implements BexExecutionMachine and consumes BexRuntimeContext/BexRuntimeIntrinsics rather than API-owned concrete host types.",
-      "Contracts evidence and failure translation are exposed only from blue-bex-contracts."
+      "Contracts evidence and failure translation are exposed only from blue-bex-contracts.",
+      "Exact values retain their verified Blue identity and frozen capability through BexExactValueCapability; hosted output admission does not reconstruct or rehash them."
     ]
   },
   "reviewedHighlights": [

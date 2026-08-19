@@ -235,11 +235,7 @@ public final class ProcessorExecutionContextBexGasLedgerHost
                 delegate.charge(
                         counter,
                         quantity,
-                        GasChargeContext.of(
-                                exact.scopePath(),
-                                exact.contractKey(),
-                                exact.logicalPath(),
-                                exact.reason()));
+                        contractsAttribution(exact));
             } catch (GasLimitExceededException exhausted) {
                 throw new BexHostGasExhaustion(
                         exhausted.namespace(),
@@ -251,5 +247,16 @@ public final class ProcessorExecutionContextBexGasLedgerHost
                         exhausted);
             }
         }
+    }
+
+    static GasChargeContext contractsAttribution(
+            BexGasChargeContext context) {
+        BexGasChargeContext exact = context != null
+                ? context : BexGasChargeContext.empty();
+        return GasChargeContext.of(
+                null,
+                exact.contractKey(),
+                exact.logicalPath(),
+                exact.reason());
     }
 }
