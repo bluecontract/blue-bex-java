@@ -335,6 +335,26 @@ class BexConformanceReportTruthfulnessTest {
     }
 
     @Test
+    void stagedCandidateDoesNotReadHistoricalPublicReleaseModes(
+            @TempDir Path temporaryDirectory) {
+        Map<String, Object> modes =
+                BexConformanceReportMain.publicReleaseMatrixNotSelected(
+                        temporaryDirectory);
+
+        Map<?, ?> standalone = (Map<?, ?>) modes.get("standalonePublished");
+        Map<?, ?> local = (Map<?, ?>) modes.get("localComposite");
+        assertEquals(
+                "not-applicable-to-staged-candidate",
+                standalone.get("status"));
+        assertEquals(Boolean.FALSE, standalone.get("evidenceRead"));
+        assertEquals(
+                "not-applicable-to-staged-candidate",
+                local.get("status"));
+        assertEquals(Boolean.FALSE, local.get("evidenceRead"));
+        assertFalse(Boolean.TRUE.equals(modes.get("allRequiredModesPassed")));
+    }
+
+    @Test
     void standaloneModeReceiptUsesTheStrictValidationVocabulary() {
         Map<String, Object> provenance =
                 new LinkedHashMap<String, Object>();

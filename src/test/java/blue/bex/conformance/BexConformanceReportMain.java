@@ -179,15 +179,19 @@ public final class BexConformanceReportMain {
                     namedEvidence,
                     publishedApiInspection);
         }
-        Map<String, Object> buildModes = buildModeMatrix(
-                persistentEvidenceRoot,
-                declaredDependency,
-                projectVersion,
-                sourceState,
-                compositePath,
-                publishedApiInspection);
-        boolean exactFinalArtifactProven =
-                bindLanguageReleaseIdentityToModes(
+        boolean stagedRepositoryMode = "staged-repository".equals(
+                dependencyMode);
+        Map<String, Object> buildModes = stagedRepositoryMode
+                ? publicReleaseMatrixNotSelected(persistentEvidenceRoot)
+                : buildModeMatrix(
+                        persistentEvidenceRoot,
+                        declaredDependency,
+                        projectVersion,
+                        sourceState,
+                        compositePath,
+                        publishedApiInspection);
+        boolean exactFinalArtifactProven = !stagedRepositoryMode
+                && bindLanguageReleaseIdentityToModes(
                         languageReleaseIdentity,
                         buildModes);
         releaseGates.put(
@@ -1377,9 +1381,15 @@ public final class BexConformanceReportMain {
                 declaredDependency.equals(
                         publishedApiInspection.get("coordinate"));
 
+        boolean standalone =
+                "standalone-published".equals(
+                        dependencyResolution.get("mode"));
+        boolean staged =
+                "staged-repository".equals(
+                        dependencyResolution.get("mode"));
         Map<String, Object> localSource =
                 Collections.emptyMap();
-        boolean localMatchesPublished = compositePath == null;
+        boolean localMatchesPublished = compositePath == null && !staged;
         if (compositePath != null
                 && Files.isDirectory(compositePath)) {
             SourceState state = sourceState(compositePath);
@@ -1405,12 +1415,6 @@ public final class BexConformanceReportMain {
         boolean dependencyResolved =
                 "passed".equals(
                         dependencyResolution.get("status"));
-        boolean standalone =
-                "standalone-published".equals(
-                        dependencyResolution.get("mode"));
-        boolean staged =
-                "staged-repository".equals(
-                        dependencyResolution.get("mode"));
         Map<String, Object> dependencyProvenance = castMap(
                 dependencyResolution.get("provenance"));
         boolean resolvedArtifactHashMatchesPublished =
@@ -1883,6 +1887,32 @@ public final class BexConformanceReportMain {
                         ? Collections.emptyList()
                         : missingPublishedHostApis(
                                 publishedApiInspection));
+    }
+
+    static Map<String, Object> publicReleaseMatrixNotSelected(Path root) {
+        Map<String, Object> standalone = map(
+                "mode", "standalone-published",
+                "status", "not-applicable-to-staged-candidate",
+                "evidenceRead", false,
+                "evidencePath", root.resolve("modes")
+                        .resolve("standalone-published")
+                        .resolve("mode.properties").toString());
+        Map<String, Object> local = map(
+                "mode", "local-composite",
+                "status", "not-applicable-to-staged-candidate",
+                "evidenceRead", false,
+                "evidencePath", root.resolve("modes")
+                        .resolve("local-composite")
+                        .resolve("mode.properties").toString());
+        return map(
+                "standalonePublished", standalone,
+                "localComposite", local,
+                "artifactsBehaviorallyEquivalent", false,
+                "allRequiredModesPassed", false,
+                "standaloneBlocker", Collections.emptyList(),
+                "reason",
+                "public release evidence is retained but not compared to "
+                        + "an isolated staged candidate");
     }
 
     private static Map<String, Object> validateModeEvidence(
@@ -3557,27 +3587,36 @@ public final class BexConformanceReportMain {
         Path independentProperties = persistentEvidenceRoot.resolve(
                 "independent-clean-builds-" + dependencyMode
                         + ".properties");
-        Map<String, Object> independentCleanBuilds =
-                Files.isRegularFile(independentProperties)
-                        ? independentCleanBuildEvidence(
-                        projectDir,
-                        buildDir,
-                        independentProperties,
-                        projectVersion,
-                        sourceCommit,
-                        dependencyMode,
-                        declaredDependency,
-                        dependencyResolution,
-                        compositePath)
-                        : independentCleanBuildJsonEvidence(
-                        projectDir,
-                        projectDir.resolve("build")
-                                .resolve("reports")
-                                .resolve("bex-release")
-                                .resolve("inputs")
-                                .resolve("independent-clean-builds.json"),
-                        sourceCommit,
-                        dependencyMode);
+        Map<String, Object> independentCleanBuilds;
+        if ("staged-repository".equals(dependencyMode)) {
+            independentCleanBuilds = map(
+                    "status", "not-applicable-to-staged-candidate",
+                    "evidenceRead", false,
+                    "reason",
+                    "independent public-release pairs are not "
+                            + "candidate-stage evidence");
+        } else if (Files.isRegularFile(independentProperties)) {
+            independentCleanBuilds = independentCleanBuildEvidence(
+                    projectDir,
+                    buildDir,
+                    independentProperties,
+                    projectVersion,
+                    sourceCommit,
+                    dependencyMode,
+                    declaredDependency,
+                    dependencyResolution,
+                    compositePath);
+        } else {
+            independentCleanBuilds = independentCleanBuildJsonEvidence(
+                    projectDir,
+                    projectDir.resolve("build")
+                            .resolve("reports")
+                            .resolve("bex-release")
+                            .resolve("inputs")
+                            .resolve("independent-clean-builds.json"),
+                    sourceCommit,
+                    dependencyMode);
+        }
         return map(
                 "deterministicArchives",
                 deterministicArchiveEvidence(
