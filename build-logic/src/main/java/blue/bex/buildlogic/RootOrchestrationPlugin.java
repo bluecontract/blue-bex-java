@@ -3,6 +3,7 @@ package blue.bex.buildlogic;
 import blue.bex.buildlogic.tasks.GenerateModernizationReportTask;
 import blue.bex.buildlogic.tasks.GenerateReleaseReportTask;
 import blue.bex.buildlogic.tasks.GenerateWorkingReportTask;
+import blue.bex.buildlogic.tasks.VerifySdkStageReportTask;
 import blue.bex.buildlogic.tasks.VerifyPublishedLanguageTask;
 import groovy.json.JsonSlurper;
 import java.io.File;
@@ -57,7 +58,31 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                 "Runs the strict published/local public-release gate.");
         TaskProvider<Task> sdkStage = lifecycle(
                 project, "bexSdkStageVerify",
-                "Runs the isolated local-only SDK staging gate.");
+                "Verifies the isolated SDK candidate without publishing it.");
+        TaskProvider<VerifySdkStageReportTask> sdkStageReport =
+                project.getTasks().register(
+                        "verifyBexSdkStageReport",
+                        VerifySdkStageReportTask.class,
+                        task -> {
+                            task.setGroup("verification");
+                            task.setDescription(
+                                    "Fails on any staged dependency or "
+                                            + "conformance blocker.");
+                            task.getConformanceReport().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "blue-bex-conformance/build/reports/"
+                                                    + "bex-conformance/report.json"));
+                            task.getCandidateBaseline().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "gradle/verification/"
+                                                    + "sdk-stage-language-baseline.json"));
+                            task.getProjectVersion().set(project.provider(
+                                    () -> String.valueOf(project.getVersion())));
+                            task.getOutputFile().set(
+                                    project.getLayout().getBuildDirectory().file(
+                                            "reports/bex-sdk-stage/"
+                                                    + "verification.json"));
+                        });
         TaskProvider<VerifyPublishedLanguageTask> publishedLanguage =
                 project.getTasks().named(
                         "bexPublishedLanguageVerification",
@@ -332,6 +357,7 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                 task.dependsOn(
                         compatibility,
                         reproducibility,
+                        sdkStageReport,
                         core.getTasks().named("verifyLanguageDependencyMode"),
                         contracts.getTasks().named("verifyLanguageDependencyMode"),
                         aggregate.getTasks().named("verifyLanguageDependencyMode"));
@@ -358,6 +384,8 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                     }
                 });
             });
+            sdkStageReport.configure(task -> task.dependsOn(
+                    suite.getTasks().named("writeBexConformanceReport")));
             modernization.configure(task -> task.dependsOn(
                     working,
                     publishedLanguage,
