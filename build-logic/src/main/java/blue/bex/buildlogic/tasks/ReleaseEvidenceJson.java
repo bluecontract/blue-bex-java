@@ -60,13 +60,15 @@ final class ReleaseEvidenceJson {
 
     static boolean publishedLanguagePassed(Map<String, Object> evidence) {
         if (!hasString(evidence, "schema",
-                "blue-bex-published-language/2.0")
+                "blue-bex-published-language/3.0")
                 || !hasString(evidence, "status", "passed")
                 || !hasBoolean(evidence,
                 "configuredAssertionsMatch", true)
                 || !hasBoolean(evidence, "apiInspectionPassed", true)
+                || !hasBoolean(evidence,
+                "focusedArtifactHashesPassed", true)
                 || !hasString(evidence,
-                "differentialStatus", "passed")
+                "repeatabilityStatus", "passed")
                 || !matches(evidence, "artifactSha256", SHA_256)
                 || !matches(evidence, "sourceCommit", COMMIT)
                 || !coordinate(stringOrEmpty(evidence, "coordinate"))) {
@@ -100,22 +102,22 @@ final class ReleaseEvidenceJson {
         }
     }
 
-    static boolean differentialPassed(
+    static boolean publishedRepeatabilityPassed(
             Map<String, Object> evidence,
             String expectedCommit) {
         if (!hasString(evidence, "schema",
-                "blue-bex-local-published-differential/1.0")
+                "blue-bex-published-conformance-repeatability/1.0")
                 || !hasString(evidence, "status", "passed")
                 || !hasString(evidence,
-                "localMode", "local-composite")
-                || !hasString(evidence,
-                "publishedMode", "standalone-published")
+                "dependencyPolicy", "published-only")
+                || !hasInteger(evidence, "runCount", 4)
                 || !hasBoolean(evidence, "sourceBound", true)
-                || !hasBoolean(evidence, "dependenciesDistinct", true)
+                || !hasBoolean(evidence,
+                "dependencyIdentityRepeated", true)
                 || !hasString(evidence,
-                "semanticAndGasParity", "passed")
+                "semanticAndGasRepeatability", "passed")
                 || !hasString(evidence,
-                "exactGasTraceParity", "passed")) {
+                "exactGasTraceRepeatability", "passed")) {
             return false;
         }
         String commit = stringOrEmpty(evidence, "bexCommit");
@@ -125,10 +127,13 @@ final class ReleaseEvidenceJson {
             return false;
         }
         try {
-            return digestPairMatches(StrictJson.object(
-                    evidence, "semanticEvidenceSha256"))
-                    && digestPairMatches(StrictJson.object(
-                    evidence, "gasEvidenceSha256"));
+            List<Object> modes = StrictJson.array(evidence, "modes");
+            return modes.size() == 4
+                    && modes.stream().allMatch(
+                    mode -> "standalone-published".equals(mode))
+                    && repeatedDigest(evidence, "semanticEvidenceSha256")
+                    && repeatedDigest(evidence, "gasEvidenceSha256")
+                    && repeatedDigest(evidence, "dependencyArtifactSha256");
         } catch (IllegalArgumentException invalid) {
             return false;
         }
@@ -138,8 +143,10 @@ final class ReleaseEvidenceJson {
             Map<String, Object> evidence,
             String expectedCommit) {
         if (!hasString(evidence, "schema",
-                "blue-bex-independent-clean-builds/2.1")
+                "blue-bex-independent-clean-builds/3.0")
                 || !hasString(evidence, "status", "passed")
+                || !hasString(evidence,
+                "dependencyPolicy", "published-only")
                 || !hasBoolean(evidence,
                 "distinctCheckoutRoots", true)
                 || !hasBoolean(evidence,
@@ -173,7 +180,8 @@ final class ReleaseEvidenceJson {
                     gradleHomes,
                     manifests)
                     && buildPairPassed(
-                    StrictJson.object(evidence, "localComposite"),
+                    StrictJson.object(
+                            evidence, "standalonePublishedReplica"),
                     commit,
                     checkoutRoots,
                     gitDirectories,
@@ -197,6 +205,7 @@ final class ReleaseEvidenceJson {
             Set<Path> gradleHomes,
             Set<Path> manifests) throws Exception {
         if (!hasString(pair, "status", "passed")
+                || !hasString(pair, "mode", "standalone-published")
                 || !hasBoolean(pair, "exactManifestBytesMatch", true)
                 || !hasBoolean(pair, "exactArtifactBytesMatch", true)
                 || !hasBoolean(pair, "artifactPathSetMatch", true)
@@ -344,10 +353,16 @@ final class ReleaseEvidenceJson {
                 manifestBytes);
     }
 
-    private static boolean digestPairMatches(Map<String, Object> pair) {
-        String local = stringOrEmpty(pair, "local");
-        String published = stringOrEmpty(pair, "published");
-        return local.matches(SHA_256) && local.equals(published);
+    private static boolean repeatedDigest(
+            Map<String, Object> evidence, String field) {
+        List<Object> values = StrictJson.array(evidence, field);
+        if (values.size() != 4) {
+            return false;
+        }
+        String expected = values.get(0) instanceof String
+                ? (String) values.get(0) : "";
+        return expected.matches(SHA_256)
+                && values.stream().allMatch(expected::equals);
     }
 
     private static boolean safeArtifactPath(String path) {

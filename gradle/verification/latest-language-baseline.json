@@ -78,38 +78,56 @@
     }
   },
   "language": {
-    "exactHead": "505a654699b86b42bf0e282ddf94560a91529bcf",
-    "verifiedImplementationCommit": "505a654699b86b42bf0e282ddf94560a91529bcf",
-    "verifiedReleaseVersion": "3.1.0-rc.20",
-    "localCompositeProjectVersion": "3.1.0-rc.20",
-    "bexDeclaredPublishedCandidateVersion": "3.1.0-rc.20",
-    "publishedCandidateStatus": "passed",
+    "exactHead": "5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52",
+    "verifiedImplementationCommit": "5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52",
+    "sourceTag": "v3.1.0-rc.21",
+    "sourceTagObject": "447b4bc440cc720a5fdd09fe50b9c9a280645a4f",
+    "verifiedReleaseVersion": "3.1.0-rc.21",
+    "bexDeclaredPublishedVersion": "3.1.0-rc.21",
+    "publishedReleaseStatus": "passed",
+    "publishedRepository": "https://repo1.maven.org/maven2",
+    "publishedMetadataLastUpdated": "20260820080329",
     "documentationOnlyDiffPaths": [],
-    "czTomlSha256": "32b6457085126ec8b2701840c3a8da6a4c6714509c867ecfb4cace3632cf13f6",
+    "czTomlSha256": "9d041e324ef28255fc905095cd29322dd8765009fd3890f48b4c0afa4208a8da",
     "focusedModules": [
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-model:3.1.0-rc.20",
-        "projectPath": ":blue-language-model",
-        "localArtifact": "blue-language-model-3.1.0-rc.20.jar",
-        "verifiedLocalArtifactSha256": "ef55be8331147442b858474add4782489d993568effe30202a9c4a8b014d5bd8"
+        "declaredPublishedCoordinate": "blue.language:blue-language-model:3.1.0-rc.21",
+        "artifactId": "blue-language-model",
+        "publishedArtifact": "blue-language-model-3.1.0-rc.21.jar",
+        "verifiedPublishedArtifactSha256": "ef55be8331147442b858474add4782489d993568effe30202a9c4a8b014d5bd8"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.20",
-        "projectPath": ":blue-language-core",
-        "localArtifact": "blue-language-core-3.1.0-rc.20.jar",
-        "verifiedLocalArtifactSha256": "916d5e6315f34d25ad4a2ddbc5587a209506871ea70dd2daa7aa69dbdbe1263d"
+        "declaredPublishedCoordinate": "blue.language:blue-language-core:3.1.0-rc.21",
+        "artifactId": "blue-language-core",
+        "publishedArtifact": "blue-language-core-3.1.0-rc.21.jar",
+        "verifiedPublishedArtifactSha256": "8d7167254a39132e7a494561ed966748918c138c08f0967ccc3e841edba0b1f0"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.20",
-        "projectPath": ":blue-language-mapping",
-        "localArtifact": "blue-language-mapping-3.1.0-rc.20.jar",
-        "verifiedLocalArtifactSha256": "d9141d5c611bde7eb6a21bce3dc4bc0df7d8167f013eeaef2a365dd0a6af329b"
+        "declaredPublishedCoordinate": "blue.language:blue-language-mapping:3.1.0-rc.21",
+        "artifactId": "blue-language-mapping",
+        "publishedArtifact": "blue-language-mapping-3.1.0-rc.21.jar",
+        "verifiedPublishedArtifactSha256": "d9141d5c611bde7eb6a21bce3dc4bc0df7d8167f013eeaef2a365dd0a6af329b"
       },
       {
-        "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.20",
-        "projectPath": ":blue-contracts-core",
-        "localArtifact": "blue-contracts-core-3.1.0-rc.20.jar",
-        "verifiedLocalArtifactSha256": "5845c6bead274dffd8d22afcb323f7cdf6e53b5656e0070bd241a1a660516280"
+        "declaredPublishedCoordinate": "blue.language:blue-contracts-core:3.1.0-rc.21",
+        "artifactId": "blue-contracts-core",
+        "publishedArtifact": "blue-contracts-core-3.1.0-rc.21.jar",
+        "verifiedPublishedArtifactSha256": "66ce3f0ba7e76118ddc95b40a3105bbfa5ab49fd56b3c57b7c4a1ff93d72b432"
+      }
+    ],
+    "publishedAggregate": {
+      "coordinate": "blue.language:blue-language-java:3.1.0-rc.21",
+      "artifact": "blue-language-java-3.1.0-rc.21.jar",
+      "artifactSha256": "0de1584be094515ddd27938819464dc024a993c7eb06e4145cac129ad5bbfed0"
+    },
+    "additionalPublishedComponents": [
+      {
+        "coordinate": "blue.language:blue-conformance:3.1.0-rc.21",
+        "artifactSha256": "db1a398958d02c8b80d04cba0f3997d72f14c5965c106a356d7043d8b92b9e10"
+      },
+      {
+        "coordinate": "blue.language:blue-language-ipfs:3.1.0-rc.21",
+        "artifactSha256": "bec7355f39a109c4fe6dfc5f9970232dc0a75cd8e5b4ab055abc311314d24c8e"
       }
     ],
     "hostingPackageIdentities": {

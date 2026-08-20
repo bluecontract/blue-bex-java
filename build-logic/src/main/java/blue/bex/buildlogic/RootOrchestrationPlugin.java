@@ -5,14 +5,10 @@ import blue.bex.buildlogic.tasks.GenerateReleaseReportTask;
 import blue.bex.buildlogic.tasks.GenerateWorkingReportTask;
 import blue.bex.buildlogic.tasks.VerifySdkStageReportTask;
 import blue.bex.buildlogic.tasks.VerifyPublishedLanguageTask;
-import groovy.json.JsonSlurper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -39,7 +35,10 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                 "Runs all normative BEX conformance evidence.");
         TaskProvider<Task> local = lifecycle(
                 project, "bexLocalLanguageVerification",
-                "Verifies every module against the explicit local Language composite.");
+                "Optional developer check against a local Language composite.");
+        TaskProvider<Task> publishedDependencies = lifecycle(
+                project, "bexPublishedDependencyVerification",
+                "Verifies every module against authenticated published Language.");
         TaskProvider<Task> compatibility = lifecycle(
                 project, "bexCompatibilityCheck",
                 "Verifies API, bytecode, dependency, and semantic compatibility.");
@@ -48,14 +47,14 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                 "Verifies deterministic BEX-owned module and aggregate archives.");
         TaskProvider<Task> working = lifecycle(
                 project, "bexWorkingVerification",
-                "Runs the mandatory local-composite working gate.");
+                "Runs the mandatory published-Language working gate.");
         TaskProvider<Task> modern = lifecycle(
                 project, "bexModernizationVerification",
                 "Runs the complete architecture, documentation, property, and "
                         + "serious benchmark gate.");
         TaskProvider<Task> release = lifecycle(
                 project, "bexReleaseVerify",
-                "Runs the strict published/local public-release gate.");
+                "Runs the strict published-only public-release gate.");
         TaskProvider<Task> sdkStage = lifecycle(
                 project, "bexSdkStageVerify",
                 "Verifies the isolated SDK candidate without publishing it.");
@@ -177,8 +176,6 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                         });
         File latestLanguageBaseline = project.getLayout().getProjectDirectory().file(
                 "gradle/verification/latest-language-baseline.json").getAsFile();
-        LanguageBaseline languageBaseline = readLanguageBaseline(
-                latestLanguageBaseline);
         TaskProvider<Copy> baselineReceipt = project.getTasks().register(
                 "writeLatestLanguageBaselineReport", Copy.class, task -> {
                     task.setGroup("verification");
@@ -194,7 +191,7 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                         task -> {
                             task.setGroup("verification");
                             task.setDescription(
-                                    "Writes the exact local-composite BEX "
+                                    "Writes the exact published-Language BEX "
                                             + "working-readiness receipt.");
                             task.getTestResultsDirectory().set(
                                     project.getLayout().getProjectDirectory().dir(
@@ -202,23 +199,6 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                                     + "test-results/test"));
                             task.getBexRepository().set(
                                     project.getLayout().getProjectDirectory());
-                            task.getLanguageRepositoryPath().set(
-                                    project.getProviders().gradleProperty(
-                                            "blueLanguageCompositePath")
-                                            .orElse(""));
-                            task.getExpectedLanguageCommit().set(
-                                    languageBaseline.exactHead);
-                            task.getVerifiedImplementationCommit().set(
-                                    languageBaseline.verifiedImplementationCommit);
-                            task.getAllowedLanguageDeltaPaths().set(
-                                    languageBaseline.documentationOnlyDiffPaths);
-                            task.getLocalCompositeCommand().set(
-                                    "./gradlew --no-daemon clean "
-                                            + "bexWorkingVerification "
-                                            + "-PblueLanguageCompositePath="
-                                            + project.getProviders().gradleProperty(
-                                                    "blueLanguageCompositePath")
-                                                    .orElse("").get());
                             task.getProjectVersion().set(project.provider(
                                     () -> String.valueOf(project.getVersion())));
                             task.getFailOnIncomplete().set(true);
@@ -266,21 +246,22 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             .fileValue(retained);
                                 }
                             }
-                            Object differential = project.findProperty(
-                                    "bexLocalPublishedDifferential");
-                            if (differential != null
-                                    && !differential.toString().trim().isEmpty()) {
-                                task.getDifferentialReport().fileValue(
-                                        project.file(differential.toString()));
+                            Object repeatability = project.findProperty(
+                                    "bexPublishedRepeatability");
+                            if (repeatability != null
+                                    && !repeatability.toString().trim().isEmpty()) {
+                                task.getRepeatabilityReport().fileValue(
+                                        project.file(repeatability.toString()));
                             } else {
                                 File retained = project.getLayout()
                                         .getBuildDirectory().file(
                                                 "reports/bex-release/inputs/"
-                                                        + "local-published-"
-                                                        + "differential.json")
+                                                        + "published-"
+                                                        + "repeatability.json")
                                         .get().getAsFile();
                                 if (retained.isFile()) {
-                                    task.getDifferentialReport().fileValue(retained);
+                                    task.getRepeatabilityReport()
+                                            .fileValue(retained);
                                 }
                             }
                             task.getJsonOutputFile().set(
@@ -315,6 +296,25 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                     + checkout);
                 }
             }));
+            publishedDependencies.configure(task -> {
+                task.dependsOn(Arrays.asList(
+                        core.getTasks().named("verifyLanguageDependencyMode"),
+                        contracts.getTasks().named(
+                                "verifyLanguageDependencyMode"),
+                        suite.getTasks().named("verifyLanguageDependencyMode"),
+                        aggregate.getTasks().named(
+                                "verifyLanguageDependencyMode"),
+                        examples.getTasks().named("verifyLanguageDependencyMode"),
+                        core.getTasks().named("writeLanguageDependencyEvidence"),
+                        contracts.getTasks().named(
+                                "writeLanguageDependencyEvidence"),
+                        suite.getTasks().named("writeLanguageDependencyEvidence"),
+                        aggregate.getTasks().named(
+                                "writeLanguageDependencyEvidence"),
+                        examples.getTasks().named(
+                                "writeLanguageDependencyEvidence")));
+                task.doFirst(unused -> requirePublishedOnly(project));
+            });
 
             project.getTasks().named("check").configure(task ->
                     task.dependsOn(check));
@@ -399,7 +399,7 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                     sourceArchive));
             workingReport.configure(task -> {
                 task.dependsOn(
-                        local, compatibility, reproducibility,
+                        publishedDependencies, compatibility, reproducibility,
                         suite.getTasks().named("jmhSmoke"),
                         project.getTasks().named("verifyBexArchitecture"),
                         core.getTasks().named("assemble"),
@@ -423,6 +423,9 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                         project.getLayout().getProjectDirectory().file(
                                 "src/test/resources/hosted-release/"
                                         + "required-public-api.txt"),
+                        project.getLayout().getProjectDirectory().file(
+                                "src/test/resources/hosted-release/"
+                                        + "published-api-inspection.properties"),
                         project.getLayout().getProjectDirectory().file(
                                 "docs/latest-language-api-migration.json"),
                         project.getLayout().getProjectDirectory().file(
@@ -461,13 +464,24 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                 "blue-bex-contracts/src/main/java/**/*.java")));
             });
             working.configure(task -> task.dependsOn(
-                    local, compatibility, reproducibility,
+                    publishedDependencies, compatibility, reproducibility,
                     workingReport,
                     project.getTasks().named("generateBexSourceFingerprint")));
             modern.configure(task -> task.dependsOn(working, modernization));
             releaseReport.configure(task -> task.dependsOn(
                     modern, publishedLanguage));
-            release.configure(task -> task.dependsOn(releaseReport));
+            release.configure(task -> {
+                task.dependsOn(releaseReport);
+                task.doFirst(unused -> requirePublishedOnly(project));
+            });
+        });
+        project.getGradle().getTaskGraph().whenReady(graph -> {
+            if (graph.hasTask(publishedDependencies.get())
+                    || graph.hasTask(working.get())
+                    || graph.hasTask(modern.get())
+                    || graph.hasTask(release.get())) {
+                requirePublishedOnly(project);
+            }
         });
     }
 
@@ -511,75 +525,16 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
         return selected;
     }
 
-    private static LanguageBaseline readLanguageBaseline(File baselineFile) {
-        final Object parsed;
-        try {
-            parsed = new JsonSlurper().parseText(
-                    Files.readString(baselineFile.toPath()));
-        } catch (IOException | RuntimeException exception) {
-            throw new GradleException(
-                    "Cannot read latest Language baseline: " + baselineFile,
-                    exception);
-        }
-
-        Map<?, ?> root = requireObject(parsed, "Language baseline root");
-        Map<?, ?> language = requireObject(
-                root.get("language"), "Language baseline language");
-        return new LanguageBaseline(
-                requireString(language, "exactHead"),
-                requireString(language, "verifiedImplementationCommit"),
-                requireStringList(language, "documentationOnlyDiffPaths"));
-    }
-
-    private static Map<?, ?> requireObject(Object value, String description) {
-        if (!(value instanceof Map)) {
-            throw new GradleException(description + " must be a JSON object");
-        }
-        return (Map<?, ?>) value;
-    }
-
-    private static String requireString(Map<?, ?> object, String field) {
-        Object value = object.get(field);
-        if (!(value instanceof String)
-                || ((String) value).trim().isEmpty()) {
-            throw new GradleException(
-                    "Language baseline " + field + " must be a non-empty string");
-        }
-        return (String) value;
-    }
-
-    private static List<String> requireStringList(
-            Map<?, ?> object, String field) {
-        Object value = object.get(field);
-        if (!(value instanceof List)) {
-            throw new GradleException(
-                    "Language baseline " + field + " must be a JSON array");
-        }
-        List<String> result = new ArrayList<>();
-        for (Object item : (List<?>) value) {
-            if (!(item instanceof String)
-                    || ((String) item).trim().isEmpty()) {
+    private static void requirePublishedOnly(Project project) {
+        for (String property : new String[] {
+                "blueLanguageCompositePath", "blueLanguageRepository"
+        }) {
+            Object configured = project.findProperty(property);
+            if (configured != null
+                    && !configured.toString().trim().isEmpty()) {
                 throw new GradleException(
-                        "Language baseline " + field
-                                + " must contain only non-empty strings");
+                        "Published BEX verification forbids -P" + property);
             }
-            result.add((String) item);
-        }
-        return result;
-    }
-
-    private static final class LanguageBaseline {
-        private final String exactHead;
-        private final String verifiedImplementationCommit;
-        private final List<String> documentationOnlyDiffPaths;
-
-        private LanguageBaseline(
-                String exactHead,
-                String verifiedImplementationCommit,
-                List<String> documentationOnlyDiffPaths) {
-            this.exactHead = exactHead;
-            this.verifiedImplementationCommit = verifiedImplementationCommit;
-            this.documentationOnlyDiffPaths = documentationOnlyDiffPaths;
         }
     }
 

@@ -81,11 +81,12 @@ both manifests, both classifications, and the complete additions/removals under
 Published mode resolves exact module coordinates from the controlled public
 repository configuration. `mavenLocal()` or an uncontrolled same-GAV repository
 must not masquerade as release evidence. The strict gate inspects coordinates,
-origin, hashes, API, and a local/published differential run.
+origin, hashes, API, and four isolated published-mode repeatability runs.
 
-If matching modular Language artifacts are unavailable, local composite work can
-still be complete and committed, but `bexReleaseVerify` must remain red or
-`not-executed`. See [Release](release.md).
+If matching modular Language artifacts are unavailable, optional local-composite
+developer work can still proceed, but it is never accepted by
+`bexReleaseVerify`, which must remain red or `not-executed`. See
+[Release](release.md).
 
 ## Consumer migration
 

@@ -187,7 +187,8 @@ public abstract class GenerateModernizationReportTask extends DefaultTask {
                     + "- Public release ready: " + releaseReady + "\n\n"
                     + (releaseReady ? "Published dependency evidence is complete."
                     : "Published release remains fail-closed until matching "
-                            + "Language artifacts and differential evidence exist.")
+                            + "Language artifacts and published repeatability "
+                            + "evidence exist.")
                     + "\n";
             File markdownFile = getMarkdownOutputFile().get().getAsFile();
             markdownFile.getParentFile().mkdirs();

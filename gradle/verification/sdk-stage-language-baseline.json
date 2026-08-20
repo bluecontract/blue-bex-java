@@ -1,16 +1,23 @@
 {
   "schema": "blue-bex-sdk-stage-baseline/1.0",
-  "status": "candidate-source-lock",
+  "status": "retired-after-publication",
   "language": {
     "candidateVersion": "3.1.0-rc.21",
     "sourceCommit": "e0dfc897ea7d158895325fae2bf84e103b8c1989",
     "sourceBranch": "feature/cyclic-topology",
     "releaseVersionSelection": "-PreleaseVersion=3.1.0-rc.21",
     "historicalPublishedVersion": "3.1.0-rc.20",
-    "historicalPublishedEvidence": [
-      "src/test/resources/hosted-release/published-api-inspection.properties",
-      "gradle/verification/latest-language-baseline.json"
-    ]
+    "historicalPublishedEvidence": [],
+    "publishedRelease": {
+      "version": "3.1.0-rc.21",
+      "sourceCommit": "5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52",
+      "sourceTag": "v3.1.0-rc.21",
+      "sourceTagObject": "447b4bc440cc720a5fdd09fe50b9c9a280645a4f",
+      "currentEvidence": [
+        "src/test/resources/hosted-release/published-api-inspection.properties",
+        "gradle/verification/latest-language-baseline.json"
+      ]
+    }
   },
   "bex": {
     "candidateVersion": "1.1.0-rc.4",
@@ -19,9 +26,9 @@
     "historicalReleaseMetadata": ".cz.toml"
   },
   "policy": {
-    "dependencyMode": "staged-repository",
-    "publishedEvidenceComparison": "not-applicable-to-candidate-stage",
-    "artifactAcceptance": "every focused staged Language JAR must hash-match the resolved JAR",
-    "publication": "verification and publish are separate Gradle invocations"
+    "dependencyMode": "retired-staged-repository",
+    "publishedEvidenceComparison": "superseded-by-authenticated-standalone-published-release",
+    "artifactAcceptance": "historical candidate evidence is not accepted for publication",
+    "publication": "public gates consume authenticated Maven Central artifacts only"
   }
 }

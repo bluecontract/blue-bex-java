@@ -197,11 +197,12 @@ public final class BexConformanceReportMain {
         releaseGates.put(
                 "cleanDependencyCacheAcceptance",
                 cleanDependencyCacheAcceptance(buildModes));
-        boolean bothModesPassed =
-                Boolean.TRUE.equals(buildModes.get("allRequiredModesPassed"));
+        boolean publishedEvidencePassed =
+                Boolean.TRUE.equals(buildModes.get(
+                        "allRequiredPublishedEvidencePassed"));
         boolean releaseReady =
                 currentModeFailures.isEmpty()
-                        && bothModesPassed
+                        && publishedEvidencePassed
                         && exactFinalArtifactProven;
 
         Map<String, Object> report = new LinkedHashMap<String, Object>();
@@ -225,7 +226,9 @@ public final class BexConformanceReportMain {
                 "declaredCoordinate", declaredDependency,
                 "resolution", dependencyResolution,
                 "localComposite",
-                compositeDependencyEvidence(compositePath)));
+                map(
+                        "status",
+                        "not-applicable-to-published-only-release")));
         report.put("hostedStandaloneMatrix", buildModes);
         report.put("publishedHostApiInspection",
                 evidenceMap(publishedApiInspection));
@@ -339,7 +342,7 @@ public final class BexConformanceReportMain {
                                 ? "all-required-evidence-passed"
                                 : readinessReason(
                                         currentModeFailures,
-                                        bothModesPassed)));
+                                        publishedEvidencePassed)));
         System.out.println("BEX conformance report: " + output);
         System.out.println("BEX conformance report: " + markdown);
     }
@@ -656,6 +659,9 @@ public final class BexConformanceReportMain {
     static boolean modeRunCanPersistEvidence(
             String dependencyMode,
             Map<String, Object> dependencyResolution) {
+        if ("local-composite".equals(dependencyMode)) {
+            return false;
+        }
         if (!"standalone-published".equals(dependencyMode)) {
             return true;
         }
@@ -1387,29 +1393,6 @@ public final class BexConformanceReportMain {
         boolean staged =
                 "staged-repository".equals(
                         dependencyResolution.get("mode"));
-        Map<String, Object> localSource =
-                Collections.emptyMap();
-        boolean localMatchesPublished = compositePath == null && !staged;
-        if (compositePath != null
-                && Files.isDirectory(compositePath)) {
-            SourceState state = sourceState(compositePath);
-            List<String> tagsAtHead =
-                    gitTagsAtHead(compositePath);
-            localMatchesPublished =
-                    !state.worktreeDirty
-                            && state.completeWorkspace()
-                            && publishedSourceIdentityMatches(
-                            declaredDependency,
-                            publishedApiInspection,
-                            state.commit,
-                            tagsAtHead);
-            localSource = new LinkedHashMap<String, Object>(
-                    state.report());
-            localSource.put("tagsAtHead", tagsAtHead);
-            localSource.put(
-                    "matchesPublishedIdentity",
-                    localMatchesPublished);
-        }
         Map<String, Object> resolvedArtifact =
                 castMap(dependencyResolution.get("artifact"));
         boolean dependencyResolved =
@@ -1423,8 +1406,7 @@ public final class BexConformanceReportMain {
                         && publishedHash.equals(
                         resolvedArtifact.get("sha256"));
         boolean resolvedArtifactIdentitySatisfied =
-                !standalone
-                        || resolvedArtifactHashMatchesPublished;
+                standalone && resolvedArtifactHashMatchesPublished;
         boolean exactStagedArtifactProven = staged
                 && dependencyResolved
                 && "passed".equals(dependencyProvenance.get("status"))
@@ -1432,17 +1414,16 @@ public final class BexConformanceReportMain {
                         "stagedRepositoryArtifactsMatchResolved"))
                 && String.valueOf(resolvedArtifact.get("sha256"))
                 .matches("[0-9a-f]{64}");
-        boolean exactFinalArtifactProven = !staged
+        boolean exactFinalArtifactProven = standalone
                 && commitIdentified
-                        && hashIdentified
-                        && compatible
-                        && coordinateMatches
-                        && localMatchesPublished
-                        && dependencyResolved
-                        && resolvedArtifactIdentitySatisfied;
+                && hashIdentified
+                && compatible
+                && coordinateMatches
+                && dependencyResolved
+                && resolvedArtifactIdentitySatisfied;
         return map(
                 "schema",
-                "blue-bex-language-release-identity/1.1",
+                "blue-bex-language-release-identity/1.2",
                 "exactFinalArtifactProven",
                 exactFinalArtifactProven,
                 "exactSelectedArtifactProven",
@@ -1478,11 +1459,9 @@ public final class BexConformanceReportMain {
                 staged && Boolean.TRUE.equals(dependencyProvenance.get(
                         "stagedRepositoryArtifactsMatchResolved")),
                 "resolvedArtifact", resolvedArtifact,
-                "localCompositeSource", localSource,
-                "localCompositeMatchesPublishedCommit",
-                localMatchesPublished,
-                "localCompositeMatchesPublishedIdentity",
-                localMatchesPublished,
+                "releaseDependencyPolicy", "published-only",
+                "localCompositeStatus",
+                "not-applicable-to-published-only-release",
                 "failures",
                 exactFinalArtifactProven
                         ? Collections.emptyList()
@@ -1505,9 +1484,9 @@ public final class BexConformanceReportMain {
                         resolvedArtifactIdentitySatisfied
                                 ? null
                                 : "resolved-artifact-hash-mismatch",
-                        localMatchesPublished
+                        standalone
                                 ? null
-                                : "local-composite-not-clean-exact-published-commit-and-version-tag")
+                                : "published-only-release-requires-standalone-published-dependency")
                         .stream()
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList()),
@@ -1801,6 +1780,9 @@ public final class BexConformanceReportMain {
     static String modeEvidenceProvenanceStatus(
             String mode,
             Map<String, Object> provenance) {
+        if ("local-composite".equals(mode)) {
+            return "not-applicable-to-published-only-release";
+        }
         String status = String.valueOf(provenance.get("status"));
         if (!"standalone-published".equals(mode)) {
             return status;
@@ -1815,6 +1797,9 @@ public final class BexConformanceReportMain {
     static String modeEvidenceCacheScope(
             String mode,
             Map<String, Object> cacheAcceptance) {
+        if ("local-composite".equals(mode)) {
+            return "not-applicable-to-published-only-release";
+        }
         return "standalone-published".equals(mode)
                 ? "standalone-published-blue-language-module-version-cache"
                 : String.valueOf(cacheAcceptance.get("scope"));
@@ -1860,28 +1845,19 @@ public final class BexConformanceReportMain {
                 sourceState,
                 activeCompositePath,
                 publishedApiInspection);
-        Map<String, Object> local = validateModeEvidence(
-                root,
-                "local-composite",
-                declaredDependency,
-                projectVersion,
-                sourceState,
-                activeCompositePath,
-                publishedApiInspection);
-        boolean bothPassed =
-                "passed".equals(standalone.get("status"))
-                        && "passed".equals(local.get("status"));
-        boolean artifactsEquivalent = bothPassed
-                && artifactHashes(standalone).equals(
-                artifactHashes(local));
+        Map<String, Object> local = map(
+                "mode", "local-composite",
+                "status", "not-applicable-to-published-only-release",
+                "evidenceRead", false,
+                "effectiveCoordinate", "not-applicable");
         boolean allRequired =
-                bothPassed && artifactsEquivalent;
+                "passed".equals(standalone.get("status"));
         return map(
+                "releaseDependencyPolicy", "published-only",
                 "standalonePublished", standalone,
                 "localComposite", local,
-                "artifactsBehaviorallyEquivalent",
-                artifactsEquivalent,
-                "allRequiredModesPassed", allRequired,
+                "localCompositeRequired", false,
+                "allRequiredPublishedEvidencePassed", allRequired,
                 "standaloneBlocker",
                 "passed".equals(standalone.get("status"))
                         ? Collections.emptyList()
@@ -1899,16 +1875,15 @@ public final class BexConformanceReportMain {
                         .resolve("mode.properties").toString());
         Map<String, Object> local = map(
                 "mode", "local-composite",
-                "status", "not-applicable-to-staged-candidate",
+                "status", "not-applicable-to-published-only-release",
                 "evidenceRead", false,
-                "evidencePath", root.resolve("modes")
-                        .resolve("local-composite")
-                        .resolve("mode.properties").toString());
+                "effectiveCoordinate", "not-applicable");
         return map(
+                "releaseDependencyPolicy", "published-only",
                 "standalonePublished", standalone,
                 "localComposite", local,
-                "artifactsBehaviorallyEquivalent", false,
-                "allRequiredModesPassed", false,
+                "localCompositeRequired", false,
+                "allRequiredPublishedEvidencePassed", false,
                 "standaloneBlocker", Collections.emptyList(),
                 "reason",
                 "public release evidence is retained but not compared to "
@@ -2275,42 +2250,40 @@ public final class BexConformanceReportMain {
                 && tagsAtHead.contains(publishedTag);
     }
 
-    private static boolean localModeMatchesPublishedIdentity(
+    private static boolean standaloneModeAuthenticatesPublishedIdentity(
             Map<String, Object> buildModes) {
-        Map<String, Object> local =
-                castMap(buildModes.get("localComposite"));
-        Map<String, Object> compositeSource =
-                castMap(local.get("compositeSource"));
-        return "passed".equals(local.get("status"))
-                && Boolean.TRUE.equals(
-                compositeSource.get(
-                        "matchesPublishedIdentity"));
+        Map<String, Object> standalone =
+                castMap(buildModes.get("standalonePublished"));
+        return "passed".equals(standalone.get("status"));
     }
 
     static boolean bindLanguageReleaseIdentityToModes(
             Map<String, Object> identity,
             Map<String, Object> buildModes) {
-        boolean localMatches =
-                localModeMatchesPublishedIdentity(buildModes);
+        boolean standaloneAuthenticated =
+                standaloneModeAuthenticatesPublishedIdentity(buildModes);
         boolean currentDependencyExact =
                 Boolean.TRUE.equals(
                         identity.get(
                                 "currentDependencyExactFinalArtifactProven"));
-        boolean exact = currentDependencyExact && localMatches;
+        boolean exact = currentDependencyExact && standaloneAuthenticated;
         identity.put(
-                "localCompositeMatchesPublishedCommit",
-                localMatches);
+                "releaseDependencyPolicy",
+                "published-only");
         identity.put(
-                "localCompositeMatchesPublishedIdentity",
-                localMatches);
+                "validatedStandalonePublishedMode",
+                standaloneAuthenticated);
         identity.put(
-                "validatedLocalCompositeModeMatchesPublishedIdentity",
-                localMatches);
+                "validatedStandalonePublishedModeAuthenticatesArtifact",
+                standaloneAuthenticated);
         identity.put(
-                "validatedLocalCompositeModeFailure",
-                localMatches
+                "validatedStandalonePublishedModeFailure",
+                standaloneAuthenticated
                         ? null
-                        : "validated-local-composite-mode-not-bound-to-published-language-identity");
+                        : "validated-standalone-published-mode-not-authenticated");
+        identity.put(
+                "localCompositeStatus",
+                "not-applicable-to-published-only-release");
         Set<String> failures = new LinkedHashSet<String>();
         Object existingFailures = identity.get("failures");
         if (existingFailures instanceof Collection<?>) {
@@ -2321,9 +2294,9 @@ public final class BexConformanceReportMain {
                 }
             }
         }
-        if (!localMatches) {
+        if (!standaloneAuthenticated) {
             failures.add(
-                    "validated-local-composite-mode-not-bound-to-published-language-identity");
+                    "validated-standalone-published-mode-not-authenticated");
         }
         identity.put(
                 "failures",
@@ -2718,7 +2691,8 @@ public final class BexConformanceReportMain {
                     "resolution",
                     "Commit and publish the final Language kernel, "
                             + "record its exact coordinate, commit, and "
-                            + "artifact hash, then rerun both modes."));
+                            + "artifact hash, then rerun the published-only "
+                            + "release gate."));
         }
         if (!sourceState.uncommittedReleasePaths.isEmpty()) {
             limitations.add(map(
@@ -2752,7 +2726,8 @@ public final class BexConformanceReportMain {
                     "Publish the current generic runtime-work-session "
                             + "and semantic-output-boundary APIs from "
                             + "blue-language-java, then update the "
-                            + "declared coordinate and rerun both modes."));
+                            + "declared coordinate and rerun the published-only "
+                            + "release gate."));
         }
         return limitations;
     }
@@ -3236,12 +3211,12 @@ public final class BexConformanceReportMain {
 
     private static String readinessReason(
             List<String> currentModeFailures,
-            boolean bothModesPassed) {
+            boolean publishedEvidencePassed) {
         List<String> reasons =
                 new ArrayList<String>(currentModeFailures);
-        if (!bothModesPassed) {
+        if (!publishedEvidencePassed) {
             reasons.add(
-                    "standalone-and-local-composite-matrix-incomplete");
+                    "standalone-published-evidence-incomplete");
         }
         return String.join(";", reasons);
     }
@@ -3667,9 +3642,10 @@ public final class BexConformanceReportMain {
                     "evidencePath", evidencePath.toString(),
                     "parseStatus", "invalid-json");
         }
-        String sectionName = "local-composite".equals(dependencyMode)
-                ? "localComposite" : "standalonePublished";
+        String sectionName = "standalonePublished";
         Map<String, Object> pair = castMap(evidence.get(sectionName));
+        Map<String, Object> replicaPair = castMap(
+                evidence.get("standalonePublishedReplica"));
         Map<String, Object> firstBuild = castMap(pair.get("firstBuild"));
         Map<String, Object> secondBuild = castMap(pair.get("secondBuild"));
         Map<String, Object> first = castMap(firstBuild.get("manifest"));
@@ -3732,6 +3708,7 @@ public final class BexConformanceReportMain {
         boolean rolesPresent = corePresent && contractsPresent
                 && aggregatePresent && sourceReleasePresent;
         boolean pairValid = "passed".equals(pair.get("status"))
+                && "standalone-published".equals(pair.get("mode"))
                 && Boolean.TRUE.equals(pair.get("exactManifestBytesMatch"))
                 && Boolean.TRUE.equals(pair.get("exactArtifactBytesMatch"))
                 && Boolean.TRUE.equals(pair.get("artifactPathSetMatch"))
@@ -3744,9 +3721,53 @@ public final class BexConformanceReportMain {
                 && sourceCommit.equals(firstBuild.get("head"))
                 && sourceCommit.equals(secondBuild.get("head"))
                 && manifestsValid && artifactsValid && rolesPresent;
-        boolean passed = "blue-bex-independent-clean-builds/2.1".equals(
+
+        Map<String, Object> replicaFirstBuild = castMap(
+                replicaPair.get("firstBuild"));
+        Map<String, Object> replicaSecondBuild = castMap(
+                replicaPair.get("secondBuild"));
+        List<Object> replicaFirstArtifacts = objectList(
+                replicaFirstBuild.get("artifacts"));
+        List<Object> replicaSecondArtifacts = objectList(
+                replicaSecondBuild.get("artifacts"));
+        long replicaArtifactCount = longValue(
+                replicaPair.get("artifactCount"));
+        boolean replicaManifestsValid = manifestEvidenceMatches(
+                castMap(replicaFirstBuild.get("manifest")),
+                canonicalHash,
+                canonicalBytes.length,
+                artifactCount)
+                && manifestEvidenceMatches(
+                castMap(replicaSecondBuild.get("manifest")),
+                canonicalHash,
+                canonicalBytes.length,
+                artifactCount);
+        boolean replicaPairValid = "passed".equals(
+                replicaPair.get("status"))
+                && "standalone-published".equals(
+                replicaPair.get("mode"))
+                && Boolean.TRUE.equals(replicaPair.get(
+                "exactManifestBytesMatch"))
+                && Boolean.TRUE.equals(replicaPair.get(
+                "exactArtifactBytesMatch"))
+                && Boolean.TRUE.equals(replicaPair.get(
+                "artifactPathSetMatch"))
+                && Boolean.TRUE.equals(replicaPair.get(
+                "requiredArtifactRolesPresent"))
+                && replicaArtifactCount == artifactCount
+                && recordedArtifacts.equals(replicaFirstArtifacts)
+                && recordedArtifacts.equals(replicaSecondArtifacts)
+                && Boolean.TRUE.equals(replicaFirstBuild.get("clean"))
+                && Boolean.TRUE.equals(replicaSecondBuild.get("clean"))
+                && sourceCommit.equals(replicaFirstBuild.get("head"))
+                && sourceCommit.equals(replicaSecondBuild.get("head"))
+                && replicaManifestsValid;
+        boolean passed = "blue-bex-independent-clean-builds/3.0".equals(
                 evidence.get("schema"))
                 && "passed".equals(evidence.get("status"))
+                && "published-only".equals(
+                evidence.get("dependencyPolicy"))
+                && "standalone-published".equals(dependencyMode)
                 && sourceCommit.equals(evidence.get("bexCommit"))
                 && longValue(evidence.get("checkoutCount")) == 4L
                 && longValue(evidence.get("gitDirectoryCount")) == 4L
@@ -3760,7 +3781,8 @@ public final class BexConformanceReportMain {
                 "distinctGradleHomes"))
                 && Boolean.TRUE.equals(evidence.get(
                 "distinctInputManifestFiles"))
-                && pairValid;
+                && pairValid
+                && replicaPairValid;
         return map(
                 "status", passed ? "passed" : "stale-or-failed",
                 "evidencePresent", true,
@@ -3769,12 +3791,17 @@ public final class BexConformanceReportMain {
                 "schema", evidence.get("schema"),
                 "commit", evidence.get("bexCommit"),
                 "dependencyMode", dependencyMode,
-                "validatedSection", sectionName,
+                "validatedSections", java.util.Arrays.asList(
+                        sectionName,
+                        "standalonePublishedReplica"),
                 "distinctInputManifestFiles",
                 evidence.get("distinctInputManifestFiles"),
                 "artifactCount", recordedArtifacts.size(),
                 "manifestSha256", canonicalHash,
                 "manifestsValid", manifestsValid,
+                "replicaManifestsValid", replicaManifestsValid,
+                "standalonePublishedPairValid", pairValid,
+                "standalonePublishedReplicaPairValid", replicaPairValid,
                 "requiredArtifactRolesPresent", rolesPresent,
                 "currentArtifactsMatch", artifactsValid,
                 "currentArtifacts", currentArtifacts);
