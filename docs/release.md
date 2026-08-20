@@ -49,7 +49,7 @@ same-run conformance report's `currentModeFailures` makes the task fail.
 
 The source lock is
 `gradle/verification/sdk-stage-language-baseline.json`: it binds Language
-`3.1.0-rc.21` to commit `e463efe3b0ae161c680f1c00cd2846f7e4aa8e8f` and
+`3.1.0-rc.21` to commit `e0dfc897ea7d158895325fae2bf84e103b8c1989` and
 BEX `1.1.0-rc.4` to an explicit candidate-version selection. The retained
 `.cz.toml` value `1.1.0-rc.3` and the retained Maven Central Language rc.20
 inspection describe historical releases. They are not rewritten or compared

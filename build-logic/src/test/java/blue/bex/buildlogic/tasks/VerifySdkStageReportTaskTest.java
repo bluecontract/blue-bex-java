@@ -24,7 +24,7 @@ final class VerifySdkStageReportTaskTest {
                 task.getOutputFile().get().getAsFile().toPath());
         assertTrue(receipt.contains("\"status\": \"passed\""));
         assertTrue(receipt.contains(
-                "e463efe3b0ae161c680f1c00cd2846f7e4aa8e8f"));
+                "e0dfc897ea7d158895325fae2bf84e103b8c1989"));
     }
 
     @Test
@@ -58,7 +58,7 @@ final class VerifySdkStageReportTaskTest {
                   "status": "candidate-source-lock",
                   "language": {
                     "candidateVersion": "3.1.0-rc.21",
-                    "sourceCommit": "e463efe3b0ae161c680f1c00cd2846f7e4aa8e8f",
+                    "sourceCommit": "e0dfc897ea7d158895325fae2bf84e103b8c1989",
                     "historicalPublishedVersion": "3.1.0-rc.20"
                   },
                   "bex": {

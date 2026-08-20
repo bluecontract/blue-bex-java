@@ -3,7 +3,7 @@
   "status": "candidate-source-lock",
   "language": {
     "candidateVersion": "3.1.0-rc.21",
-    "sourceCommit": "e463efe3b0ae161c680f1c00cd2846f7e4aa8e8f",
+    "sourceCommit": "e0dfc897ea7d158895325fae2bf84e103b8c1989",
     "sourceBranch": "feature/cyclic-topology",
     "releaseVersionSelection": "-PreleaseVersion=3.1.0-rc.21",
     "historicalPublishedVersion": "3.1.0-rc.20",
