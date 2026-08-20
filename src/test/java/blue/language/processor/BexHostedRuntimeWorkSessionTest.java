@@ -681,7 +681,8 @@ class BexHostedRuntimeWorkSessionTest {
                     exhausted.counter());
             assertEquals(1L, exhausted.quantity());
             assertEquals(2L, exhausted.weight());
-            assertEquals(0L, exhausted.admittedGas());
+            assertEquals(100L, exhausted.admittedGas(),
+                    "the shared-cap receipt includes the competing live reservation");
             assertEquals(100L, exhausted.effectiveBudget());
             assertEquals(0, identityCalls.get());
             assertEquals(0, host.submitCount);

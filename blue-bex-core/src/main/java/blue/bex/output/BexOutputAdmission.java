@@ -6,6 +6,7 @@ import blue.bex.gas.BexGasMeter;
 import blue.bex.value.BexBlueNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.bex.value.BexFrozenWriter;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import blue.language.identity.BlueIds;
@@ -57,12 +58,22 @@ public final class BexOutputAdmission {
         if (value.isExact()) {
             String exactId = BlueIds.requireBlueIdOrCyclicMember(
                     value.exactBlueId(), "BEX exact output blueId");
+            BexEstablishedIdentity carried = Objects.requireNonNull(
+                    semanticIdentity.carryExactIdentity(
+                            exactId,
+                            BexFrozenWriter.toFrozen(value)),
+                    "carried exact identity");
+            if (!exactId.equals(carried.blueId())) {
+                throw new BexException(
+                        "Exact BEX output identity changed at the host boundary");
+            }
             return new BexAdmittedValue(
                     value,
                     value,
                     new Node().blueId(exactId),
                     exactId,
-                    false);
+                    false,
+                    carried.exactCapability());
         }
 
         BexAdmittedValue prior = admittedTransientValues.get(value);
@@ -103,7 +114,8 @@ public final class BexOutputAdmission {
         EstablishedTransientIdentity identity =
                 new EstablishedTransientIdentity(
                         established.frozenValue(),
-                        blueId);
+                        blueId,
+                        established.exactCapability());
         BexAdmittedValue admitted =
                 identity.admit(value);
         admittedTransientValues.put(value, admitted);
@@ -113,14 +125,17 @@ public final class BexOutputAdmission {
     private static final class EstablishedTransientIdentity {
         private final FrozenNode frozenValue;
         private final String blueId;
+        private final BexExactValueCapability exactCapability;
 
         private EstablishedTransientIdentity(
                 FrozenNode frozenValue,
-                String blueId) {
+                String blueId,
+                BexExactValueCapability exactCapability) {
             this.frozenValue = Objects.requireNonNull(
                     frozenValue, "frozenValue");
             this.blueId = Objects.requireNonNull(
                     blueId, "blueId");
+            this.exactCapability = exactCapability;
         }
 
         private BexAdmittedValue admit(
@@ -134,7 +149,8 @@ public final class BexOutputAdmission {
                     exact,
                     frozenValue.toNode(),
                     blueId,
-                    true);
+                    true,
+                    exactCapability);
         }
     }
 

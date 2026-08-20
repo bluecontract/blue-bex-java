@@ -23,4 +23,22 @@ public interface BexSemanticIdentityBoundary {
     };
 
     BexEstablishedIdentity establishIdentity(Node node);
+
+    /**
+     * Carries an existing exact value through the host boundary.
+     *
+     * <p>The standalone boundary retains only the supplied identity and
+     * representation. Hosted boundaries may override this method to attach an
+     * invocation-owned exact capability.</p>
+     *
+     * @param blueId the already established exact Blue identity
+     * @param frozenValue the verified frozen value carrying that identity
+     * @return the established identity and any host-owned exact capability
+     */
+    default BexEstablishedIdentity carryExactIdentity(
+            String blueId,
+            FrozenNode frozenValue) {
+        return new BexEstablishedIdentity(blueId, frozenValue);
+    }
+
 }

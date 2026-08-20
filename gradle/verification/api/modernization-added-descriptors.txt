@@ -76,11 +76,13 @@ class public abstract interface blue.bex.gas.BexSharedGasBudget
 class public abstract interface blue.bex.gas.BexSharedGasBudget :: method public abstract admittedGas():long
 class public abstract interface blue.bex.gas.BexSharedGasBudget :: method public abstract maximumGas():long
 class public abstract interface blue.bex.gas.BexSharedGasBudget :: method public abstract remainingGas():long
+class public abstract interface blue.bex.output.BexExactValueCapability
 class public abstract interface blue.bex.output.BexFailurePolicy
 class public abstract interface blue.bex.output.BexFailurePolicy :: field public static final STANDALONE:blue.bex.output.BexFailurePolicy
 class public abstract interface blue.bex.output.BexFailurePolicy :: method public abstract evidenceUnavailable(java.lang.Throwable):boolean
 class public abstract interface blue.bex.output.BexFailurePolicy :: method public preserveOrWrap(java.lang.String,java.lang.RuntimeException):java.lang.RuntimeException
 class public abstract interface blue.bex.output.BexFailurePolicy :: method public translate(java.lang.RuntimeException):java.lang.RuntimeException
+class public abstract interface blue.bex.output.BexSemanticIdentityBoundary :: method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
 class public abstract interface blue.bex.runtime.BexRuntimeContext
 class public abstract interface blue.bex.runtime.BexRuntimeContext :: method public abstract binding(java.lang.String):blue.bex.value.BexValue
 class public abstract interface blue.bex.runtime.BexRuntimeContext :: method public abstract currentContract():blue.bex.value.BexValue
@@ -236,6 +238,8 @@ class public final blue.bex.contracts.BexContractsFailureBoundary implements blu
 class public final blue.bex.contracts.BexContractsFailureBoundary implements blue.bex.api.BexFailureBoundary :: field public static final INSTANCE:blue.bex.contracts.BexContractsFailureBoundary
 class public final blue.bex.contracts.BexContractsFailureBoundary implements blue.bex.api.BexFailureBoundary :: method public classify(java.lang.Throwable):blue.bex.api.BexFailureBoundary$Classification
 class public final blue.bex.contracts.BexContractsFailureBoundary implements blue.bex.api.BexFailureBoundary :: method public translate(java.lang.RuntimeException):java.lang.RuntimeException
+class public final blue.bex.contracts.ProcessorExactBlueValueCapability implements blue.bex.output.BexExactValueCapability
+class public final blue.bex.contracts.ProcessorExactBlueValueCapability implements blue.bex.output.BexExactValueCapability :: method public exactValue():blue.language.processor.ExactBlueValue
 class public final blue.bex.contracts.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView
 class public final blue.bex.contracts.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: constructor public <init>(blue.language.processor.ProcessorExecutionContext)
 class public final blue.bex.contracts.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView :: method public canonicalAt(java.lang.String):blue.bex.value.BexValue
@@ -259,6 +263,7 @@ class public final blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost 
 class public final blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost implements blue.bex.api.BexGasLedgerHost :: method public submit(blue.bex.gas.BexGasLedgerCapability):void
 class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary
 class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary :: constructor public <init>(blue.language.processor.ProcessorExecutionContext)
+class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary :: method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
 class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary :: method public establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
 class public final blue.bex.gas.BexGasChargeContext
 class public final blue.bex.gas.BexGasChargeContext :: method public contractKey():java.lang.String
@@ -281,6 +286,9 @@ class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeEx
 class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeException :: method public namespace():java.lang.String
 class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeException :: method public quantity():long
 class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeException :: method public weight():long
+class public final blue.bex.output.BexAdmittedValue :: method public exactCapability():blue.bex.output.BexExactValueCapability
+class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
+class public final blue.bex.output.BexEstablishedIdentity :: method public exactCapability():blue.bex.output.BexExactValueCapability
 class public final blue.bex.output.BexOutputAdmission :: constructor public <init>(blue.bex.gas.BexGasMeter,blue.bex.output.BexSemanticIdentityBoundary,blue.bex.output.BexFailurePolicy)
 class public final blue.bex.pointer.BexPointerCache :: method public synchronized get(java.lang.String,blue.bex.result.BexMetricsRecorder):blue.bex.pointer.BexPointer
 class public final blue.bex.result.BexChangeset implements blue.bex.value.BexChangesetValueView

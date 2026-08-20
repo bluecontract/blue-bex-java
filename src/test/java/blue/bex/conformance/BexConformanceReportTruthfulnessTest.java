@@ -267,24 +267,41 @@ class BexConformanceReportTruthfulnessTest {
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.7",
-                        Collections.<String, String>emptyMap());
-        Map<String, Object> local =
+                        Collections.<String, String>emptyMap(),
+                        "standalone-published");
+        Map<String, Object> snapshot =
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.7-SNAPSHOT",
-                        Collections.<String, String>emptyMap());
+                        Collections.<String, String>emptyMap(),
+                        "standalone-published");
         Map<String, Object> mismatched =
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.8",
-                        Collections.<String, String>emptyMap());
+                        Collections.<String, String>emptyMap(),
+                        "standalone-published");
+        Map<String, Object> staged =
+                BexConformanceReportMain.versionAutomationEvidence(
+                        temporaryDirectory,
+                        "2.0.0-rc.8",
+                        Collections.<String, String>emptyMap(),
+                        "staged-repository");
 
         assertTrue(Boolean.TRUE.equals(
                 release.get("matchesProjectVersion")));
         assertTrue(Boolean.TRUE.equals(
-                local.get("matchesProjectVersion")));
+                snapshot.get("matchesProjectVersion")));
         assertFalse(Boolean.TRUE.equals(
                 mismatched.get("matchesProjectVersion")));
+        assertTrue(Boolean.TRUE.equals(
+                staged.get("matchesProjectVersion")));
+        assertEquals(
+                "2.0.0-rc.7",
+                staged.get("historicalConfiguredVersion"));
+        assertEquals(
+                "explicit-staged-candidate",
+                staged.get("selectionKind"));
     }
 
     @Test
@@ -312,9 +329,31 @@ class BexConformanceReportTruthfulnessTest {
                 BexConformanceReportMain.modeRunCanPersistEvidence(
                         "standalone-published", dependency));
 
-        assertTrue(
+        assertFalse(
                 BexConformanceReportMain.modeRunCanPersistEvidence(
                         "local-composite", dependency));
+    }
+
+    @Test
+    void stagedCandidateDoesNotReadHistoricalPublicReleaseModes(
+            @TempDir Path temporaryDirectory) {
+        Map<String, Object> modes =
+                BexConformanceReportMain.publicReleaseMatrixNotSelected(
+                        temporaryDirectory);
+
+        Map<?, ?> standalone = (Map<?, ?>) modes.get("standalonePublished");
+        Map<?, ?> local = (Map<?, ?>) modes.get("localComposite");
+        assertEquals(
+                "not-applicable-to-staged-candidate",
+                standalone.get("status"));
+        assertEquals(Boolean.FALSE, standalone.get("evidenceRead"));
+        assertEquals(
+                "not-applicable-to-published-only-release",
+                local.get("status"));
+        assertEquals(Boolean.FALSE, local.get("evidenceRead"));
+        assertEquals(Boolean.FALSE, modes.get("localCompositeRequired"));
+        assertFalse(Boolean.TRUE.equals(
+                modes.get("allRequiredPublishedEvidencePassed")));
     }
 
     @Test
@@ -338,11 +377,11 @@ class BexConformanceReportTruthfulnessTest {
                 BexConformanceReportMain.modeEvidenceCacheScope(
                         "standalone-published", cache));
         assertEquals(
-                "passed",
+                "not-applicable-to-published-only-release",
                 BexConformanceReportMain.modeEvidenceProvenanceStatus(
                         "local-composite", provenance));
         assertEquals(
-                "all focused and aggregate Language modules",
+                "not-applicable-to-published-only-release",
                 BexConformanceReportMain.modeEvidenceCacheScope(
                         "local-composite", cache));
 
@@ -356,16 +395,16 @@ class BexConformanceReportTruthfulnessTest {
     }
 
     @Test
-    void localCompositeIdentityMustMatchPublishedCommitAndVersionTag() {
+    void publishedSourceIdentityRequiresExactRc21CommitAndVersionTag() {
         String coordinate =
-                "blue.language:blue-language-java:3.1.0-rc.20";
+                "blue.language:blue-language-java:3.1.0-rc.21";
         String commit =
                 "0123456789abcdef0123456789abcdef01234567";
         Map<String, String> inspection =
                 new LinkedHashMap<String, String>();
         inspection.put("coordinate", coordinate);
         inspection.put("source.commit", commit);
-        inspection.put("source.tag", "v3.1.0-rc.20");
+        inspection.put("source.tag", "v3.1.0-rc.21");
 
         assertTrue(
                 BexConformanceReportMain
@@ -374,7 +413,7 @@ class BexConformanceReportTruthfulnessTest {
                                 inspection,
                                 commit,
                                 Collections.singleton(
-                                        "v3.1.0-rc.20")));
+                                        "v3.1.0-rc.21")));
         assertFalse(
                 BexConformanceReportMain
                         .publishedSourceIdentityMatches(
@@ -382,7 +421,7 @@ class BexConformanceReportTruthfulnessTest {
                                 inspection,
                                 "1123456789abcdef0123456789abcdef01234567",
                                 Collections.singleton(
-                                        "v3.1.0-rc.20")));
+                                        "v3.1.0-rc.21")));
         assertFalse(
                 BexConformanceReportMain
                         .publishedSourceIdentityMatches(
@@ -390,9 +429,9 @@ class BexConformanceReportTruthfulnessTest {
                                 inspection,
                                 commit,
                                 Collections.singleton(
-                                        "v3.1.0-rc.19")));
+                                        "v3.1.0-rc.21-invalid")));
 
-        inspection.put("source.tag", "release-3.1.0-rc.20");
+        inspection.put("source.tag", "release-3.1.0-rc.21");
         assertFalse(
                 BexConformanceReportMain
                         .publishedSourceIdentityMatches(
@@ -400,11 +439,11 @@ class BexConformanceReportTruthfulnessTest {
                                 inspection,
                                 commit,
                                 Collections.singleton(
-                                        "release-3.1.0-rc.20")));
+                                        "release-3.1.0-rc.21")));
     }
 
     @Test
-    void finalIdentityCannotClaimAnUnvalidatedLocalMode() {
+    void finalIdentityRequiresValidatedStandalonePublishedMode() {
         Map<String, Object> identity =
                 new LinkedHashMap<String, Object>();
         identity.put(
@@ -412,27 +451,16 @@ class BexConformanceReportTruthfulnessTest {
                 Boolean.TRUE);
         identity.put("exactFinalArtifactProven", Boolean.TRUE);
         identity.put(
-                "localCompositeMatchesPublishedCommit",
-                Boolean.TRUE);
-        identity.put(
-                "localCompositeMatchesPublishedIdentity",
-                Boolean.TRUE);
-        identity.put(
                 "failures",
                 Collections.emptyList());
 
-        Map<String, Object> local =
+        Map<String, Object> standalone =
                 new LinkedHashMap<String, Object>();
-        local.put("status", "stale-or-failed");
-        local.put(
-                "compositeSource",
-                Collections.singletonMap(
-                        "matchesPublishedIdentity",
-                        Boolean.FALSE));
+        standalone.put("status", "stale-or-failed");
         Map<String, Object> modes =
                 Collections.singletonMap(
-                        "localComposite",
-                        local);
+                        "standalonePublished",
+                        standalone);
 
         assertFalse(
                 BexConformanceReportMain
@@ -446,14 +474,38 @@ class BexConformanceReportTruthfulnessTest {
         assertEquals(
                 Boolean.FALSE,
                 identity.get(
-                        "localCompositeMatchesPublishedCommit"));
+                        "validatedStandalonePublishedMode"));
         assertEquals(
                 Boolean.FALSE,
                 identity.get(
-                        "localCompositeMatchesPublishedIdentity"));
+                        "validatedStandalonePublishedModeAuthenticatesArtifact"));
+        assertEquals(
+                "not-applicable-to-published-only-release",
+                identity.get("localCompositeStatus"));
         assertTrue(
                 String.valueOf(identity.get("failures"))
                         .contains(
-                                "validated-local-composite-mode-not-bound-to-published-language-identity"));
+                                "validated-standalone-published-mode-not-authenticated"));
+
+        Map<String, Object> authenticatedIdentity =
+                new LinkedHashMap<String, Object>();
+        authenticatedIdentity.put(
+                "currentDependencyExactFinalArtifactProven",
+                Boolean.TRUE);
+        authenticatedIdentity.put("failures", Collections.emptyList());
+        standalone.put("status", "passed");
+
+        assertTrue(
+                BexConformanceReportMain
+                        .bindLanguageReleaseIdentityToModes(
+                                authenticatedIdentity,
+                                modes));
+        assertEquals(
+                Boolean.TRUE,
+                authenticatedIdentity.get("exactFinalArtifactProven"));
+        assertEquals(
+                Boolean.TRUE,
+                authenticatedIdentity.get(
+                        "validatedStandalonePublishedModeAuthenticatesArtifact"));
     }
 }

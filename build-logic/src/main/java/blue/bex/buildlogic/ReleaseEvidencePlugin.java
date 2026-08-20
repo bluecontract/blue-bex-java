@@ -60,21 +60,21 @@ public final class ReleaseEvidencePlugin implements Plugin<Project> {
                                             "reports/bex-release/inputs/"
                                                     + "published-artifacts"),
                                     spec -> spec.include("*.jar")));
-                            Object differential = project.findProperty(
-                                    "bexLocalPublishedDifferential");
-                            if (differential != null
-                                    && !differential.toString().trim().isEmpty()) {
-                                task.getDifferentialReport().fileValue(
-                                        project.file(differential.toString()));
+                            Object repeatability = project.findProperty(
+                                    "bexPublishedRepeatability");
+                            if (repeatability != null
+                                    && !repeatability.toString().trim().isEmpty()) {
+                                task.getRepeatabilityReport().fileValue(
+                                        project.file(repeatability.toString()));
                             } else {
                                 File retained = project.getLayout()
                                         .getBuildDirectory().file(
                                                 "reports/bex-release/inputs/"
-                                                        + "local-published-"
-                                                        + "differential.json")
+                                                        + "published-"
+                                                        + "repeatability.json")
                                         .get().getAsFile();
                                 if (retained.isFile()) {
-                                    task.getDifferentialReport().fileValue(retained);
+                                    task.getRepeatabilityReport().fileValue(retained);
                                 }
                             }
                             task.getOutputFile().set(

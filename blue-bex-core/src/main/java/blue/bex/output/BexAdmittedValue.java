@@ -14,18 +14,21 @@ public final class BexAdmittedValue {
     private final Node node;
     private final String nodeBlueId;
     private final boolean reconstructed;
+    private final BexExactValueCapability exactCapability;
 
     BexAdmittedValue(BexValue value,
                      BexValue semanticValue,
                      Node node,
                      String nodeBlueId,
-                     boolean reconstructed) {
+                     boolean reconstructed,
+                     BexExactValueCapability exactCapability) {
         this.value = Objects.requireNonNull(value, "value");
         this.semanticValue = Objects.requireNonNull(
                 semanticValue, "semanticValue");
         this.node = Objects.requireNonNull(node, "node");
         this.nodeBlueId = Objects.requireNonNull(nodeBlueId, "nodeBlueId");
         this.reconstructed = reconstructed;
+        this.exactCapability = exactCapability;
     }
 
     /**
@@ -59,5 +62,14 @@ public final class BexAdmittedValue {
 
     public boolean reconstructed() {
         return reconstructed;
+    }
+
+    /**
+     * Returns the optional opaque exact capability retained by the host.
+     *
+     * @return the retained capability, or {@code null} when none was supplied
+     */
+    public BexExactValueCapability exactCapability() {
+        return exactCapability;
     }
 }

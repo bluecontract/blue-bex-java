@@ -296,6 +296,8 @@ class public final blue.bex.contracts.BexContractsFailureBoundary implements blu
   field public static final INSTANCE:blue.bex.contracts.BexContractsFailureBoundary
   method public classify(java.lang.Throwable):blue.bex.api.BexFailureBoundary$Classification
   method public translate(java.lang.RuntimeException):java.lang.RuntimeException
+class public final blue.bex.contracts.ProcessorExactBlueValueCapability implements blue.bex.output.BexExactValueCapability
+  method public exactValue():blue.language.processor.ExactBlueValue
 class public final blue.bex.contracts.ProcessorExecutionContextBexDocumentView implements blue.bex.api.BexDocumentView
   constructor public <init>(blue.language.processor.ProcessorExecutionContext)
   method public canonicalAt(java.lang.String):blue.bex.value.BexValue
@@ -319,6 +321,7 @@ class public final blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost 
   method public submit(blue.bex.gas.BexGasLedgerCapability):void
 class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary
   constructor public <init>(blue.language.processor.ProcessorExecutionContext)
+  method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
   method public establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
 class public final blue.bex.gas.BexGasCharge
   constructor public <init>(long,blue.bex.gas.BexGasCounter,long,long,java.lang.String,java.lang.String,java.lang.String)
@@ -566,6 +569,7 @@ class public abstract interface blue.bex.gas.BexSharedGasBudget
   method public abstract maximumGas():long
   method public abstract remainingGas():long
 class public final blue.bex.output.BexAdmittedValue
+  method public exactCapability():blue.bex.output.BexExactValueCapability
   method public node():blue.language.model.Node
   method public nodeBlueId():java.lang.String
   method public reconstructed():boolean
@@ -573,8 +577,11 @@ class public final blue.bex.output.BexAdmittedValue
   method public value():blue.bex.value.BexValue
 class public final blue.bex.output.BexEstablishedIdentity
   constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode)
+  constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
   method public blueId():java.lang.String
+  method public exactCapability():blue.bex.output.BexExactValueCapability
   method public frozenValue():blue.language.snapshot.FrozenNode
+class public abstract interface blue.bex.output.BexExactValueCapability
 class public abstract interface blue.bex.output.BexFailurePolicy
   field public static final STANDALONE:blue.bex.output.BexFailurePolicy
   method public abstract evidenceUnavailable(java.lang.Throwable):boolean
@@ -597,6 +604,7 @@ class public final blue.bex.output.BexOutputKind extends java.lang.Enum
 class public abstract interface blue.bex.output.BexSemanticIdentityBoundary
   field public static final STANDALONE:blue.bex.output.BexSemanticIdentityBoundary
   method public abstract establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
+  method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
 class public final blue.bex.pointer.BexPointer
   method public descendant(java.util.List):blue.bex.pointer.BexPointer
   method public equals(java.lang.Object):boolean

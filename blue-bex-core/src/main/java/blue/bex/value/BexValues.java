@@ -202,10 +202,39 @@ public final class BexValues {
                             ? Collections.singletonList(blueId)
                             : outstanding);
         }
-        FrozenNode canonicalReference = FrozenNode.fromNode(
-                new Node().blueId(blueId));
+        Node verifiedFragmentNode = result.value().get().clone();
         FrozenNode verifiedDirectFragment = FrozenNode.fromResolvedNode(
-                result.value().get());
+                verifiedFragmentNode);
+        FrozenNode canonicalReference;
+        if (blueId.indexOf('#') >= 0) {
+            /*
+             * A cyclic member has no independently hashable body. Keep its
+             * complete-set identity opaque even after semantic materialization.
+             */
+            canonicalReference = FrozenNode.fromNode(
+                    new Node().blueId(blueId));
+        } else {
+            if (verifiedFragmentNode.getBlueId() != null
+                    && !blueId.equals(verifiedFragmentNode.getBlueId())) {
+                throw new BexInvalidExecutionEvidenceException(
+                        "Verified exact reference fragment changed identity for "
+                                + blueId);
+            }
+            verifiedFragmentNode.blueId(null);
+            try {
+                canonicalReference = FrozenNode.fromNode(
+                        verifiedFragmentNode);
+            } catch (RuntimeException invalid) {
+                throw new BexInvalidExecutionEvidenceException(
+                        "Verified exact reference fragment is not canonical for "
+                                + blueId);
+            }
+            if (!blueId.equals(canonicalReference.blueId())) {
+                throw new BexInvalidExecutionEvidenceException(
+                        "Verified exact reference fragment does not identify "
+                                + blueId);
+            }
+        }
         return new ResolvedSnapshot(
                 canonicalReference, verifiedDirectFragment);
     }

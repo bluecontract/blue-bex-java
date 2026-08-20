@@ -42,7 +42,7 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
     @InputFile
     @Optional
     @PathSensitive(PathSensitivity.NONE)
-    public abstract RegularFileProperty getDifferentialReport();
+    public abstract RegularFileProperty getRepeatabilityReport();
 
     @Internal
     public abstract DirectoryProperty getRepositoryDirectory();
@@ -64,15 +64,15 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
             String published = read(
                     getPublishedLanguageReport().get().getAsFile());
             String independent = optionalText(getIndependentCleanBuildReport());
-            String differential = optionalText(getDifferentialReport());
+            String repeatability = optionalText(getRepeatabilityReport());
             Map<String, Object> modernizationEvidence =
                     ReleaseEvidenceJson.parseOrEmpty(modernization);
             Map<String, Object> publishedEvidence =
                     ReleaseEvidenceJson.parseOrEmpty(published);
             Map<String, Object> independentEvidence =
                     ReleaseEvidenceJson.parseOrEmpty(independent);
-            Map<String, Object> differentialEvidence =
-                    ReleaseEvidenceJson.parseOrEmpty(differential);
+            Map<String, Object> repeatabilityEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(repeatability);
             File repository = getRepositoryDirectory().get().getAsFile();
             String commit = gitText(repository, "rev-parse", "HEAD").trim();
             boolean clean = gitBytes(repository, "status", "--porcelain", "-z")
@@ -93,9 +93,9 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
             boolean independentReady =
                     ReleaseEvidenceJson.independentBuildsPassed(
                             independentEvidence, commit);
-            boolean differentialReady =
-                    ReleaseEvidenceJson.differentialPassed(
-                            differentialEvidence, commit);
+            boolean repeatabilityReady =
+                    ReleaseEvidenceJson.publishedRepeatabilityPassed(
+                            repeatabilityEvidence, commit);
 
             List<String> blockers = new ArrayList<>();
             addBlocker(blockers, modernizationReady,
@@ -106,8 +106,8 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     "matching published Language artifacts are not authenticated");
             addBlocker(blockers, independentReady,
                     "two isolated clean-build pairs are absent or do not match");
-            addBlocker(blockers, differentialReady,
-                    "local/published semantic and exact-gas differential is absent");
+            addBlocker(blockers, repeatabilityReady,
+                    "published semantic and exact-gas repeatability is absent");
             addBlocker(blockers, clean,
                     "BEX source checkout is dirty");
             addBlocker(blockers, exactTag,
@@ -115,7 +115,8 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
             boolean releaseReady = blockers.isEmpty();
 
             String json = "{\n"
-                    + "  \"schema\": \"blue-bex-strict-release/1.0\",\n"
+                    + "  \"schema\": \"blue-bex-strict-release/2.0\",\n"
+                    + "  \"dependencyPolicy\": \"published-only\",\n"
                     + "  \"bexCommit\": " + quote(commit) + ",\n"
                     + "  \"sourceState\": {\"clean\":" + clean
                     + ",\"expectedTag\":"
@@ -133,8 +134,8 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     + "  \"independentCleanBuildStatus\": "
                     + quote(independentReady ? "passed" : "not-executed")
                     + ",\n"
-                    + "  \"localPublishedDifferentialStatus\": "
-                    + quote(differentialReady ? "passed" : "not-executed")
+                    + "  \"publishedRepeatabilityStatus\": "
+                    + quote(repeatabilityReady ? "passed" : "not-executed")
                     + ",\n"
                     + "  \"blockers\": " + jsonStrings(blockers) + ",\n"
                     + "  \"releaseReady\": " + releaseReady + "\n"
@@ -149,8 +150,8 @@ public abstract class GenerateReleaseReportTask extends DefaultTask {
                     + "- Published Language: " + pass(publishedReady) + "\n"
                     + "- Independent clean builds: " + pass(independentReady)
                     + "\n"
-                    + "- Local/published differential: "
-                    + pass(differentialReady) + "\n"
+                    + "- Published semantic/gas repeatability: "
+                    + pass(repeatabilityReady) + "\n"
                     + "- Clean exact tagged source: "
                     + pass(clean && exactTag) + "\n"
                     + "- `releaseReady`: `" + releaseReady + "`\n\n"

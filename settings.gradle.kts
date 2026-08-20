@@ -24,6 +24,39 @@ val compositePath = providers.gradleProperty("blueLanguageCompositePath")
     .orNull
     ?.trim()
     ?.takeIf(String::isNotEmpty)
+val stagedRepositoryPath = providers.gradleProperty("blueLanguageRepository")
+    .orNull
+    ?.trim()
+    ?.takeIf(String::isNotEmpty)
+val publishedOnlyTasks = setOf(
+    "bexPublishedDependencyVerification",
+    "bexPublishedLanguageVerification",
+    "bexWorkingVerification",
+    "generateBexWorkingReport",
+    "bexModernizationVerification",
+    "generateBexModernizationReport",
+    "bexReleaseVerify",
+    "generateBexReleaseReport",
+    "bexReleaseEvidence",
+    "publish",
+    "jreleaserFullRelease"
+)
+val requestedPublishedOnlyTask = gradle.startParameter.taskNames
+    .map { it.substringAfterLast(':') }
+    .firstOrNull {
+        it in publishedOnlyTasks || it.startsWith("publish") ||
+            it.startsWith("jreleaser")
+    }
+if (requestedPublishedOnlyTask != null) {
+    require(compositePath == null) {
+        "$requestedPublishedOnlyTask is published-only and forbids " +
+            "blueLanguageCompositePath"
+    }
+    require(stagedRepositoryPath == null) {
+        "$requestedPublishedOnlyTask is published-only and forbids " +
+            "blueLanguageRepository"
+    }
+}
 
 if (compositePath != null) {
     val checkout = file(compositePath)

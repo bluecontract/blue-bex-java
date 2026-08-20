@@ -105,6 +105,13 @@ final class AdmittedExactBexValue implements BexValue {
             if (establishedChild.isExact()
                     && establishedChild.exactBlueId().equals(
                     suppliedChild.exactBlueId())) {
+                /*
+                 * The run-local child already carries this exact identity and
+                 * its verified semantic cursor. Rewrapping it behind the
+                 * aggregate's canonical pure reference would discard that
+                 * cursor and spuriously require provider evidence for ordinary
+                 * reads of the just-produced value.
+                 */
                 return suppliedChild;
             }
             /*
@@ -168,6 +175,14 @@ final class AdmittedExactBexValue implements BexValue {
 
     Object rawScalar() {
         return BexValues.rawScalar(establishedValue);
+    }
+
+    FrozenNode establishedFrozenValue() {
+        if (!(establishedValue instanceof FrozenNodeBexValue)) {
+            throw new IllegalStateException(
+                    "Admitted exact value has no frozen host representation");
+        }
+        return ((FrozenNodeBexValue) establishedValue).canonicalNode();
     }
 
     /*

@@ -12,12 +12,12 @@ It is the human-readable companion to
 | BEX baseline | `395c484111f8c4e9e0e98d2db7f1c5b0777bd5a8` |
 | Working compatibility checkpoint | `169e589` |
 | BEX migration | Modernization delta rooted at the working checkpoint; the commit containing this ledger is the final target revision |
-| Language target | `505a654699b86b42bf0e282ddf94560a91529bcf` (`v3.1.0-rc.20`) |
-| Language verified implementation | `505a654699b86b42bf0e282ddf94560a91529bcf` |
+| Language target | `5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52` (`v3.1.0-rc.21`) |
+| Language verified implementation | `5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52` |
 | Language target delta | None; the target and verified implementation commits are identical |
 | Previous API manifest SHA-256 | `830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315` |
 | Working-checkpoint API manifest SHA-256 | `43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0` |
-| Final modular API manifest SHA-256 | `5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92` |
+| Final modular API manifest SHA-256 | `a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43` |
 
 The migration target cannot truthfully name its eventual BEX commit while that
 commit is being assembled. The Git commit containing this ledger is the target
@@ -26,7 +26,7 @@ entry was audited.
 
 ## Exact descriptor changes
 
-The subsequent modular modernization contains 254 removed and 484 added exact
+The subsequent modular modernization contains 254 removed and 492 added exact
 owner-qualified descriptors relative to commit `169e589`. Both compared manifests, both
 classifications, and the complete sorted addition/removal sets are
 source-controlled under `gradle/verification/api/`. The `binaryApiCheck` task
@@ -54,6 +54,9 @@ presented as the exhaustive machine delta.
 | Added | internal implementation | `blue.bex.type.BexBlueTypeMatcher::<init>(blue.language.runtime.BlueLanguage)` | Supported modular matcher/runtime boundary. | Additive alone; migration target for the removed constructor. |
 | Removed | host SPI | `method public static referenceBacked(blue.bex.value.BexValue,blue.language.Blue):blue.bex.value.BexValue` | Replaced by the overload using the modular graph-capable runtime. | Binary and source breaking for direct host callers. |
 | Added | host SPI | `method public static referenceBacked(blue.bex.value.BexValue,blue.language.runtime.BlueLanguage):blue.bex.value.BexValue` | Verified, demand-driven reference materialization through `BlueLanguage`. | Additive alone; migration target for host integrations. |
+| Added | host SPI | `class public abstract interface blue.bex.output.BexExactValueCapability` | Carries an already verified exact Blue value across BEX output admission. | Compatible additive host capability. |
+| Added | host SPI | `class public final blue.bex.contracts.ProcessorExactBlueValueCapability implements blue.bex.output.BexExactValueCapability` | Adapts the Contracts `ExactBlueValue` capability without reserialization. | Compatible additive Contracts adapter. |
+| Added | host SPI | `method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity` on `BexSemanticIdentityBoundary` | Preserves an established ordinary BlueId and frozen value through semantic output admission. | Compatible default-method addition. |
 
 The compiler-package acyclicity pass contributes these reviewed descriptors:
 
@@ -128,14 +131,14 @@ isolated because diagnostics cannot alter compile/cache/execution/gas success.
 ## Public API classification and deterministic inventory
 
 [`public-api-classification.json`](public-api-classification.json) classifies
-all 101 public production types as stable API, host SPI, intrinsic SPI, internal
-implementation, or conformance-only. The exact 1,028 class/member descriptors are
+all 103 public production types as stable API, host SPI, intrinsic SPI, internal
+implementation, or conformance-only. The exact 1,036 class/member descriptors are
 source-controlled in
 `src/test/resources/hosted-release/required-public-api.txt`; that file is the
 machine-comparable inventory, while the JSON file supplies intent metadata.
 
 At this audited state the required inventory is byte-for-byte identical to
 `blue-bex-conformance/build/reports/bex-release/public-api.txt`, and both have
-SHA-256 `5acb4712e3e03c5ba9a58d87b4a40bed4e1dcca76ed58ef355a77f0efc9d3c92`.
+SHA-256 `a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43`.
 Build wiring generates the latter from compiled classes and fails on any diff
 from the reviewed source-controlled baseline.

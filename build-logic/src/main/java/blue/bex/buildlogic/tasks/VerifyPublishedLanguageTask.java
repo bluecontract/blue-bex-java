@@ -11,9 +11,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
@@ -36,8 +38,8 @@ import org.gradle.api.tasks.TaskAction;
  *
  * <p>Caller-supplied coordinates and digests are assertions, not evidence.
  * This task only passes when they agree with the source-controlled inspection,
- * the resolved artifact bytes, and a same-source local/published differential
- * report. Missing publication inputs remain explicitly {@code not-executed}.
+ * the resolved artifact bytes, and same-source published-mode repeatability
+ * evidence. Missing publication inputs remain explicitly {@code not-executed}.
  */
 public abstract class VerifyPublishedLanguageTask extends DefaultTask {
     private static final String COMPATIBLE_STATUS =
@@ -66,7 +68,7 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
     @InputFile
     @Optional
     @PathSensitive(PathSensitivity.NONE)
-    public abstract RegularFileProperty getDifferentialReport();
+    public abstract RegularFileProperty getRepeatabilityReport();
 
     @OutputFile
     public abstract RegularFileProperty getOutputFile();
@@ -112,7 +114,8 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
                     "[^:]+:[^:]+:[^:]+")
                     && reviewedSha.matches("[0-9a-f]{64}")
                     && sourceCommit.matches("[0-9a-f]{40}")
-                    && sourceTag.matches("v?[A-Za-z0-9][A-Za-z0-9._-]*");
+                    && sourceTag.equals("v" + coordinateVersion(
+                    reviewedCoordinate));
             if (!reviewedIdentityComplete) {
                 reasons.add("reviewed coordinate, artifact hash, or source identity "
                         + "is incomplete");
@@ -136,37 +139,41 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
             boolean reviewedApiClaimsPass = reviewedApiClaimsPass(
                     inspection, artifacts, reasons);
 
-            String differential = getDifferentialReport().isPresent()
-                    && getDifferentialReport().get().getAsFile().isFile()
-                    ? read(getDifferentialReport().get().getAsFile()) : "";
-            Map<String, Object> differentialEvidence =
-                    ReleaseEvidenceJson.parseOrEmpty(differential);
-            boolean differentialPassed =
-                    ReleaseEvidenceJson.differentialPassed(
-                            differentialEvidence, null);
-            if (!differential.isEmpty() && !differentialPassed) {
-                reasons.add("local/published semantic and exact-gas differential "
-                        + "did not pass");
+            boolean focusedArtifactHashesPass = focusedArtifactHashesPass(
+                    inspection, artifactEvidence, reasons);
+
+            String repeatability = getRepeatabilityReport().isPresent()
+                    && getRepeatabilityReport().get().getAsFile().isFile()
+                    ? read(getRepeatabilityReport().get().getAsFile()) : "";
+            Map<String, Object> repeatabilityEvidence =
+                    ReleaseEvidenceJson.parseOrEmpty(repeatability);
+            boolean repeatabilityPassed =
+                    ReleaseEvidenceJson.publishedRepeatabilityPassed(
+                            repeatabilityEvidence, null);
+            if (!repeatability.isEmpty() && !repeatabilityPassed) {
+                reasons.add("published-mode semantic and exact-gas "
+                        + "repeatability did not pass");
             }
 
             boolean inputsPresent = configured && !artifacts.isEmpty()
-                    && !differential.isEmpty();
+                    && !repeatability.isEmpty();
             boolean passed = reviewedCompatible && reviewedIdentityComplete
                     && assertionsMatch && artifactHashMatches
-                    && reviewedApiClaimsPass && differentialPassed;
+                    && reviewedApiClaimsPass && focusedArtifactHashesPass
+                    && repeatabilityPassed;
             String status;
             if (!reviewedCompatible) {
                 status = "incompatible";
             } else if (!inputsPresent) {
                 status = "not-executed";
-                reasons.add("resolved artifacts and same-run differential evidence "
-                        + "are required");
+                reasons.add("resolved artifacts and same-run published-mode "
+                        + "repeatability evidence are required");
             } else {
                 status = passed ? "passed" : "failed";
             }
 
             String json = "{\n"
-                    + "  \"schema\": \"blue-bex-published-language/2.0\",\n"
+                    + "  \"schema\": \"blue-bex-published-language/3.0\",\n"
                     + "  \"status\": " + quote(status) + ",\n"
                     + "  \"coordinate\": " + quote(reviewedCoordinate) + ",\n"
                     + "  \"artifactSha256\": " + quote(reviewedSha) + ",\n"
@@ -182,8 +189,10 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
                     + artifactsJson(artifactEvidence) + ",\n"
                     + "  \"apiInspectionPassed\": "
                     + reviewedApiClaimsPass + ",\n"
-                    + "  \"differentialStatus\": "
-                    + quote(differentialPassed ? "passed" : "not-executed")
+                    + "  \"focusedArtifactHashesPassed\": "
+                    + focusedArtifactHashesPass + ",\n"
+                    + "  \"repeatabilityStatus\": "
+                    + quote(repeatabilityPassed ? "passed" : "not-executed")
                     + ",\n"
                     + "  \"blockers\": " + jsonStrings(reasons) + "\n"
                     + "}\n";
@@ -229,6 +238,72 @@ public abstract class VerifyPublishedLanguageTask extends DefaultTask {
             }
         }
         return passed;
+    }
+
+    private static boolean focusedArtifactHashesPass(
+            Properties inspection,
+            List<ArtifactEvidence> artifacts,
+            List<String> reasons) {
+        String coordinate = property(inspection, "coordinate");
+        String version = coordinateVersion(coordinate);
+        List<String> modules = propertyList(
+                inspection, "release.requiredArtifacts");
+        String[] coordinateParts = coordinate.split(":", -1);
+        String coordinateArtifact = coordinateParts.length == 3
+                ? coordinateParts[1] : "";
+        boolean passed = true;
+        Set<String> expectedNames = new HashSet<>();
+        if (modules.isEmpty() || !modules.contains(coordinateArtifact)) {
+            passed = false;
+            reasons.add("reviewed required Language artifact list is invalid");
+        }
+        for (String module : modules) {
+            String expectedName = module + "-" + version + ".jar";
+            expectedNames.add(expectedName);
+            String expected = property(
+                    inspection, "artifact." + module + ".sha256");
+            boolean validExpected = expected.matches("[0-9a-f]{64}");
+            long matching = artifacts.stream()
+                    .filter(item -> item.file.getName().equals(expectedName)
+                            && expected.equals(item.sha256))
+                    .count();
+            boolean resolved = validExpected && matching == 1;
+            if (!resolved) {
+                passed = false;
+                reasons.add("reviewed hash did not authenticate resolved "
+                        + module + " artifact");
+            }
+        }
+        Set<String> actualNames = artifacts.stream()
+                .map(item -> item.file.getName())
+                .collect(Collectors.toSet());
+        if (artifacts.size() != expectedNames.size()
+                || !actualNames.equals(expectedNames)) {
+            passed = false;
+            reasons.add("resolved Language artifact set differs from the "
+                    + "required set reviewed for publication");
+        }
+        return passed;
+    }
+
+    private static List<String> propertyList(
+            Properties properties, String key) {
+        String value = property(properties, key);
+        if (value.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> result = java.util.Arrays.stream(value.split(",", -1))
+                .map(String::trim)
+                .collect(Collectors.toList());
+        return result.stream().anyMatch(String::isEmpty)
+                || result.stream().distinct().count() != result.size()
+                ? java.util.Collections.emptyList() : result;
+    }
+
+    private static String coordinateVersion(String coordinate) {
+        int separator = coordinate.lastIndexOf(':');
+        return separator >= 0 && separator + 1 < coordinate.length()
+                ? coordinate.substring(separator + 1) : "";
     }
 
     private static boolean containsJarEntry(List<File> files, String name)

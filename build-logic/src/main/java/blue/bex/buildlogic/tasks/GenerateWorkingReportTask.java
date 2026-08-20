@@ -12,9 +12,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -27,7 +27,6 @@ import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputDirectory;
@@ -39,7 +38,7 @@ import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 import org.w3c.dom.Element;
 
-/** Writes the exact local-composite BEX working-readiness receipt. */
+/** Writes the exact published-Language BEX working-readiness receipt. */
 public abstract class GenerateWorkingReportTask extends DefaultTask {
     private static final Pattern FORBIDDEN_IMPORT = Pattern.compile(
             "(?m)^import\\s+blue\\.language\\.(?:utils\\.|"
@@ -70,21 +69,6 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
     public abstract DirectoryProperty getBexRepository();
 
     @Input
-    public abstract Property<String> getLanguageRepositoryPath();
-
-    @Input
-    public abstract Property<String> getExpectedLanguageCommit();
-
-    @Input
-    public abstract Property<String> getVerifiedImplementationCommit();
-
-    @Input
-    public abstract ListProperty<String> getAllowedLanguageDeltaPaths();
-
-    @Input
-    public abstract Property<String> getLocalCompositeCommand();
-
-    @Input
     public abstract Property<String> getProjectVersion();
 
     @Input
@@ -97,10 +81,7 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
     public void generate() {
         try {
             File bex = getBexRepository().get().getAsFile();
-            File language = new File(getLanguageRepositoryPath().get())
-                    .getCanonicalFile();
             GitState bexState = gitState(bex);
-            GitState languageState = gitState(language);
 
             List<File> evidence = regularFiles(getEvidenceFiles());
             String conformance = textFor(evidence, "/bex-conformance/report.json");
@@ -119,6 +100,16 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     evidence, "/hosted-release/required-public-api.txt");
             String jmh = textFor(evidence, "/jmh/smoke-results.json");
             String published = textFor(evidence, "published-language.json");
+            String publishedInspection = textFor(
+                    evidence, "published-api-inspection.properties");
+            Properties inspection = properties(publishedInspection);
+            String languageCoordinate = inspection.getProperty(
+                    "coordinate", "").trim();
+            String languageVersion = coordinateVersion(languageCoordinate);
+            String languageCommit = inspection.getProperty(
+                    "source.commit", "").trim();
+            String languageTag = inspection.getProperty(
+                    "source.tag", "").trim();
 
             TestTotals tests = readTests(
                     getTestResultsDirectory().get().getAsFile());
@@ -147,36 +138,36 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     .collect(Collectors.toList());
             boolean dependenciesPassed = dependencyFiles.size() == 5;
             List<String> dependencyJson = new ArrayList<>();
+            StringBuilder combinedDependencies = new StringBuilder();
             for (File file : dependencyFiles) {
                 String text = read(file);
                 dependencyJson.add(text.trim());
-                dependenciesPassed &= text.contains(
-                        "\"mode\": \"local-composite\"")
-                        && text.contains("\"languageCommit\": \""
-                                + getExpectedLanguageCommit().get() + "\"")
+                combinedDependencies.append(text).append('\n');
+                dependenciesPassed &= text.contains("\"status\": \"passed\"")
                         && text.contains(
-                                "\"languageCheckoutState\": \"clean\"")
+                        "\"mode\": \"standalone-published\"")
+                        && text.contains("\"declaredLanguageVersion\": \""
+                                + languageVersion + "\"")
+                        && text.contains(
+                                "\"languageCheckoutState\": "
+                                        + "\"not-applicable\"")
                         && text.contains("\"bexCommit\": \""
                                 + bexState.head + "\"")
+                        && !text.contains("project :blue-language-")
                         && shaCount(text) > 0;
             }
-
-            Set<String> actualDelta = new LinkedHashSet<>(gitLines(
-                    language, "diff", "--name-only",
-                    getVerifiedImplementationCommit().get() + "..HEAD"));
-            Set<String> allowedDelta = new LinkedHashSet<>(
-                    getAllowedLanguageDeltaPaths().get());
-            boolean languageCodeEquivalent = languageState.head.equals(
-                    getExpectedLanguageCommit().get())
-                    && !languageState.dirty
-                    && actualDelta.equals(allowedDelta);
+            dependenciesPassed &= languageCoordinate.equals(
+                    "blue.language:blue-language-java:" + languageVersion)
+                    && languageCommit.matches("[0-9a-f]{40}")
+                    && languageTag.equals("v" + languageVersion)
+                    && focusedArtifactsAuthenticated(
+                    inspection, combinedDependencies.toString(),
+                    languageVersion);
 
             String expectedBexCz = stringAfter(
                     baseline, "\"bex\"", "\"czTomlSha256\"");
             String baselineBexCommit = stringAfter(
                     baseline, "\"bex\"", "\"migrationBaselineCommit\"");
-            String expectedLanguageCz = stringAfter(
-                    baseline, "\"language\"", "\"czTomlSha256\"");
             File bexCzFile = new File(bex, ".cz.toml");
             String actualBexCzText = read(bexCzFile);
             String baselineBexCzText = gitText(
@@ -184,7 +175,6 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
             String actualBexCz = sha256(bexCzFile);
             String baselineBexCz = sha256(
                     baselineBexCzText.getBytes(StandardCharsets.UTF_8));
-            String actualLanguageCz = sha256(new File(language, ".cz.toml"));
             CommitizenVersionCheck.Result bexVersion =
                     CommitizenVersionCheck.evaluate(
                             actualBexCzText,
@@ -192,8 +182,7 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                             getProjectVersion().get());
             boolean baselineBexCzVerified = baselineBexCz.equals(expectedBexCz);
             boolean versionAutomationValid = baselineBexCzVerified
-                    && bexVersion.passed
-                    && actualLanguageCz.equals(expectedLanguageCz);
+                    && bexVersion.passed;
 
             LegacyTotals legacy = legacyTotals(getProductionSources());
             int legacyBeforeLines = integerAfter(
@@ -232,7 +221,6 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
             String publishedStatus = hasStatus(published, "passed")
                     ? "passed" : "not-executed";
             boolean workingReady = !bexState.dirty
-                    && languageCodeEquivalent
                     && versionAutomationValid
                     && dependenciesPassed
                     && tests.executed > 0
@@ -247,17 +235,18 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     && reproducible;
 
             String json = "{\n"
-                    + "  \"schema\": \"blue-bex-latest-language-working/1.0\",\n"
+                    + "  \"schema\": \"blue-bex-latest-language-working/2.0\",\n"
                     + "  \"bex\": {\"commit\":" + quote(bexState.head)
                     + ",\"dirty\":" + bexState.dirty
                     + ",\"statusSha256\":" + quote(bexState.statusSha256)
                     + "},\n"
-                    + "  \"language\": {\"exactCommit\":"
-                    + quote(languageState.head) + ",\"dirty\":"
-                    + languageState.dirty + ",\"verifiedImplementationCommit\":"
-                    + quote(getVerifiedImplementationCommit().get())
-                    + ",\"codeEquivalent\":" + languageCodeEquivalent
-                    + ",\"deltaPaths\":" + jsonStrings(actualDelta) + "},\n"
+                    + "  \"language\": {\"selection\":"
+                    + quote("published-maven-central")
+                    + ",\"coordinate\":" + quote(languageCoordinate)
+                    + ",\"sourceCommit\":" + quote(languageCommit)
+                    + ",\"sourceTag\":" + quote(languageTag)
+                    + ",\"focusedArtifactsAuthenticated\":"
+                    + dependenciesPassed + "},\n"
                     + "  \"languageModuleBaseline\": "
                     + jsonOrEmpty(baseline) + ",\n"
                     + "  \"versionAutomation\": {\"status\":"
@@ -275,10 +264,7 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     + bexVersion.matchesProjectVersion
                     + ",\"bexNonVersionConfigMatchesBaseline\":"
                     + bexVersion.nonVersionConfigMatchesBaseline
-                    + ",\"languageCzTomlSha256\":"
-                    + quote(actualLanguageCz)
-                    + ",\"languageMatchesBaseline\":"
-                    + actualLanguageCz.equals(expectedLanguageCz) + "},\n"
+                    + "},\n"
                     + "  \"dependencyEvidence\": "
                     + jsonObjects(dependencyJson) + ",\n"
                     + "  \"legacyImports\": {\"before\":{\"lines\":"
@@ -316,9 +302,8 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
                     + "  \"reproducibility\": {\"status\":"
                     + quote(reproducible ? "passed" : "failed")
                     + ",\"replicas\":" + fileEvidenceJson(replicas) + "},\n"
-                    + "  \"localComposite\": {\"command\":"
-                    + quote(getLocalCompositeCommand().get())
-                    + ",\"outcome\":"
+                    + "  \"publishedDependency\": {\"coordinate\":"
+                    + quote(languageCoordinate) + ",\"outcome\":"
                     + quote(workingReady ? "passed" : "failed") + "},\n"
                     + "  \"workingReady\": " + workingReady + ",\n"
                     + "  \"publishedModeStatus\": "
@@ -342,6 +327,54 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
         return files.getFiles().stream().filter(File::isFile)
                 .sorted(Comparator.comparing(GenerateWorkingReportTask::unix))
                 .collect(Collectors.toList());
+    }
+
+    private static Properties properties(String text) throws IOException {
+        Properties result = new Properties();
+        try (java.io.StringReader reader = new java.io.StringReader(text)) {
+            result.load(reader);
+        }
+        return result;
+    }
+
+    private static String coordinateVersion(String coordinate) {
+        int separator = coordinate.lastIndexOf(':');
+        return separator >= 0 && separator + 1 < coordinate.length()
+                ? coordinate.substring(separator + 1) : "";
+    }
+
+    private static boolean focusedArtifactsAuthenticated(
+            Properties inspection, String dependencyEvidence, String version) {
+        List<String> modules = propertyList(
+                inspection, "release.resolvedRuntimeArtifacts");
+        if (modules.isEmpty()) {
+            return false;
+        }
+        for (String module : modules) {
+            String hash = inspection.getProperty(
+                    "artifact." + module + ".sha256", "").trim();
+            if (!hash.matches("[0-9a-f]{64}")
+                    || !dependencyEvidence.contains(
+                    module + "-" + version + ".jar")
+                    || !dependencyEvidence.contains(hash)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> propertyList(
+            Properties properties, String key) {
+        String value = properties.getProperty(key, "").trim();
+        if (value.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> result = Arrays.stream(value.split(",", -1))
+                .map(String::trim)
+                .collect(Collectors.toList());
+        return result.stream().anyMatch(String::isEmpty)
+                || result.stream().distinct().count() != result.size()
+                ? java.util.Collections.emptyList() : result;
     }
 
     private static List<FileEvidence> describe(ConfigurableFileCollection files)

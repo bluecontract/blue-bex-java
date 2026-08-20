@@ -29,11 +29,10 @@ never converted into an invented execution count.
 
 ## Run locally
 
-Use the explicit verified Language composite:
+Use the exact reviewed Language release from Maven Central:
 
 ```bash
-./gradlew --no-daemon clean bexWorkingVerification \
-  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+./gradlew --no-daemon clean bexWorkingVerification
 ```
 
 The working gate creates:
@@ -56,8 +55,7 @@ module and source artifacts; and byte-identical BEX-owned archive replicas.
 Run the longer modernization gate separately:
 
 ```bash
-./gradlew --no-daemon bexModernizationVerification \
-  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+./gradlew --no-daemon bexModernizationVerification
 ```
 
 It adds architecture/source metrics, concurrency and property tests, fourteen
@@ -71,6 +69,17 @@ blue-bex-conformance/build/reports/jmh/results.json
 blue-bex-conformance/build/reports/jmh/environment.json
 ```
 
+An explicit Language composite remains available only for developer integration
+with an unpublished Language checkout:
+
+```bash
+./gradlew --no-daemon bexCheck \
+  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+```
+
+That optional developer mode is not release evidence and is never used by the
+final-publication gate.
+
 ## Reproducibility claims
 
 `verifyReproducibleArchives` and
@@ -79,18 +88,19 @@ module/source/Javadoc/source-release archives from the same compiled inputs.
 That is the BEX-owned working claim; it is not mislabeled as two clean builds.
 
 Public release additionally uses four isolated BEX checkouts and four isolated
-Gradle homes: two standalone-published builds and two local-composite builds.
-`.github/scripts/run-final-publication-gates.sh` records exact artifact
-manifests for each pair and compares local versus published conformance fields
-for semantic and exact-gas equality.
+Gradle homes, all in `standalone-published` mode. The final-publication script
+records exact artifact manifests and conformance receipts for every build,
+requires byte-identical BEX artifacts, and compares the published semantic,
+fixture, operator, and exact-gas evidence for repeatability.
 
 ## Fail-closed publication
 
 `bexPublishedLanguageVerification` authenticates resolved artifact bytes
 against `published-api-inspection.properties`, requires every reviewed API
-claim and a same-run local/published differential, and cannot pass from a CLI
-coordinate/hash alone. `bexReleaseVerify` then requires modernization, both
-independent clean-build pairs, clean exact-tagged BEX source, and writes:
+claim and same-run published repeatability evidence, and cannot pass from a CLI
+coordinate/hash alone. `bexReleaseVerify` then requires modernization, all four
+independent standalone-published builds, clean exact-tagged BEX source, and
+writes:
 
 ```text
 build/reports/bex-release/final.json
@@ -98,5 +108,4 @@ build/reports/bex-release/final.md
 ```
 
 Unavailable or incompatible published Language modules remain visibly
-`not-executed` or `incompatible`; they never make local-composite evidence red
-and never become a public-release pass.
+`not-executed` or `incompatible` and never become a public-release pass.

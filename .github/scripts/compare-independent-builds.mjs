@@ -11,20 +11,22 @@ import {
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 const [standaloneOneManifest, standaloneTwoManifest,
-  localOneManifest, localTwoManifest,
-  standaloneOneRoot, standaloneTwoRoot, localOneRoot, localTwoRoot,
-  standaloneOneGradle, standaloneTwoGradle, localOneGradle, localTwoGradle,
+  standaloneThreeManifest, standaloneFourManifest,
+  standaloneOneRoot, standaloneTwoRoot, standaloneThreeRoot,
+  standaloneFourRoot, standaloneOneGradle, standaloneTwoGradle,
+  standaloneThreeGradle, standaloneFourGradle,
   bexCommit, outputPath] = process.argv.slice(2);
 if (!standaloneOneManifest || !standaloneTwoManifest ||
-    !localOneManifest || !localTwoManifest ||
+    !standaloneThreeManifest || !standaloneFourManifest ||
     !standaloneOneRoot || !standaloneTwoRoot ||
-    !localOneRoot || !localTwoRoot ||
+    !standaloneThreeRoot || !standaloneFourRoot ||
     !standaloneOneGradle || !standaloneTwoGradle ||
-    !localOneGradle || !localTwoGradle || !bexCommit || !outputPath) {
+    !standaloneThreeGradle || !standaloneFourGradle ||
+    !bexCommit || !outputPath) {
   throw new Error(
-    'usage: compare-independent-builds.mjs S1 S2 L1 L2 ' +
-      'S1_ROOT S2_ROOT L1_ROOT L2_ROOT S1_GRADLE S2_GRADLE ' +
-      'L1_GRADLE L2_GRADLE COMMIT OUTPUT'
+    'usage: compare-independent-builds.mjs S1 S2 S3 S4 ' +
+      'S1_ROOT S2_ROOT S3_ROOT S4_ROOT S1_GRADLE S2_GRADLE ' +
+      'S3_GRADLE S4_GRADLE COMMIT OUTPUT'
   );
 }
 
@@ -219,6 +221,7 @@ function pair(first, second) {
   const passed = exactManifestBytesMatch && exactArtifactBytesMatch &&
     requiredArtifactsPresent;
   return {
+    mode: 'standalone-published',
     status: passed ? 'passed' : 'failed',
     exactManifestBytesMatch,
     exactArtifactBytesMatch,
@@ -239,8 +242,10 @@ const builds = [
     standaloneOneRoot, standaloneOneGradle),
   buildEvidence(standaloneTwoManifest,
     standaloneTwoRoot, standaloneTwoGradle),
-  buildEvidence(localOneManifest, localOneRoot, localOneGradle),
-  buildEvidence(localTwoManifest, localTwoRoot, localTwoGradle)
+  buildEvidence(standaloneThreeManifest,
+    standaloneThreeRoot, standaloneThreeGradle),
+  buildEvidence(standaloneFourManifest,
+    standaloneFourRoot, standaloneFourGradle)
 ];
 const checkoutRoots = builds.map((build) => build.report.checkoutRoot);
 const gitDirectories = builds.map((build) => build.report.gitDirectory);
@@ -251,14 +256,15 @@ const distinctGitDirectories = new Set(gitDirectories).size === 4;
 const distinctGradleHomes = new Set(gradleHomes).size === 4;
 const distinctInputManifestFiles = new Set(manifestPaths).size === 4;
 const standalonePublished = pair(builds[0], builds[1]);
-const localComposite = pair(builds[2], builds[3]);
+const standalonePublishedReplica = pair(builds[2], builds[3]);
 const passed = distinctCheckoutRoots && distinctGitDirectories &&
   distinctGradleHomes && distinctInputManifestFiles &&
   standalonePublished.status === 'passed' &&
-  localComposite.status === 'passed';
+  standalonePublishedReplica.status === 'passed';
 const report = {
-  schema: 'blue-bex-independent-clean-builds/2.1',
+  schema: 'blue-bex-independent-clean-builds/3.0',
   status: passed ? 'passed' : 'failed',
+  dependencyPolicy: 'published-only',
   bexCommit,
   checkoutCount: checkoutRoots.length,
   gitDirectoryCount: gitDirectories.length,
@@ -269,14 +275,14 @@ const report = {
   distinctGradleHomes,
   distinctInputManifestFiles,
   standalonePublished,
-  localComposite
+  standalonePublishedReplica
 };
 writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 if (!passed) {
   console.error(`Independent clean-build comparison failed: ${outputPath}`);
   for (const [label, comparison] of [
     ['standalone-published', standalonePublished],
-    ['local-composite', localComposite]
+    ['standalone-published-replica', standalonePublishedReplica]
   ]) {
     if (comparison.status === 'passed') {
       continue;

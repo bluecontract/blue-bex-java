@@ -5,6 +5,7 @@ import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.language.model.Node;
 import blue.language.processor.ExactBlueValue;
 import blue.language.processor.ProcessorExecutionContext;
+import blue.language.snapshot.FrozenNode;
 
 import java.util.Objects;
 
@@ -24,6 +25,31 @@ public final class ProcessorExecutionContextBexSemanticIdentityBoundary
                 Objects.requireNonNull(node, "node"));
         return new BexEstablishedIdentity(
                 exact.blueId(),
-                exact.frozenValue());
+                exact.frozenValue(),
+                new ProcessorExactBlueValueCapability(exact));
     }
+
+    @Override
+    public BexEstablishedIdentity carryExactIdentity(
+            String blueId,
+            FrozenNode frozenValue) {
+        ExactBlueValue exact = context.semanticOutputBoundary()
+                .carryExactValue(
+                        Objects.requireNonNull(blueId, "blueId"),
+                        Objects.requireNonNull(frozenValue, "frozenValue"));
+        if (!Objects.requireNonNull(blueId, "blueId").equals(
+                exact.blueId())) {
+            throw new IllegalArgumentException(
+                    "Exact BEX value identity changed at the processor boundary: "
+                            + "expected " + blueId + " but found "
+                            + exact.blueId() + " (strict="
+                            + frozenValue.isStrictCanonical() + ", reference="
+                            + frozenValue.isReferenceOnly() + ")");
+        }
+        return new BexEstablishedIdentity(
+                exact.blueId(),
+                exact.frozenValue(),
+                new ProcessorExactBlueValueCapability(exact));
+    }
+
 }

@@ -6,6 +6,7 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.bex.value.BexFrozenWriter;
 import blue.bex.test.TestBlue;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
@@ -69,6 +70,33 @@ class BexExactReferenceDocumentTest {
             assertEquals(java.util.Arrays.asList("a", "values"),
                     referenced.keys());
             assertEquals(1, demands.get());
+        }
+    }
+
+    @Test
+    void verifiedOrdinaryReferenceRetainsItsCanonicalBodyForOutputAdmission() {
+        Node content = obj(
+                "channel", obj("timeline", "orders"),
+                "operation", "reconfigure");
+        String blueId = calculateBlueId(content);
+        NodeProvider provider = requestedBlueId -> blueId.equals(
+                requestedBlueId)
+                ? Collections.singletonList(content.clone())
+                : Collections.<Node>emptyList();
+
+        try (TestBlue blue = new TestBlue(provider)) {
+            BexValue reference = BexValues.referenceBacked(
+                    BexValues.frozen(FrozenNode.fromNode(
+                            new Node().blueId(blueId))),
+                    blue.runtime());
+
+            assertEquals("object", BexValues.kind(reference));
+            FrozenNode retained = BexFrozenWriter.toFrozen(reference);
+
+            assertTrue(retained.isStrictCanonical());
+            assertEquals(blueId, retained.blueId());
+            assertTrue(retained.sameResolvedStructure(
+                    FrozenNode.fromNode(content)));
         }
     }
 
