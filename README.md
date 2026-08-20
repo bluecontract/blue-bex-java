@@ -108,6 +108,7 @@ Two fail-closed gates intentionally answer different questions:
 
 ```text
 bexWorkingVerification  exact local modular Blue Language checkout
+bexSdkStageVerify       exact isolated candidate-repository verification
 bexReleaseVerify        independently reproducible published dependencies
 ```
 
@@ -117,6 +118,13 @@ public release is eligible only when `bexReleaseVerify` records
 evidence must remain red or `not-executed`. This README does not claim that an
 unexecuted gate, benchmark, or release has passed. Consult the current generated
 reports under `build/reports`.
+
+`bexSdkStageVerify` is a third, deliberately non-publication lane. It resolves
+the locked Language candidate only from the explicit staged repository, hashes
+every focused staged Language JAR against the artifact actually resolved, and
+fails on any same-run conformance blocker. It never publishes BEX artifacts;
+the separate `publish` task performs that mutation after verification. See
+[Release](docs/release.md) for the exact commands and source lock.
 
 The normative package currently contains 60 vectors, 105 behavior fixtures, 30
 gas microfixtures, and coverage for 86 operators. Exact identities are recorded

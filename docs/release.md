@@ -21,6 +21,40 @@ Success requires zero failed, skipped, or unclassified evidence and
 `workingReady = true`. A green, reviewable working commit is a usable local
 artifact checkpoint even when published Language modules do not yet exist.
 
+## Isolated SDK candidate stage
+
+The Coordination SDK candidate uses a local Maven repository without labeling
+its contents as published. Language is staged first; BEX then verifies the
+exact candidate dependency and, in a separate invocation, publishes its own
+candidate artifacts:
+
+```bash
+./gradlew --no-daemon clean bexSdkStageVerify \
+  -PblueLanguageRepository=/absolute/path/to/fresh-staged-repository \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-staged-repository \
+  -PbexLocalStageVersion=1.1.0-rc.4
+
+./gradlew --no-daemon publish \
+  -PblueLanguageRepository=/absolute/path/to/fresh-staged-repository \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-staged-repository \
+  -PbexLocalStageVersion=1.1.0-rc.4
+```
+
+`bexSdkStageVerify` does not publish. The publication tasks depend on that gate,
+so the second command verifies again before writing BEX artifacts. The gate
+uses dependency mode `staged-repository`, requires every focused Language
+`3.1.0-rc.21` JAR in the explicit repository to hash-match the resolved JAR,
+and writes `build/reports/bex-sdk-stage/verification.json`. Any entry in the
+same-run conformance report's `currentModeFailures` makes the task fail.
+
+The source lock is
+`gradle/verification/sdk-stage-language-baseline.json`: it binds Language
+`3.1.0-rc.21` to commit `e463efe3b0ae161c680f1c00cd2846f7e4aa8e8f` and
+BEX `1.1.0-rc.4` to an explicit candidate-version selection. The retained
+`.cz.toml` value `1.1.0-rc.3` and the retained Maven Central Language rc.20
+inspection describe historical releases. They are not rewritten or compared
+to the candidate repository.
+
 ## Strict public gate
 
 ```bash
@@ -64,9 +98,10 @@ verification, artifact hashes, and the exact local/published mode status.
 The strict decision is written to `build/reports/bex-release/final.json` and
 `final.md` even when the Gradle task fails closed.
 
-Do not publish from a dirty tree, change `.cz.toml` as part of this work, embed a
-local checkout path in published metadata, or stage downloaded archives. Version
-automation and tags remain the repository's existing release process.
+Do not publish from a dirty tree, rewrite `.cz.toml` merely to select a local
+candidate, embed a local checkout path in published metadata, or stage
+downloaded archives. Version automation and tags remain the repository's
+existing release process.
 
 ## Benchmark reporting
 
