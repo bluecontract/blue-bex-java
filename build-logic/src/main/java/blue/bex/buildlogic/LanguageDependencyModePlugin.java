@@ -46,8 +46,18 @@ public final class LanguageDependencyModePlugin implements Plugin<Project> {
                             String composite = (String) project.findProperty(property);
                             boolean local = composite != null
                                     && !composite.trim().isEmpty();
+                            boolean staged = configuredRepository != null
+                                    && !configuredRepository.toString()
+                                    .trim().isEmpty();
                             task.getMode().set(local
-                                    ? "local-composite" : "standalone-published");
+                                    ? "local-composite"
+                                    : staged
+                                            ? "staged-repository"
+                                            : "standalone-published");
+                            if (staged) {
+                                task.getStagedRepositoryPath().set(
+                                        configuredRepository.toString().trim());
+                            }
                             task.getModuleName().set(project.getName());
                             task.getDeclaredLanguageVersion().set(
                                     extension.getVersion());

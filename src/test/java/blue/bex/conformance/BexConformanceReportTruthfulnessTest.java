@@ -267,17 +267,26 @@ class BexConformanceReportTruthfulnessTest {
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.7",
-                        Collections.<String, String>emptyMap());
+                        Collections.<String, String>emptyMap(),
+                        "standalone-published");
         Map<String, Object> local =
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.7-SNAPSHOT",
-                        Collections.<String, String>emptyMap());
+                        Collections.<String, String>emptyMap(),
+                        "local-composite");
         Map<String, Object> mismatched =
                 BexConformanceReportMain.versionAutomationEvidence(
                         temporaryDirectory,
                         "2.0.0-rc.8",
-                        Collections.<String, String>emptyMap());
+                        Collections.<String, String>emptyMap(),
+                        "standalone-published");
+        Map<String, Object> staged =
+                BexConformanceReportMain.versionAutomationEvidence(
+                        temporaryDirectory,
+                        "2.0.0-rc.8",
+                        Collections.<String, String>emptyMap(),
+                        "staged-repository");
 
         assertTrue(Boolean.TRUE.equals(
                 release.get("matchesProjectVersion")));
@@ -285,6 +294,14 @@ class BexConformanceReportTruthfulnessTest {
                 local.get("matchesProjectVersion")));
         assertFalse(Boolean.TRUE.equals(
                 mismatched.get("matchesProjectVersion")));
+        assertTrue(Boolean.TRUE.equals(
+                staged.get("matchesProjectVersion")));
+        assertEquals(
+                "2.0.0-rc.7",
+                staged.get("historicalConfiguredVersion"));
+        assertEquals(
+                "explicit-staged-candidate",
+                staged.get("selectionKind"));
     }
 
     @Test

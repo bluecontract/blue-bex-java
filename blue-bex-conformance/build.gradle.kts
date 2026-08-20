@@ -570,15 +570,21 @@ val writeBexConformanceReport = tasks.register<JavaExec>(
     mainClass.set("blue.bex.conformance.BexConformanceReportMain")
     val composite = providers.gradleProperty("blueLanguageCompositePath")
         .orElse("")
+    val stagedRepository = providers.gradleProperty("blueLanguageRepository")
+        .orElse("")
     doFirst {
         val compositePath = composite.get()
+        val stagedRepositoryPath = stagedRepository.get()
         setArgs(listOf(
             rootProject.projectDir.absolutePath,
             layout.buildDirectory.get().asFile.absolutePath,
             gradle.gradleVersion,
             project.version.toString(),
-            if (compositePath.isBlank())
-                "standalone-published" else "local-composite",
+            when {
+                compositePath.isNotBlank() -> "local-composite"
+                stagedRepositoryPath.isNotBlank() -> "staged-repository"
+                else -> "standalone-published"
+            },
             "blue.language:blue-language-java:$languageVersion",
             rootProject.layout.projectDirectory.dir(
                 ".gradle/bex-hosted-release").asFile.absolutePath,

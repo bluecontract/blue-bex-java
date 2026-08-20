@@ -104,7 +104,10 @@ public final class BexConformanceReportMain {
                 specificationEvidence(projectDir, baseline);
         Map<String, Object> versionAutomation =
                 versionAutomationEvidence(
-                        projectDir, projectVersion, baseline);
+                        projectDir,
+                        projectVersion,
+                        baseline,
+                        dependencyMode);
         Map<String, Object> namedEvidence =
                 namedReleaseEvidence(tests);
         Map<String, Object> gasExhaustionTraceExamples =
@@ -507,6 +510,13 @@ public final class BexConformanceReportMain {
         String languageCheckoutState = jsonString(
                 evidence, "languageCheckoutState");
         boolean standalone = "standalone-published".equals(expectedMode);
+        boolean staged = "staged-repository".equals(expectedMode);
+        boolean stagedRepositoryEvidenceApplicable = jsonBoolean(
+                evidence, "stagedRepositoryEvidenceApplicable");
+        String stagedRepositoryPath = jsonString(
+                evidence, "stagedRepositoryPath");
+        boolean stagedRepositoryArtifactsMatchResolved = jsonBoolean(
+                evidence, "stagedRepositoryArtifactsMatchResolved");
         boolean cleanCacheInitiallyAbsent = jsonBoolean(
                 evidence, "exactVersionCacheInitiallyAbsent");
         List<Map<String, Object>> artifacts =
@@ -543,8 +553,12 @@ public final class BexConformanceReportMain {
                         && aggregateArtifact != null
                         && publishedInspection.get("artifact.sha256").equals(
                                 aggregateArtifact.get("sha256"))
-                : languageCommit.matches("[0-9a-f]{40}")
-                        && "clean".equals(languageCheckoutState);
+                : staged
+                        ? stagedRepositoryEvidenceApplicable
+                                && !stagedRepositoryPath.isEmpty()
+                                && stagedRepositoryArtifactsMatchResolved
+                        : languageCommit.matches("[0-9a-f]{40}")
+                                && "clean".equals(languageCheckoutState);
         boolean cleanCacheAccepted = !standalone
                 || cleanCacheInitiallyAbsent;
         boolean passed = "passed".equals(jsonString(evidence, "status"))
@@ -562,7 +576,7 @@ public final class BexConformanceReportMain {
                 "receiptSha256", sha256(evidencePath),
                 "mode", mode,
                 "declaredCoordinate", declaredDependency,
-                "effectiveComponent", standalone
+                "effectiveComponent", standalone || staged
                         ? declaredDependency : "project :blue-language-java",
                 "effectiveCoordinate", declaredDependency,
                 "declaredLanguageVersion", declaredVersion,
@@ -578,20 +592,38 @@ public final class BexConformanceReportMain {
                                 ? "passed" : "failed",
                         "kind", standalone
                                 ? "reviewed-published-focused-modules"
-                                : "exact-clean-local-composite",
+                                : staged
+                                        ? "isolated-staged-repository"
+                                        : "exact-clean-local-composite",
                         "publishedReviewStatus",
                         publishedInspection.get("status"),
-                        "repositoryPolicy", "maven-central-only",
+                        "repositoryPolicy", standalone
+                                ? "maven-central-only"
+                                : staged
+                                        ? "explicit-staged-repository-before-maven-central"
+                                        : "included-build-substitution",
                         "recordedRepository",
-                        publishedInspection.get("repository"),
+                        staged
+                                ? stagedRepositoryPath
+                                : publishedInspection.get("repository"),
                         "recordedCoordinate",
-                        publishedInspection.get("coordinate"),
+                        staged
+                                ? declaredDependency
+                                : publishedInspection.get("coordinate"),
                         "recordedSha256",
-                        publishedInspection.get("artifact.sha256"),
+                        staged && aggregateArtifact != null
+                                ? aggregateArtifact.get("sha256")
+                                : publishedInspection.get("artifact.sha256"),
                         "resolvedHashMatchesRecordedMavenCentralHash",
                         standalone && sourceProvenanceValid,
+                        "stagedRepositoryArtifactsMatchResolved",
+                        staged && stagedRepositoryArtifactsMatchResolved,
                         "networkFetchObservation",
-                        standalone ? "isolated-resolution" : "not-applicable"),
+                        standalone
+                                ? "isolated-resolution"
+                                : staged
+                                        ? "local-staged-resolution"
+                                        : "not-applicable"),
                 "cleanDependencyCacheAcceptance", map(
                         "status", cleanCacheAccepted
                                 ? "passed" : "failed",
@@ -601,8 +633,18 @@ public final class BexConformanceReportMain {
                         "moduleVersionInitiallyAbsentAtProjectConfiguration",
                         cleanCacheInitiallyAbsent,
                         "reason", standalone
-                                ? "exact focused-module version cache must be absent before isolated resolution"
-                                : "fresh module cache proof is not required for local composite mode"),
+                                ? "exact focused-module version cache must be "
+                                        + "absent before isolated resolution"
+                                : staged
+                                        ? "explicit staged repository hashes "
+                                                + "are verified instead of a "
+                                                + "remote cache miss"
+                                        : "fresh module cache proof is not "
+                                                + "required for local "
+                                                + "composite mode"),
+                "stagedRepositoryPath", stagedRepositoryPath,
+                "stagedRepositoryArtifactsMatchResolved",
+                staged && stagedRepositoryArtifactsMatchResolved,
                 "compositePath", compositePath != null
                         ? compositePath.toString() : "");
     }
@@ -677,7 +719,8 @@ public final class BexConformanceReportMain {
     static Map<String, Object> versionAutomationEvidence(
             Path projectDir,
             String projectVersion,
-            Map<String, String> baseline) throws IOException {
+            Map<String, String> baseline,
+            String dependencyMode) throws IOException {
         Path czToml = projectDir.resolve(".cz.toml");
         String actual = Files.isRegularFile(czToml)
                 ? sha256(czToml)
@@ -690,6 +733,11 @@ public final class BexConformanceReportMain {
                         projectVersion.length()
                                 - "-SNAPSHOT".length())
                 : projectVersion;
+        boolean stagedCandidate = "staged-repository".equals(
+                dependencyMode);
+        boolean explicitStageCandidate = stagedCandidate
+                && projectVersion.matches(
+                        "[0-9]+\\.[0-9]+\\.[0-9]+-rc\\.[0-9]+");
         return map(
                 "path", ".cz.toml",
                 "sha256", actual,
@@ -697,8 +745,15 @@ public final class BexConformanceReportMain {
                 "matchesHistoricalBaseline", actual.equals(expected),
                 "configuredVersion", configuredVersion,
                 "projectVersion", projectVersion,
+                "selectionKind", stagedCandidate
+                        ? "explicit-staged-candidate"
+                        : "commitizen-release-version",
+                "historicalConfiguredVersion", configuredVersion,
+                "candidateOverrideAccepted", explicitStageCandidate,
                 "matchesProjectVersion",
-                configuredVersion.equals(expectedVersion));
+                stagedCandidate
+                        ? explicitStageCandidate
+                        : configuredVersion.equals(expectedVersion));
     }
 
     private static String readCommitizenVersion(Path czToml)
@@ -1047,6 +1102,8 @@ public final class BexConformanceReportMain {
             Map<String, Object> languageReleaseIdentity,
             Map<String, Object> representationMatrixResult) {
         List<String> failures = new ArrayList<String>();
+        boolean stagedRepository = "staged-repository".equals(
+                dependencyResolution.get("mode"));
         require(
                 failures,
                 "passed".equals(tests.overallStatus()),
@@ -1109,12 +1166,14 @@ public final class BexConformanceReportMain {
                 failures,
                 gatePassed(releaseGates, "deterministicArchives"),
                 "archive-packaging-determinism-gate-not-passing");
-        require(
-                failures,
-                gatePassed(
-                        releaseGates,
-                        "independentCleanBuilds"),
-                "independent-clean-build-reproducibility-gate-not-passing");
+        if (!stagedRepository) {
+            require(
+                    failures,
+                    gatePassed(
+                            releaseGates,
+                            "independentCleanBuilds"),
+                    "independent-clean-build-reproducibility-gate-not-passing");
+        }
         require(
                 failures,
                 gatePassed(releaseGates, "binaryApi"),
@@ -1167,8 +1226,12 @@ public final class BexConformanceReportMain {
                 failures,
                 Boolean.TRUE.equals(
                         languageReleaseIdentity.get(
-                                "exactFinalArtifactProven")),
-                "exact-final-language-artifact-not-proven");
+                                stagedRepository
+                                        ? "exactSelectedArtifactProven"
+                                        : "exactFinalArtifactProven")),
+                stagedRepository
+                        ? "exact-staged-language-artifact-not-proven"
+                        : "exact-final-language-artifact-not-proven");
         require(
                 failures,
                 "passed".equals(
@@ -1345,6 +1408,11 @@ public final class BexConformanceReportMain {
         boolean standalone =
                 "standalone-published".equals(
                         dependencyResolution.get("mode"));
+        boolean staged =
+                "staged-repository".equals(
+                        dependencyResolution.get("mode"));
+        Map<String, Object> dependencyProvenance = castMap(
+                dependencyResolution.get("provenance"));
         boolean resolvedArtifactHashMatchesPublished =
                 standalone
                         && publishedHash != null
@@ -1353,8 +1421,15 @@ public final class BexConformanceReportMain {
         boolean resolvedArtifactIdentitySatisfied =
                 !standalone
                         || resolvedArtifactHashMatchesPublished;
-        boolean exactFinalArtifactProven =
-                commitIdentified
+        boolean exactStagedArtifactProven = staged
+                && dependencyResolved
+                && "passed".equals(dependencyProvenance.get("status"))
+                && Boolean.TRUE.equals(dependencyProvenance.get(
+                        "stagedRepositoryArtifactsMatchResolved"))
+                && String.valueOf(resolvedArtifact.get("sha256"))
+                .matches("[0-9a-f]{64}");
+        boolean exactFinalArtifactProven = !staged
+                && commitIdentified
                         && hashIdentified
                         && compatible
                         && coordinateMatches
@@ -1366,8 +1441,17 @@ public final class BexConformanceReportMain {
                 "blue-bex-language-release-identity/1.1",
                 "exactFinalArtifactProven",
                 exactFinalArtifactProven,
+                "exactSelectedArtifactProven",
+                staged
+                        ? exactStagedArtifactProven
+                        : exactFinalArtifactProven,
                 "currentDependencyExactFinalArtifactProven",
                 exactFinalArtifactProven,
+                "selectionKind", staged
+                        ? "staged-repository-candidate"
+                        : standalone
+                                ? "published-coordinate"
+                                : "local-composite",
                 "declaredCoordinate", declaredDependency,
                 "publishedCoordinate",
                 publishedApiInspection.get("coordinate"),
@@ -1386,6 +1470,9 @@ public final class BexConformanceReportMain {
                 resolvedArtifactHashMatchesPublished,
                 "resolvedArtifactIdentitySatisfied",
                 resolvedArtifactIdentitySatisfied,
+                "stagedRepositoryArtifactsMatchResolved",
+                staged && Boolean.TRUE.equals(dependencyProvenance.get(
+                        "stagedRepositoryArtifactsMatchResolved")),
                 "resolvedArtifact", resolvedArtifact,
                 "localCompositeSource", localSource,
                 "localCompositeMatchesPublishedCommit",
@@ -1419,7 +1506,12 @@ public final class BexConformanceReportMain {
                                 : "local-composite-not-clean-exact-published-commit-and-version-tag")
                         .stream()
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()),
+                "selectedArtifactFailures",
+                staged && !exactStagedArtifactProven
+                        ? Collections.singletonList(
+                                "staged-artifact-provenance-not-passing")
+                        : Collections.emptyList());
     }
 
     private static Map<String, Object> representationMatrixResult(

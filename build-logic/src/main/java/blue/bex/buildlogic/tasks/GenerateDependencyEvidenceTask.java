@@ -22,6 +22,7 @@ import org.gradle.api.provider.ListProperty;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Internal;
+import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
 
@@ -44,6 +45,10 @@ public abstract class GenerateDependencyEvidenceTask extends DefaultTask {
 
     @Input
     public abstract Property<Boolean> getExactVersionCacheInitiallyAbsent();
+
+    @Input
+    @Optional
+    public abstract Property<String> getStagedRepositoryPath();
 
     @Internal
     public abstract DirectoryProperty getLanguageCheckout();
@@ -70,6 +75,49 @@ public abstract class GenerateDependencyEvidenceTask extends DefaultTask {
                         + ",\"bytes\":" + artifact.length()
                         + ",\"sha256\":" + quote(sha256(artifact)) + "}");
             }
+            String mode = getMode().get();
+            boolean stagedRepositoryMode =
+                    "staged-repository".equals(mode);
+            String stagedRepository = getStagedRepositoryPath().isPresent()
+                    ? getStagedRepositoryPath().get().trim() : "";
+            List<String> stagedArtifactJson = new ArrayList<>();
+            boolean stagedArtifactsMatch = stagedRepositoryMode;
+            if (stagedRepositoryMode) {
+                File repository = new File(stagedRepository).getCanonicalFile();
+                String version = getDeclaredLanguageVersion().get();
+                String[] focusedModules = {
+                        "blue-language-model",
+                        "blue-language-core",
+                        "blue-language-mapping",
+                        "blue-contracts-core",
+                        "blue-language-java"
+                };
+                for (String module : focusedModules) {
+                    File stagedArtifact = new File(
+                            repository,
+                            "blue/language/" + module + "/" + version + "/"
+                                    + module + "-" + version + ".jar");
+                    File resolvedArtifact = artifacts.stream()
+                            .filter(candidate -> candidate.getName().equals(
+                                    stagedArtifact.getName()))
+                            .findFirst()
+                            .orElse(null);
+                    boolean matches = stagedArtifact.isFile()
+                            && resolvedArtifact != null
+                            && sha256(stagedArtifact).equals(
+                                    sha256(resolvedArtifact));
+                    stagedArtifactsMatch &= matches;
+                    stagedArtifactJson.add(
+                            "    {\"module\":" + quote(module)
+                                    + ",\"path\":" + quote(unix(stagedArtifact))
+                                    + ",\"sha256\":" + quote(
+                                    stagedArtifact.isFile()
+                                            ? sha256(stagedArtifact) : "")
+                                    + ",\"matchesResolvedArtifact\":"
+                                    + matches + "}");
+                }
+                stagedRepository = repository.getAbsolutePath();
+            }
             String languageHead = "";
             String languageStatus = "not-applicable";
             if (getLanguageCheckout().isPresent()) {
@@ -83,13 +131,14 @@ public abstract class GenerateDependencyEvidenceTask extends DefaultTask {
             String bexHead = gitText(bex, "rev-parse", "HEAD").trim();
             boolean resolved = !artifactJson.isEmpty()
                     && !getResolvedComponents().get().isEmpty()
-                    && !"dirty".equals(languageStatus);
+                    && !"dirty".equals(languageStatus)
+                    && (!stagedRepositoryMode || stagedArtifactsMatch);
             String json = "{\n"
                     + "  \"schema\": \"blue-bex-dependency-evidence/1.0\",\n"
                     + "  \"status\": "
                     + quote(resolved ? "passed" : "failed") + ",\n"
                     + "  \"module\": " + quote(getModuleName().get()) + ",\n"
-                    + "  \"mode\": " + quote(getMode().get()) + ",\n"
+                    + "  \"mode\": " + quote(mode) + ",\n"
                     + "  \"declaredLanguageVersion\": "
                     + quote(getDeclaredLanguageVersion().get()) + ",\n"
                     + "  \"bexCommit\": " + quote(bexHead) + ",\n"
@@ -98,6 +147,14 @@ public abstract class GenerateDependencyEvidenceTask extends DefaultTask {
                     + quote(languageStatus) + ",\n"
                     + "  \"exactVersionCacheInitiallyAbsent\": "
                     + getExactVersionCacheInitiallyAbsent().get() + ",\n"
+                    + "  \"stagedRepositoryEvidenceApplicable\": "
+                    + stagedRepositoryMode + ",\n"
+                    + "  \"stagedRepositoryPath\": "
+                    + quote(stagedRepository) + ",\n"
+                    + "  \"stagedRepositoryArtifactsMatchResolved\": "
+                    + stagedArtifactsMatch + ",\n"
+                    + "  \"stagedRepositoryArtifacts\": [\n"
+                    + String.join(",\n", stagedArtifactJson) + "\n  ],\n"
                     + "  \"resolvedComponents\": "
                     + jsonArray(getResolvedComponents().get()) + ",\n"
                     + "  \"artifacts\": [\n"
