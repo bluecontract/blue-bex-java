@@ -11,8 +11,8 @@ LF-normalized byte lengths and SHA-256 values, reverse vector coverage, direct
 coverage for every operator, and all gas counters. The executable totals are:
 
 ```text
-60 normative vectors
-105 behavior fixtures
+75 normative vectors
+120 behavior fixtures
 30 gas microfixtures
 86 operators
 ```
@@ -48,7 +48,7 @@ build/reports/bex-modernization/architecture.json
 ```
 
 The final working report requires zero failed, skipped, and unclassified tests;
-exact 60/105/30/86 execution totals; all critical semantic sections; hosted
+exact 75/120/30/86 execution totals; all critical semantic sections; hosted
 boundary selectors; Java 8 classfiles; exact reviewed API descriptors; all
 module and source artifacts; and byte-identical BEX-owned archive replicas.
 

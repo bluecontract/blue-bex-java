@@ -775,8 +775,8 @@ public abstract class GenerateWorkingReportTask extends DefaultTask {
         }
 
         private boolean complete() {
-            return vectors == 60 && requiredVectors == 60
-                    && behavior == 105 && requiredBehavior == 105
+            return vectors == 75 && requiredVectors == 75
+                    && behavior == 120 && requiredBehavior == 120
                     && gas == 30 && requiredGas == 30
                     && operators == 86 && requiredOperators == 86;
         }

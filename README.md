@@ -126,7 +126,7 @@ fails on any same-run conformance blocker. It never publishes BEX artifacts;
 the separate `publish` task performs that mutation after verification. See
 [Release](docs/release.md) for the exact commands and source lock.
 
-The normative package currently contains 60 vectors, 105 behavior fixtures, 30
+The normative package currently contains 75 vectors, 120 behavior fixtures, 30
 gas microfixtures, and coverage for 86 operators. Exact identities are recorded
 in [Conformance](docs/conformance.md).
 

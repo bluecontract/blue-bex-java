@@ -7,8 +7,8 @@ fixture manifest.
 ## Exact package baseline
 
 ```text
-normative vectors       60
-behavior fixtures      105
+normative vectors       75
+behavior fixtures      120
 gas microfixtures       30
 normative operators     86
 
@@ -19,7 +19,7 @@ gas manifest
 sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 
 fixture package
-sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
 ```
 
 Documentation-only corrections do not change these identities. If

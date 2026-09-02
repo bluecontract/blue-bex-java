@@ -3,16 +3,19 @@ package blue.bex;
 import blue.bex.api.BexEngine;
 import blue.bex.api.BexExecutionContext;
 import blue.bex.api.BexProgramSource;
+import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasMeter;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexAdmittedValue;
 import blue.bex.output.BexOutputAdmission;
 import blue.bex.output.BexOutputKind;
+import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetricsRecorder;
 import blue.bex.result.BexPatchEntry;
 import blue.bex.result.BexResultOverlay;
 import blue.bex.runtime.BexExecutionAccumulator;
+import blue.bex.runtime.BexRuntime;
 import blue.bex.test.TestBlue;
 import blue.bex.value.BexBlueNodeWriter;
 import blue.bex.value.BexNodeWriter;
@@ -20,6 +23,7 @@ import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
 import blue.language.model.Nodes;
+import blue.language.runtime.BlueLanguage;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -31,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static blue.bex.test.BexTestFixtures.defaultContext;
 import static blue.bex.test.BexTestFixtures.defaultDocumentView;
 import static blue.bex.test.BexTestFixtures.frozen;
+import static blue.bex.test.BexTestFixtures.list;
 import static blue.bex.test.BexTestFixtures.obj;
 import static blue.bex.test.BexTestFixtures.op;
 import static blue.bex.test.BexTestFixtures.stepExpr;
@@ -44,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BexBlueOutputNullBoundaryTest {
 
     @Test
-    void recursivelyNormalizesNullByStructuralPosition() {
+    void cBexNull02RecursivelyNormalizesNullByStructuralPosition() {
         Map<String, Object> source = new LinkedHashMap<>();
         source.put("omitted", null);
         source.put("empty", Collections.emptyMap());
@@ -76,7 +81,7 @@ class BexBlueOutputNullBoundaryTest {
     }
 
     @Test
-    void explicitPlaceholderConvergesWithListNullButEmptyObjectDoesNot() {
+    void cBexNull03ExplicitPlaceholderConvergesWithListNullButEmptyObjectDoesNot() {
         BexValue values = BexValues.fromSimple(Arrays.asList(
                 null,
                 Collections.singletonMap("$empty", true),
@@ -169,6 +174,37 @@ class BexBlueOutputNullBoundaryTest {
     }
 
     @Test
+    void cBexNull01FailureDiscardsPreviouslyBufferedPatchAndEvent() {
+        Node program = obj(
+                "type", "Blue/BEX Program",
+                "do", list(
+                        op("$appendChange", obj(
+                                "op", "replace",
+                                "path", "/state",
+                                "val", "buffered")),
+                        op("$appendEvent", obj("kind", "buffered")),
+                        op("$appendEvent", op("$null", true))));
+
+        try (BlueLanguage blue = BlueLanguage.builder().build();
+             BexEngine engine = BexEngine.builder().language(blue).build()) {
+            BexCompiledProgram compiled = engine.compile(
+                    BexProgramSource.inline(frozen(program)));
+            BexRuntime runtime = new BexRuntime(
+                    compiled,
+                    defaultContext(),
+                    blue,
+                    BexGasSchedule.defaults(),
+                    new BexMetricsRecorder(),
+                    new BexPointerCache());
+
+            assertThrows(BexException.class, runtime::execute);
+            assertTrue(runtime.accumulator().changeset().entries().isEmpty());
+            assertTrue(runtime.accumulator().events().events().isEmpty());
+            assertTrue(runtime.accumulator().events().admittedEvents().isEmpty());
+        }
+    }
+
+    @Test
     void compiledNullAndEmptyObjectStayDistinctUntilBlueAdmission() {
         TestBlue blue = new TestBlue();
         Node program = blue.parseSourceYaml(String.join("\n",
@@ -236,7 +272,7 @@ class BexBlueOutputNullBoundaryTest {
 
     @Test
     void exactEmptyBlueNodeIsAnObjectRatherThanBexNull() {
-        BexValue exactEmpty = BexValues.nodeSnapshot(new Node());
+        BexValue exactEmpty = BexValues.nodeSnapshot(Nodes.emptyObject());
 
         assertTrue(exactEmpty.isExact());
         assertTrue(exactEmpty.isObject());

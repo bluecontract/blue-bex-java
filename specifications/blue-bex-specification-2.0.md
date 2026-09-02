@@ -147,7 +147,22 @@ A conforming Blue BEX 2.0 implementation MUST implement the complete specificati
 
 A compiler-only component may describe itself as a BEX 2.0 compiler, but not as a conforming BEX 2.0 runtime.
 
-This proposal intentionally does not publish final BEX runtime-registry or fixture-package identities. They MUST be rebuilt after the Language identity cascade and the updated output-boundary fixtures pass. The machine-readable `blue-bex/gas/2.0` manifest remains normative for portable counters, weights, formulas, and forbidden metering shortcuts; if its exact bytes remain unchanged, its own content identity may remain unchanged, but every dependent release binding must still be recomputed and verified.
+The source-controlled conformance baseline is:
+
+```text
+normative vectors: 75
+behavior fixtures: 120
+gas microfixtures: 30
+normative operators: 86
+runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
+fixture package: sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
+```
+
+These identities MUST be rebuilt after any identity-bearing registry,
+manifest, or fixture change. The machine-readable `blue-bex/gas/2.0` manifest
+remains normative for portable counters, weights, formulas, and forbidden
+metering shortcuts.
 
 ### 1.5 Dependencies
 

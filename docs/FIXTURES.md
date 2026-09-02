@@ -176,13 +176,13 @@ manifest, vector map, and operator map.
 The implementation-baseline inventory and identities are:
 
 ```text
-normative vectors: 60
-behavior fixtures: 105
+normative vectors: 75
+behavior fixtures: 120
 gas microfixtures: 30
 normative operators: 86
 runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
 gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
-fixture package: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+fixture package: sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
 ```
 
 Run the complete package and generate machine-readable evidence with:
