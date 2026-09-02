@@ -88,5 +88,7 @@ entries:
   definition: Closed BEX conformance projection.
 - path: runtime.bufferedEffectsCommitted
   definition: Whether buffered BEX changes/events crossed the successful result boundary.
+- path: runtime.overlayValue
+  definition: Post-run accumulator overlay root, including the reset value after failure.
 - path: runtime.started
   definition: Whether runtime execution began after compilation.

@@ -8,8 +8,8 @@ gasFixtureCount: 30
 files:
 - path: HARNESS.md
   role: support
-  sha256: 13d8124d59aa495f41cdc40f68d38be0299dc61765b4b7271978d728e8376b03
-  bytes: 6357
+  sha256: 46f7cb9b23e5a1ba5793174f7eae49a11690aba9856018f3934453958fd2991b
+  bytes: 6585
 - path: README.md
   role: support
   sha256: a0776a0e1f3c21b388369a7ac92506d2ceca34d3d813cced09f627d253cb42f9
@@ -168,8 +168,8 @@ files:
   bytes: 843
 - path: fixture-schema.yaml
   role: support
-  sha256: a808d5fb6fe7f7596fd12b17b8c10873f01c0b8d731c845c3bfda2c0e570b6dc
-  bytes: 3062
+  sha256: 787874fc0a67a3f6e43b1777fc500177c0816451ff28684a43df9185474609ee
+  bytes: 3387
 - path: g/bex-g-01.yaml
   role: behavior-fixture
   sha256: fecea8ce022312ad088d896a2a74ecebe65eb98812bb65c94e9178e76b73a8fe
@@ -560,8 +560,8 @@ files:
   bytes: 370
 - path: projection-catalog.yaml
   role: support
-  sha256: 5f2abd8055a4d1df72e7ca56edf441ad68348ca93cf79a61bbeff67ad029fedc
-  bytes: 4429
+  sha256: 880754a85a52deacdf4ef86b8ea0079f24643e125f745469ac53a60037528e5d
+  bytes: 4548
 - path: r/bex-r-01.yaml
   role: behavior-fixture
   sha256: 5f5466a3d0cbefb69d1c5820cf98066ff84edc780fdac1828f62a979b6c88a1a
@@ -635,7 +635,7 @@ packageIdentityAlgorithm:
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity is null before hashing
   lineEndings: LF
-packageIdentity: sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
+packageIdentity: sha256:05ec2ecad0227f6b812fd32e51fce2c6cb23f592bd54a83c7fb20286e0273e6c
 gasSchedule: blue-bex/gas/2.0
 gasManifestPackageIdentity: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 gasManifestSha256: 1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d

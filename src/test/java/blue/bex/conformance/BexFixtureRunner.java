@@ -90,18 +90,12 @@ final class BexFixtureRunner {
                     context,
                     Collections.<String, Object>emptyMap(),
                     fixture.id() + "[case:" + name + "]");
-
-            assertEquals(
-                    testcase.get("errorClass"),
-                    run.errorClass,
-                    run.name + " error class; " + diagnostics(run));
-            assertNotNull(run.failure,
-                    run.name + " was required to fail");
-            if (testcase.containsKey("reason")) {
-                assertReason(
-                        String.valueOf(testcase.get("reason")), run);
-            }
-            validateHostLedgerPhase(run);
+            Map<String, Object> caseExpected =
+                    new LinkedHashMap<String, Object>(testcase);
+            caseExpected.remove("name");
+            caseExpected.remove("program");
+            caseExpected.remove("context");
+            validateRun(fixture, caseExpected, run);
         }
     }
 
@@ -404,6 +398,9 @@ final class BexFixtureRunner {
         }
         if ("runtime.bufferedEffectsCommitted".equals(path)) {
             return run.bufferedEffectsCommitted;
+        }
+        if ("runtime.overlayValue".equals(path)) {
+            return run.overlayValue != null ? run.overlayValue : ABSENT;
         }
         if ("runtime.started".equals(path)) {
             return run.runtimeStarted;

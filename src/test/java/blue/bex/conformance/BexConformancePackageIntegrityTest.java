@@ -231,18 +231,41 @@ class BexConformancePackageIntegrityTest {
                     "Duplicate projection: " + projection);
         }
         for (ConformancePackage.Fixture fixture : behavior) {
-            Object assertionsValue = fixture.expected().get("assertions");
-            if (assertionsValue == null) {
-                continue;
+            assertDeclaredProjections(
+                    projections,
+                    fixture.expected(),
+                    fixture.path + ".expected");
+            Object cases = fixture.expected().get("cases");
+            if (cases != null) {
+                for (Object caseValue : ConformancePackage.list(
+                        cases, fixture.path + ".expected.cases")) {
+                    Map<String, Object> fixtureCase = ConformancePackage.map(
+                            caseValue, fixture.path + " case");
+                    assertDeclaredProjections(
+                            projections,
+                            fixtureCase,
+                            fixture.path + ".expected.cases["
+                                    + fixtureCase.get("name") + "]");
+                }
             }
-            for (Object assertionValue : ConformancePackage.list(
-                    assertionsValue, fixture.path + ".expected.assertions")) {
-                Map<String, Object> assertion = ConformancePackage.map(
-                        assertionValue, fixture.path + " assertion");
-                String actual = text(assertion.get("actual"));
-                assertTrue(projections.contains(actual),
-                        fixture.path + " uses undeclared projection " + actual);
-            }
+        }
+    }
+
+    private static void assertDeclaredProjections(
+            Set<String> projections,
+            Map<String, Object> expected,
+            String path) {
+        Object assertionsValue = expected.get("assertions");
+        if (assertionsValue == null) {
+            return;
+        }
+        for (Object assertionValue : ConformancePackage.list(
+                assertionsValue, path + ".assertions")) {
+            Map<String, Object> assertion = ConformancePackage.map(
+                    assertionValue, path + " assertion");
+            String actual = text(assertion.get("actual"));
+            assertTrue(projections.contains(actual),
+                    path + " uses undeclared projection " + actual);
         }
     }
 

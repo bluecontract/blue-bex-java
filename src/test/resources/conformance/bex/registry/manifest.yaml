@@ -3,7 +3,7 @@ registryKind: runtime-type
 specificationVersion: '2.0'
 languageVersion: '1.0'
 contractsVersion: '1.0'
-fixturePackageIdentity: sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
+fixturePackageIdentity: sha256:05ec2ecad0227f6b812fd32e51fce2c6cb23f592bd54a83c7fb20286e0273e6c
 entries:
 - key: Compute2
   path: Compute2.blue

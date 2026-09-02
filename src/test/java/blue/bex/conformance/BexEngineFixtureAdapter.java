@@ -14,9 +14,13 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.gas.BexGasLimitExceededException;
+import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexEstablishedIdentity;
 import blue.bex.output.BexSemanticIdentityBoundary;
+import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
+import blue.bex.result.BexMetricsRecorder;
+import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
@@ -102,12 +106,16 @@ final class BexEngineFixtureAdapter {
                     identityBoundary,
                     parentBudget,
                     localLimit);
+            BexGasSchedule bexGasSchedule = BexGasSchedule.defaults();
+            BexIntrinsicRegistry intrinsicRegistry = fixtureIntrinsics();
             BexEngine engine = BexEngine.builder()
                     .language(blue.runtime())
-                    .intrinsics(fixtureIntrinsics())
+                    .gasSchedule(bexGasSchedule)
+                    .intrinsics(intrinsicRegistry)
                     .build();
 
             BexExecutionResult result = null;
+            BexRuntime runtime = null;
             Throwable failure = null;
             boolean runtimeStarted = false;
             try {
@@ -116,7 +124,15 @@ final class BexEngineFixtureAdapter {
                         BexProgramSource.inline(
                                 FrozenNode.fromResolvedNode(programNode)));
                 runtimeStarted = true;
-                result = engine.execute(compiled, executionContext);
+                runtime = new BexRuntime(
+                        compiled,
+                        executionContext,
+                        blue.runtime(),
+                        bexGasSchedule,
+                        new BexMetricsRecorder(),
+                        new BexPointerCache(),
+                        intrinsicRegistry);
+                result = runtime.execute();
             } catch (RuntimeException ex) {
                 failure = ex;
             } catch (Error error) {
@@ -149,12 +165,15 @@ final class BexEngineFixtureAdapter {
             Object resultValue = result != null
                     ? result.value().toSimple()
                     : null;
-            Object changes = result != null
-                    ? result.changeset().asValue().toSimple()
+            Object changes = runtime != null
+                    ? runtime.accumulator().changeset().asValue().toSimple()
                     : Collections.emptyList();
-            Object events = result != null
-                    ? result.events().asValue().toSimple()
+            Object events = runtime != null
+                    ? runtime.accumulator().events().asValue().toSimple()
                     : Collections.emptyList();
+            Object overlayValue = runtime != null
+                    ? runtime.accumulator().overlay().rootValue().toSimple()
+                    : null;
 
             return new BexFixtureRun(
                     runName,
@@ -182,6 +201,7 @@ final class BexEngineFixtureAdapter {
                     failedChargePresent,
                     identityBoundary.complexIdentityCalls,
                     result != null,
+                    overlayValue,
                     identityBoundary.boundaryValue(),
                     resultValue,
                     changes,
