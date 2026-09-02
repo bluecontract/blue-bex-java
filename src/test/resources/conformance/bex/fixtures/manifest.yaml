@@ -128,8 +128,8 @@ files:
   bytes: 879
 - path: empty/bex-empty-06.yaml
   role: behavior-fixture
-  sha256: 4435cbf8a2e1d09310378f16cc1c7526e6f6df9193de13f99140d1226699b35a
-  bytes: 1685
+  sha256: 2cb0f9b1f190c48827ba5d932cb3bf6058e42e6e0d5af5d1fe341cdaa74e8068
+  bytes: 7537
 - path: empty/bex-empty-07.yaml
   role: behavior-fixture
   sha256: ece99b4173d785a23dac7224e586aee1280b2cbae3010497aa33b959e8860657
@@ -635,7 +635,7 @@ packageIdentityAlgorithm:
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity is null before hashing
   lineEndings: LF
-packageIdentity: sha256:44afe1f9b890f3fedaa3a39176ef095b064f85a483570d1c80198906fb8bea06
+packageIdentity: sha256:592018fb7614d1d3b976cd855a69a400e887c36a663cf9192ef6ad5d55bb47c5
 gasSchedule: blue-bex/gas/2.0
 gasManifestPackageIdentity: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 gasManifestSha256: 1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d
