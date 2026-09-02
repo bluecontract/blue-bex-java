@@ -1,6 +1,6 @@
 # Blue BEX Specification 2.0
 
-> **Status.** Final Implementation Baseline. Operator semantics, counter ownership, counter names, formulas, and trace ordering are frozen for implementation; numerical weights and portable limits remain provisional pending calibration. Final public publication freezes the calibrated manifest and regenerates dependent fixture identities.
+> **Status.** Proposed release-candidate revision aligned with the Blue Language empty-object change and the BEX-to-Blue null-boundary correction. BEX execution-time `null` remains distinct from `undefined` and `{}`, but its conversion to Blue content now follows the same context-sensitive null and empty-object normalization as an equivalent Blue Source value. Operator semantics, counter ownership, counter names, formulas, and trace ordering otherwise remain the implementation baseline. Final public publication MUST regenerate dependent runtime, fixture, gas-expectation, and package identities after the Language and Contracts changes are complete.
 
 > **Scope.** This document defines Blue BEX: a deterministic expression and statement language encoded as Blue-compatible data. It specifies the program model, compilation, values, expressions, statements, functions, pointers, result accumulation, Blue host boundary, exact gas ledger, errors, fixtures, and conformance. It does not redefine Blue Language or Contracts processing.
 
@@ -147,17 +147,7 @@ A conforming Blue BEX 2.0 implementation MUST implement the complete specificati
 
 A compiler-only component may describe itself as a BEX 2.0 compiler, but not as a conforming BEX 2.0 runtime.
 
-The implementation-baseline BEX runtime registry package identity is:
-
-```text
-sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
-```
-
-The machine-readable `blue-bex/gas/2.0` manifest is normative for all portable runtime counters, weights, formulas, and forbidden metering shortcuts. Its implementation-baseline package identity is:
-
-```text
-sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
-```
+This proposal intentionally does not publish final BEX runtime-registry or fixture-package identities. They MUST be rebuilt after the Language identity cascade and the updated output-boundary fixtures pass. The machine-readable `blue-bex/gas/2.0` manifest remains normative for portable counters, weights, formulas, and forbidden metering shortcuts; if its exact bytes remain unchanged, its own content identity may remain unchanged, but every dependent release binding must still be recomputed and verified.
 
 ### 1.5 Dependencies
 
@@ -324,19 +314,26 @@ Rules:
 - Reading a semantically absent object key returns `undefined`.
 - Reading an out-of-range list index returns `undefined`.
 - `$pointerGet` returns `undefined` for an absent path unless a default is supplied.
-- Object construction omits fields whose evaluated value is `undefined`.
+- Object construction omits fields whose evaluated value is `undefined`; it may retain `null` as an execution-time member. If that object later crosses a Blue output boundary, null-valued object members are omitted under §11.6a.
 - Lists MUST NOT contain `undefined` items.
 - Converting root `undefined` to a Blue node MUST fail.
 - Incomplete access, provider unavailability, or a limit is an error/suspension outcome, not `undefined`.
 
 ### 3.4 Null (normative)
 
-`null` is a value, not absence.
+`null` is a BEX value, not BEX absence.
 
 - `null` is falsy.
 - `$exists(null)` is true.
-- BEX `null` converts to an empty Blue object at the strict Blue output boundary.
 - `null` is distinct from `undefined` and from an empty object during BEX execution.
+- Blue Language 1.0 does not define a canonical null node. BEX `null` therefore has no direct Blue Node BlueId merely because it exists during execution.
+- When BEX content crosses the strict Blue output boundary, `null` is normalized by its structural position under §11.6a:
+  - a root `null`, patch value `null`, emitted-event root `null`, exact-node intrinsic input `null`, or `$nodeBlueId(null)` request fails Blue output admission;
+  - a `null` object member is omitted;
+  - a `null` list item becomes the exact Blue positional placeholder `{ $empty: true }`.
+- A program that needs a present empty Blue object MUST construct `{}` explicitly, use `$emptyObject`, or use another operator such as `$object` whose specified result is an object.
+
+BEX `null` and `undefined` may therefore produce the same *object-member omission* at the Blue boundary while remaining observably distinct during execution. In lists they do not converge: `undefined` is invalid, while `null` becomes the Blue positional placeholder. This boundary rule prevents an execution-time null sentinel from silently becoming present empty-object business content.
 
 ### 3.5 Scalars and the Blue numeric boundary (normative)
 
@@ -360,7 +357,7 @@ BEX objects map Text keys to BEX values.
 
 - A semantically absent key reads as `undefined`.
 - Keys are exposed in lexicographic Unicode code-point order for `$keys`, `$entries`, object iteration, deterministic conversion, sorting inputs, and diagnostics.
-- Object construction omits `undefined` fields and preserves `null` fields.
+- Object construction omits `undefined` fields and preserves `null` fields during BEX execution. At the Blue output boundary, preserved null-valued object members are omitted under §11.6a.
 - Exact Blue objects may remain collapsed behind their Node BlueIds until a direct member is demanded.
 - Key enumeration requires the complete direct key set. Inability to establish that set is not an empty object.
 
@@ -1259,15 +1256,18 @@ An existing exact Blue value crosses the boundary by identity. The host MUST pre
 
 A transient value is converted recursively to a valid Blue Language 1.0 node:
 
-- `undefined` root fails;
-- an object omits `undefined` fields;
+- `undefined` or `null` at the boundary root fails;
+- an object omits members whose evaluated value is `undefined` or `null`;
+- recursive omission of null-valued children does not remove their containing object; for example `{x: {y: null}}` becomes `{x: {}}`;
 - a list containing `undefined` fails;
-- `null` becomes an empty Blue object;
+- a list item whose value is `null` becomes the exact Blue positional placeholder `{ $empty: true }`;
+- an explicit BEX empty object remains the exact Blue empty object `{}`;
+- an explicit BEX empty list remains the exact Blue empty list `[]`;
 - Text, Integer, decimal, and Boolean use the deterministic scalar rules;
 - object and list members are converted in canonical BEX order;
 - the resulting node must satisfy Blue Language syntax, payload-kind, reserved-field, list-control, and schema rules.
 
-BEX charges runtime construction and `blueOutputBoundary`; the host charges Blue semantic identity establishment exactly once under Contracts 1.0. These ledgers MUST NOT both charge the same runtime member production or the same semantic identity step.
+BEX charges runtime construction and `blueOutputBoundary`; the host charges Blue semantic identity establishment exactly once under Contracts 1.0. The boundary-generated `$empty: true` placeholder for a list `null` is normalization work, not an authored BEX object member. Implementations MUST produce the same semantic ledger and resulting identity independent of cache state or internal representation. These ledgers MUST NOT both charge the same runtime member production or the same semantic identity step.
 
 ### 11.4 `$nodeBlueId` (normative)
 
@@ -1275,7 +1275,7 @@ BEX charges runtime construction and `blueOutputBoundary`; the host charges Blue
 
 - If the operand is an exact Blue value, it returns that value's Node BlueId as Text without transitive expansion.
 - If the operand is transient, it performs the Blue output conversion, establishes its exact Node BlueId, and returns that Text.
-- `undefined` fails.
+- `undefined` and `null` fail because neither is an admissible Blue root value under this boundary profile.
 - The operation never exposes whether an exact value was originally inline or a pure reference.
 
 ### 11.5 Pure references and payload kinds (normative)
@@ -1288,11 +1288,49 @@ A node MUST NOT mix scalar `value`, list `items`, and ordinary object payload fi
 
 Converted output may use only Blue Language 1.0 schema keywords. `constraints`, `allowMultiple`, `options`, or any unsupported schema key fails. Computed language fields such as `type`, `itemType`, `keyType`, `valueType`, `schema`, `mergePolicy`, and `contracts` retain their Blue language meaning and are validated accordingly.
 
+### 11.6a Empty objects, `null`, omission, and list position (normative)
+
+For null and empty-aggregate semantics, the BEX-to-Blue boundary MUST produce the same preprocessed Blue value as the equivalent Blue Source structure. It applies this mandatory context-sensitive normalization directly; it does not execute a caller-supplied `blue` directive, imports, transformations, or Source-only list overlays.
+
+The required mapping is:
+
+| BEX value and structural position | Exact Blue boundary result |
+|---|---|
+| root `undefined` | fail |
+| root `null` | fail |
+| root `{}` | present exact `{}` |
+| root `[]` | present exact `[]` |
+| object member `undefined` | member omitted |
+| object member `null` | member omitted |
+| object member `{}` | present exact `{}` member |
+| object member `[]` | present exact `[]` member |
+| list item `undefined` | fail |
+| list item `null` | exact `{ $empty: true }` placeholder |
+| list item `{}` | ordinary exact `{}` item |
+| list item `[]` | ordinary exact `[]` item |
+
+Null removal is recursive inside objects but does not cascade into removal of the containing object:
+
+```text
+BEX {x: {y: null}} -> Blue {x: {}}
+```
+
+The same rule applies to reserved Blue fields. For example:
+
+```text
+BEX {type: null} -> Blue {}
+BEX {type: {}}   -> Blue {type: {}}
+```
+
+The first form omits the `type` member before normal Blue validation. The second preserves an explicit empty inline type and is validated under Blue Language 1.0. An implementation MUST NOT first convert `null` to `{}` and thereby turn `{type: null}` into a present empty type.
+
+The boundary MUST NOT convert an explicit empty object into `$empty: true`, remove it, or treat it as missing. Conversely, it MUST NOT convert a list `null` into an empty object. `$empty: true` remains the exact positional placeholder required by Blue Language for Source-equivalent list null.
+
 ### 11.7 Preprocessing and list controls (normative)
 
-Computed output containing `blue` fails. BEX output is runtime Blue content, not an authored preprocessing source document.
+Computed output containing `blue` fails. BEX output is runtime-produced Blue content, not a retained authored Source Document. Nevertheless, §11.6a applies the same mandatory null-removal and list-placeholder normalization that the equivalent Source structure would receive. No caller-supplied preprocessing directive, import substitution, or transformation executes at this boundary.
 
-Computed output MUST NOT contain `$previous`, `$pos`, or `$replace` as Blue list controls. `$empty: true` is allowed only in its exact Blue Language placeholder shape.
+Computed output MUST NOT contain `$previous`, `$pos`, or `$replace` as Blue list controls. `$empty: true` is allowed only in its exact Blue Language placeholder shape, including when the boundary creates it from a BEX list `null`.
 
 ### 11.8 Failure atomicity (normative)
 
@@ -1746,19 +1784,12 @@ fixture package SHA-256
 
 A conforming BEX 2.0 implementation MUST report the exact runtime-registry, gas-manifest, and fixture-package identities it implements and passes.
 
-The implementation-baseline fixture package is bound to the exact BEX runtime
-registry and `blue-bex/gas/2.0` manifest. Its authoritative inventory and
-identities are:
-
-```text
-normative vectors: 60
-behavior fixtures: 105
-gas microfixtures: 30
-normative operators: 86
-runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
-gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
-fixture package: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
-```
+This proposal intentionally claims no final fixture inventory or package identity.
+After implementation, the release process MUST regenerate the vector coverage,
+behavior-fixture count, gas-microfixture count, runtime-registry identity, fixture
+package identity, and all dependent receipts. The normative operator set and gas
+schedule may remain unchanged only when the generated audit proves that no
+operator or counter semantics outside this explicit output-boundary change moved.
 
 ## 17. Conformance Vectors
 
@@ -1784,6 +1815,12 @@ Every vector is behavior-defining and has at least one machine-readable fixture.
 - **BEX-E-04.** `$pointerJoin` escapes `~` and `/`.
 - **BEX-E-05.** `$exists` is false only for semantic `undefined`; incomplete access is not absence.
 - **BEX-E-06.** Numeric zero is truthy; empty object/list and null are falsy.
+- **BEX-E-06a.** BEX `undefined`, `null`, and `{}` remain distinct during execution. At the Blue boundary, `undefined` and `null` object members are omitted, while an explicit `{}` member remains present.
+- **BEX-E-06b.** Root `undefined`, root `null`, a patch value `null`, an emitted-event root `null`, an exact-node intrinsic input `null`, and `$nodeBlueId(null)` fail Blue output admission; an explicit `{}` succeeds and has the exact empty-object BlueId.
+- **BEX-E-06c.** A BEX list containing `null`, `{}`, and `[]` outputs three positions: `{ $empty: true }`, `{}`, and `[]`; all three positions and their distinct identities are preserved.
+- **BEX-E-06d.** `{x: {y: null}}` crosses the boundary as `{x: {}}`; recursive null removal does not erase the explicitly constructed container.
+- **BEX-E-06e.** `{type: null}` crosses the boundary as `{}`, while `{type: {}}` retains the explicit empty type and undergoes ordinary Language validation.
+- **BEX-E-06f.** An Operation Request constructed with `request: null` has no `request` member after Blue output admission; it is distinct from one constructed with `request: {}`.
 - **BEX-E-07.** `$and`, `$or`, `$coalesce`, `$choose`, `$if`, and collection search short-circuit.
 - **BEX-E-08.** Numeric conversions, exact division, Text rendering, and finite Double conversion are deterministic.
 - **BEX-E-09.** Object keys are exposed in Unicode code-point order independent of host maps and locale.
@@ -2162,6 +2199,10 @@ Appending an existing exact event charges the evaluated expression, `eventAppend
 ## Appendix C — Common Implementer Mistakes
 
 This appendix is informative.
+
+### C.0 Do not use BEX `null` to mean a present empty Blue object
+
+At the Blue boundary `{}` is present exact content. A BEX object member whose value is `null` is omitted, while a BEX list item whose value is `null` becomes `{ $empty: true }`. Root `null` is invalid. Use an explicit `{}`, `$emptyObject`, or `$object` when a present empty Blue object is intended.
 
 ### C.1 Do not treat every `$` key as an operator
 
