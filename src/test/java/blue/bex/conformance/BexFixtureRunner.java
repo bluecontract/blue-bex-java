@@ -3,7 +3,9 @@ package blue.bex.conformance;
 import blue.bex.gas.BexGasCounter;
 import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexAdmittedValue;
+import blue.language.identity.DirectBlueIdCalculator;
 import blue.language.model.Node;
+import blue.language.model.NodeWireForm;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -353,6 +355,35 @@ final class BexFixtureRunner {
         if ("output.nodeBlueId".equals(path)) {
             BexAdmittedValue output = run.output();
             return output != null ? output.nodeBlueId() : ABSENT;
+        }
+        if ("output.boundaryValue".equals(path)) {
+            return run.outputBoundaryValue != null
+                    ? run.outputBoundaryValue
+                    : ABSENT;
+        }
+        if ("output.canonical".equals(path)) {
+            BexAdmittedValue output = run.output();
+            return output != null
+                    ? NodeWireForm.get(output.node())
+                    : ABSENT;
+        }
+        if ("output.semantic".equals(path)) {
+            BexAdmittedValue output = run.output();
+            return output != null
+                    ? output.semanticValue().toSimple()
+                    : ABSENT;
+        }
+        if ("output.itemBlueIds".equals(path)) {
+            BexAdmittedValue output = run.output();
+            if (output == null || output.node().getItems() == null) {
+                return ABSENT;
+            }
+            List<String> identities = new ArrayList<String>();
+            for (Node item : output.node().getItems()) {
+                identities.add(
+                        DirectBlueIdCalculator.calculateBlueId(item));
+            }
+            return identities;
         }
         if ("output.reconstructed".equals(path)) {
             BexAdmittedValue output = run.output();

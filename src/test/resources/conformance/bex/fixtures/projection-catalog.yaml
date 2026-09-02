@@ -12,6 +12,8 @@ entries:
   definition: Minimum of parent remaining gas and optional BEX-local sub-limit.
 - path: gas.collectionItemProduced
   definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.blueOutputBoundary
+  definition: Exact quantity of Blue output-boundary admissions.
 - path: gas.collectionItemVisited
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gas.comparisonNodeVisited
@@ -24,6 +26,8 @@ entries:
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gas.integerLimbOperation
   definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.nodeIdentityRequested
+  definition: Exact quantity of explicit node-identity requests.
 - path: gas.pointerSegmentWritten
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gas.recursiveSizeCounter
@@ -62,6 +66,14 @@ entries:
   definition: Bound package-manifest coverage projection.
 - path: output.nodeBlueId
   definition: Blue output-admission result projection.
+- path: output.boundaryValue
+  definition: Independently serialized transient value presented to Language admission.
+- path: output.canonical
+  definition: Independently serialized canonical value returned by Language admission.
+- path: output.semantic
+  definition: Exact admitted Blue semantic value after boundary normalization.
+- path: output.itemBlueIds
+  definition: Ordered direct identities of the admitted canonical Blue list children.
 - path: output.reconstructed
   definition: Blue output-admission result projection.
 - path: output.type.blueId

@@ -1,0 +1,28 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-04
+vectors:
+- BEX-EMPTY-04
+category: e
+description: Recursive null omission retains the explicitly constructed containing object.
+program:
+  expr:
+    x:
+      y:
+        $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    x:
+      y: null
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      x: {}

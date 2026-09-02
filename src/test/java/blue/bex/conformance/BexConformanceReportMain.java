@@ -1129,7 +1129,7 @@ public final class BexConformanceReportMain {
                 failures,
                 passingBehavior
                         == ConformancePackage.BEHAVIOR_FIXTURE_COUNT,
-                "behavior-fixtures-not-105-of-105");
+                "behavior-fixtures-not-120-of-120");
         require(
                 failures,
                 Boolean.TRUE.equals(

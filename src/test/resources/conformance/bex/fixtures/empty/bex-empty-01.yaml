@@ -1,0 +1,27 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-01
+vectors:
+- BEX-EMPTY-01
+category: e
+description: An undefined object member is omitted at construction and at Blue output admission.
+program:
+  expr:
+    x:
+      $document: /missing
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result: {}
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected: {}
+  - actual: output.nodeBlueId
+    op: equals
+    expected: 5ajuwjHoLj33yG5t5UFsJtUb3vnRaJQEMPqSLz6VyoHK

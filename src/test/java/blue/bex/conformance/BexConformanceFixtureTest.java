@@ -21,7 +21,7 @@ class BexConformanceFixtureTest {
         assertEquals(
                 ConformancePackage.BEHAVIOR_FIXTURE_COUNT,
                 fixtures.size(),
-                "The manifest must expose exactly 105 behavior fixtures");
+                "The manifest must expose exactly 120 behavior fixtures");
 
         List<DynamicTest> tests =
                 new ArrayList<DynamicTest>(fixtures.size());

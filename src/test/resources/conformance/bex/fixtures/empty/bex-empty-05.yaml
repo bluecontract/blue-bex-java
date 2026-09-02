@@ -1,0 +1,41 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-05
+vectors:
+- BEX-EMPTY-05
+category: e
+description: List null becomes the positional placeholder while explicit empty object and list remain ordinary values.
+program:
+  expr:
+  - $null: true
+  - {}
+  - []
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - null
+  - {}
+  - []
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      items:
+      - {$empty: true}
+      - {}
+      - items: []
+  - actual: output.itemBlueIds
+    op: equals
+    expected:
+    - 6V647wzsPU3zXvrc5AwKsqbFmkgHWV8WAeyBfNG1T8Rx
+    - 5ajuwjHoLj33yG5t5UFsJtUb3vnRaJQEMPqSLz6VyoHK
+    - 4mfDwwrpfVGMwKn82vsr4rVX484P8DAMy5RNEVXqsy9h
+  - actual: output.nodeBlueId
+    op: equals
+    expected: EWr9y2M2RDtpegE6C7i36F6vph8EKqbk5dWkCtmHLnBy

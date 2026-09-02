@@ -1,0 +1,37 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-09
+vectors:
+- BEX-EMPTY-09
+category: e
+description: An Operation Request-shaped value with request null admits without a request member.
+program:
+  expr:
+    operation: doSomething
+    channel: ownerChannel
+    request:
+      $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    operation: doSomething
+    channel: ownerChannel
+    request: null
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      operation:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+        value: doSomething
+      channel:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+        value: ownerChannel

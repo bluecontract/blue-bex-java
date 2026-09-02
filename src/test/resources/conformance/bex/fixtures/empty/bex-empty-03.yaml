@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-03
+vectors:
+- BEX-EMPTY-03
+category: e
+description: An explicit empty-object member remains present exact content.
+program:
+  expr:
+    x: {}
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    x: {}
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      x: {}

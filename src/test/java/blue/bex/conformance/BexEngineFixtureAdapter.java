@@ -23,12 +23,12 @@ import blue.bex.test.TestBlue;
 import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
+import blue.language.model.NodeWireForm;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
 import blue.language.processor.GasTraceEntry;
 import blue.language.snapshot.FrozenNode;
 import blue.language.merge.ResolvedSnapshot;
-import blue.language.identity.DirectBlueIdCalculator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
@@ -92,7 +92,7 @@ final class BexEngineFixtureAdapter {
                     : -1L;
             RecordingGasHost gasHost = new RecordingGasHost(parentBudget);
             RecordingIdentityBoundary identityBoundary =
-                    new RecordingIdentityBoundary();
+                    new RecordingIdentityBoundary(blue);
 
             BexExecutionContext executionContext = executionContext(
                     blue,
@@ -182,6 +182,7 @@ final class BexEngineFixtureAdapter {
                     failedChargePresent,
                     identityBoundary.complexIdentityCalls,
                     result != null,
+                    identityBoundary.boundaryValue(),
                     resultValue,
                     changes,
                     events);
@@ -376,6 +377,10 @@ final class BexEngineFixtureAdapter {
                         invocation -> {
                     invocation.charge(
                             "payloadReturned", 1L, "fixture-payload-returned");
+                    BexValue exact = invocation.field("exact");
+                    if (!exact.isUndefined() && exact.asBoolean()) {
+                        return invocation.exactField("x").value();
+                    }
                     return invocation.field("x");
                 })
                 .register(
@@ -720,16 +725,28 @@ final class BexEngineFixtureAdapter {
 
     private static final class RecordingIdentityBoundary
             implements BexSemanticIdentityBoundary {
+        private final BexSemanticIdentityBoundary delegate;
+        private Node boundaryInput;
         private long complexIdentityCalls;
+
+        private RecordingIdentityBoundary(TestBlue blue) {
+            this.delegate = BexSemanticIdentityBoundary.standalone(
+                    blue.runtime().processing().runtimeAccess());
+        }
 
         @Override
         public BexEstablishedIdentity establishIdentity(Node node) {
+            boundaryInput = node.clone();
             if (node.getProperties() != null || node.getItems() != null) {
                 complexIdentityCalls++;
             }
-            return new BexEstablishedIdentity(
-                    DirectBlueIdCalculator.calculateBlueId(node),
-                    FrozenNode.fromResolvedNode(node.clone()));
+            return delegate.establishIdentity(node);
+        }
+
+        private Object boundaryValue() {
+            return boundaryInput != null
+                    ? NodeWireForm.get(boundaryInput)
+                    : null;
         }
     }
 

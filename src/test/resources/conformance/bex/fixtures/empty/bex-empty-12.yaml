@@ -1,0 +1,31 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-12
+vectors:
+- BEX-EMPTY-12
+category: e
+description: A null value for an optional Text-typed field is omitted before type validation.
+program:
+  expr:
+    type:
+      x:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    x:
+      $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      type:
+        x:
+          type:
+            blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC

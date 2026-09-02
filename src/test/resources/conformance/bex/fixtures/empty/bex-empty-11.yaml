@@ -1,0 +1,63 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-11
+vectors:
+- BEX-EMPTY-11
+category: e
+description: Undefined, null, and empty object remain distinct under BEX kind, equality, and exists semantics.
+program:
+  expr:
+    undefinedKind:
+      $kind:
+        $document: /missing
+    nullKind:
+      $kind:
+        $null: true
+    emptyObjectKind:
+      $kind: {}
+    undefinedExists:
+      $exists:
+        $document: /missing
+    nullExists:
+      $exists:
+        $null: true
+    emptyObjectExists:
+      $exists: {}
+    nullEqualsUndefined:
+      $eq:
+      - $null: true
+      - $document: /missing
+    nullEqualsNull:
+      $eq:
+      - $null: true
+      - $null: true
+    nullEqualsEmptyObject:
+      $eq:
+      - $null: true
+      - {}
+    undefinedMember:
+      $document: /missing
+    nullMember:
+      $null: true
+    emptyObjectMember: {}
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    undefinedKind: undefined
+    nullKind: "null"
+    emptyObjectKind: object
+    undefinedExists: false
+    nullExists: true
+    emptyObjectExists: true
+    nullEqualsUndefined: false
+    nullEqualsNull: true
+    nullEqualsEmptyObject: false
+    nullMember: null
+    emptyObjectMember: {}
+  assertions: []
