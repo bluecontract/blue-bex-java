@@ -1,6 +1,7 @@
 package blue.bex.conformance;
 
 import blue.bex.BexException;
+import blue.bex.BexExecutionEvidenceUnavailableException;
 import blue.bex.BexSourcePath;
 import blue.bex.api.BexEngine;
 import blue.bex.api.BexExecutionContext;
@@ -73,6 +74,16 @@ final class BexEngineFixtureAdapter {
                           Map<String, Object> context,
                           Map<String, Object> variant,
                           String runName) {
+        return execute(
+                fixture, program, context, variant, runName, false);
+    }
+
+    BexFixtureRun execute(ConformancePackage.Fixture fixture,
+                          Map<String, Object> program,
+                          Map<String, Object> context,
+                          Map<String, Object> variant,
+                          String runName,
+                          boolean observeOverlay) {
         Map<String, Object> providerData = optionalMap(
                 context.get("provider"), fixture.path + ".context.provider");
         RecordingNodeProvider provider =
@@ -119,7 +130,7 @@ final class BexEngineFixtureAdapter {
             Throwable failure = null;
             boolean runtimeStarted = false;
             try {
-                Node programNode = ConformancePackage.syntaxNode(program);
+                Node programNode = fixtureProgramNode(blue, program);
                 BexCompiledProgram compiled = engine.compile(
                         BexProgramSource.inline(
                                 FrozenNode.fromResolvedNode(programNode)));
@@ -171,9 +182,8 @@ final class BexEngineFixtureAdapter {
             Object events = runtime != null
                     ? runtime.accumulator().events().asValue().toSimple()
                     : Collections.emptyList();
-            Object overlayValue = runtime != null
-                    ? runtime.accumulator().overlay().rootValue().toSimple()
-                    : null;
+            Object overlayValue = observableOverlayValue(
+                    runtime, observeOverlay);
 
             return new BexFixtureRun(
                     runName,
@@ -207,6 +217,81 @@ final class BexEngineFixtureAdapter {
                     changes,
                     events);
         }
+    }
+
+    private static Object observableOverlayValue(
+            BexRuntime runtime,
+            boolean requested) {
+        if (runtime == null || !requested) {
+            return null;
+        }
+        try {
+            return runtime.accumulator().overlay().rootValue().toSimple();
+        } catch (BexExecutionEvidenceUnavailableException unavailable) {
+            /*
+             * Overlay observation is optional fixture evidence. It must not
+             * introduce a new semantic provider demand after execution (for
+             * example for an intentionally opaque cyclic-set reference).
+             */
+            return null;
+        }
+    }
+
+    /**
+     * Builds executable BEX syntax while decoding function argument patterns
+     * through Blue's source mapper. Most program maps deliberately keep
+     * reserved Blue field names as ordinary BEX output syntax, but argument
+     * patterns are static Blue nodes and therefore need their modeled
+     * {@code type}, {@code description}, schema, and empty-object semantics.
+     */
+    private static Node fixtureProgramNode(
+            TestBlue blue,
+            Map<String, Object> program) {
+        Node syntax = ConformancePackage.syntaxNode(program);
+        Object declaredFunctions = program.get("functions");
+        if (!(declaredFunctions instanceof Map)
+                || syntax.getProperties() == null) {
+            return syntax;
+        }
+        Node functionsSyntax = syntax.getProperties().get("functions");
+        if (functionsSyntax == null
+                || functionsSyntax.getProperties() == null) {
+            return syntax;
+        }
+        for (Map.Entry<String, Object> functionEntry
+                : ConformancePackage.map(
+                        declaredFunctions,
+                        "program.functions").entrySet()) {
+            if (!(functionEntry.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> definition = ConformancePackage.map(
+                    functionEntry.getValue(),
+                    "program.functions." + functionEntry.getKey());
+            Object declaredArgs = definition.get("args");
+            if (!(declaredArgs instanceof Map)) {
+                continue;
+            }
+            Node functionSyntax = functionsSyntax.getProperties().get(
+                    functionEntry.getKey());
+            Node argsSyntax = functionSyntax != null
+                    && functionSyntax.getProperties() != null
+                    ? functionSyntax.getProperties().get("args")
+                    : null;
+            if (argsSyntax == null || argsSyntax.getProperties() == null) {
+                continue;
+            }
+            for (Map.Entry<String, Object> argEntry
+                    : ConformancePackage.map(
+                            declaredArgs,
+                            "program.functions." + functionEntry.getKey()
+                                    + ".args").entrySet()) {
+                argsSyntax.getProperties().put(
+                        argEntry.getKey(),
+                        ConformancePackage.node(blue, argEntry.getValue()));
+            }
+        }
+        return syntax;
     }
 
     private static BexExecutionContext executionContext(

@@ -28,6 +28,10 @@ entries:
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gas.nodeIdentityRequested
   definition: Exact quantity of explicit node-identity requests.
+- path: gas.patchAppended
+  definition: Exact quantity of patch-append attempts admitted before output conversion.
+- path: gas.eventAppended
+  definition: Exact quantity of event-append attempts admitted before output conversion.
 - path: gas.pointerSegmentWritten
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gas.recursiveSizeCounter
@@ -48,6 +52,8 @@ entries:
   definition: Canonical ordered gas trace prefix available on exhaustion.
 - path: gas.transient.transientObjectMemberProduced
   definition: Exact quantity of the named BEX or semantic counter.
+- path: gas.transientObjectMemberProduced
+  definition: Total transient object-member construction work in the execution.
 - path: gas.utf16Counter
   definition: Exact quantity of the named BEX or semantic counter.
 - path: gasTrace
@@ -68,6 +74,10 @@ entries:
   definition: Blue output-admission result projection.
 - path: output.boundaryValue
   definition: Independently serialized transient value presented to Language admission.
+- path: output.boundaryValue.nullMember
+  definition: Null-bearing member is absent from the value presented to Language admission.
+- path: output.boundaryValue.emptyObjectMember
+  definition: Exact empty-object member presented to Language admission.
 - path: output.canonical
   definition: Independently serialized canonical value returned by Language admission.
 - path: output.semantic

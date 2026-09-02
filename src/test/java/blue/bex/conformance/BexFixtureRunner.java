@@ -56,7 +56,8 @@ final class BexFixtureRunner {
                     fixture.program(),
                     fixture.context(),
                     variant,
-                    fixture.id() + "[" + variantName + "]");
+                    fixture.id() + "[" + variantName + "]",
+                    requestsProjection(expected, "runtime.overlayValue"));
             validateRun(fixture, expected, run);
             runs.add(run);
         }
@@ -84,17 +85,19 @@ final class BexFixtureRunner {
                             testcase.get("context"),
                             fixture.path + ".case." + name + ".context")
                     : fixture.context();
-            BexFixtureRun run = adapter.execute(
-                    fixture,
-                    program,
-                    context,
-                    Collections.<String, Object>emptyMap(),
-                    fixture.id() + "[case:" + name + "]");
             Map<String, Object> caseExpected =
                     new LinkedHashMap<String, Object>(testcase);
             caseExpected.remove("name");
             caseExpected.remove("program");
             caseExpected.remove("context");
+            BexFixtureRun run = adapter.execute(
+                    fixture,
+                    program,
+                    context,
+                    Collections.<String, Object>emptyMap(),
+                    fixture.id() + "[case:" + name + "]",
+                    requestsProjection(
+                            caseExpected, "runtime.overlayValue"));
             validateRun(fixture, caseExpected, run);
         }
     }
@@ -149,9 +152,8 @@ final class BexFixtureRunner {
                     run.name + " total gas");
         }
 
-        for (Object value : ConformancePackage.list(
-                expected.get("assertions"),
-                fixture.path + ".expected.assertions")) {
+        for (Object value : assertions(
+                expected, fixture.path + ".expected.assertions")) {
             Map<String, Object> assertion = ConformancePackage.map(
                     value, fixture.path + ".expected.assertions[]");
             if (!"sameAcrossVariants".equals(assertion.get("op"))) {
@@ -246,9 +248,8 @@ final class BexFixtureRunner {
             ConformancePackage.Fixture fixture,
             Map<String, Object> expected,
             List<BexFixtureRun> runs) {
-        for (Object value : ConformancePackage.list(
-                expected.get("assertions"),
-                fixture.path + ".expected.assertions")) {
+        for (Object value : assertions(
+                expected, fixture.path + ".expected.assertions")) {
             Map<String, Object> assertion = ConformancePackage.map(
                     value, fixture.path + ".expected.assertions[]");
             if (!"sameAcrossVariants".equals(assertion.get("op"))) {
@@ -355,6 +356,13 @@ final class BexFixtureRunner {
                     ? run.outputBoundaryValue
                     : ABSENT;
         }
+        if (path.startsWith("output.boundaryValue.")) {
+            return run.outputBoundaryValue != null
+                    ? nested(
+                            run.outputBoundaryValue,
+                            path.substring("output.boundaryValue.".length()))
+                    : ABSENT;
+        }
         if ("output.canonical".equals(path)) {
             BexAdmittedValue output = run.output();
             return output != null
@@ -450,6 +458,22 @@ final class BexFixtureRunner {
         }
     }
 
+    private static Object nested(Object value, String path) {
+        Object current = value;
+        for (String segment : path.split("\\.")) {
+            if (!(current instanceof Map)) {
+                return ABSENT;
+            }
+            Map<String, Object> map =
+                    ConformancePackage.map(current, "result projection");
+            if (!map.containsKey(segment)) {
+                return ABSENT;
+            }
+            current = map.get(segment);
+        }
+        return current;
+    }
+
     private static long gasQuantityAt(
             BexFixtureRun run,
             String counter,
@@ -465,22 +489,6 @@ final class BexFixtureRunner {
             }
         }
         return quantity;
-    }
-
-    private static Object nested(Object value, String path) {
-        Object current = value;
-        for (String segment : path.split("\\.")) {
-            if (!(current instanceof Map)) {
-                return ABSENT;
-            }
-            Map<String, Object> map =
-                    ConformancePackage.map(current, "result projection");
-            if (!map.containsKey(segment)) {
-                return ABSENT;
-            }
-            current = map.get(segment);
-        }
-        return current;
     }
 
     private boolean localsRestored() {
@@ -605,8 +613,8 @@ final class BexFixtureRunner {
 
     private static boolean hasDiagnosticFailureAssertion(
             Map<String, Object> expected) {
-        for (Object value : ConformancePackage.list(
-                expected.get("assertions"), "expected.assertions")) {
+        for (Object value : assertions(
+                expected, "expected.assertions")) {
             Map<String, Object> assertion =
                     ConformancePackage.map(value, "expected.assertions[]");
             if (String.valueOf(assertion.get("actual"))
@@ -615,6 +623,30 @@ final class BexFixtureRunner {
             }
         }
         return false;
+    }
+
+    private static boolean requestsProjection(
+            Map<String, Object> expected,
+            String projection) {
+        for (Object value : assertions(
+                expected, "expected.assertions")) {
+            Map<String, Object> assertion =
+                    ConformancePackage.map(
+                            value, "expected.assertions[]");
+            if (projection.equals(assertion.get("actual"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<?> assertions(
+            Map<String, Object> expected,
+            String path) {
+        Object declared = expected.get("assertions");
+        return declared == null
+                ? Collections.emptyList()
+                : ConformancePackage.list(declared, path);
     }
 
     private static List<Map<String, Object>> variants(

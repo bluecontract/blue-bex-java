@@ -101,6 +101,22 @@ permitted transient-member construction and one semantic-identity admission.
 Full exact/transient trace equality would contradict the construction-work
 rule; the fixture asserts the stable work and the intentional delta explicitly.
 
+`BEX-EMPTY-06` makes failure atomicity observable rather than inferring it from
+the missing result. Every nested case first admits one valid patch and one valid
+event, then fails one of the root, patch, event, intrinsic, or `$nodeBlueId`
+boundaries. The case-local oracle requires empty patch and event buffers, the
+original overlay, every opened child ledger finalized exactly once, and exact boundary, identity,
+patch, event, and node-identity counter quantities plus the complete admitted
+gas total. The intrinsic case records its additional registered child ledger.
+
+`BEX-EMPTY-11` is the execution-time distinction matrix. It carries
+`undefined`, `null`, and exact `{}` through local variables and an untyped
+function argument; checks `$isKind`, `$exists`, equality, `$coalesce`, and
+`$choose`; observes object keys before output admission; and separately proves
+the intentional `$object(null) -> {}` and `$list(null) -> []` constructor
+semantics. Its raw execution result retains the null member while its admitted
+Blue boundary value omits only that member and retains exact `{}`.
+
 This decision intentionally introduces no compatibility alias. Nothing had
 been published, so the rejected `null -> {}` behavior is not retained.
 

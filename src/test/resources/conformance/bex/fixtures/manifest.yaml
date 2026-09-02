@@ -128,8 +128,8 @@ files:
   bytes: 879
 - path: empty/bex-empty-06.yaml
   role: behavior-fixture
-  sha256: 2cb0f9b1f190c48827ba5d932cb3bf6058e42e6e0d5af5d1fe341cdaa74e8068
-  bytes: 7537
+  sha256: 0f6ea1d791c452ad2fd5aeea6d0fc0a1783aa882e58ef0449336525eefb9be23
+  bytes: 7654
 - path: empty/bex-empty-07.yaml
   role: behavior-fixture
   sha256: ece99b4173d785a23dac7224e586aee1280b2cbae3010497aa33b959e8860657
@@ -148,8 +148,8 @@ files:
   bytes: 824
 - path: empty/bex-empty-11.yaml
   role: behavior-fixture
-  sha256: dcf3d37ecedf6b1a88c683badcbc4bcb45358b19c75b8e1d0837dc71e10fae91
-  bytes: 1298
+  sha256: 651a706a40d2e1c6f7a3951d255b991cf59ba293dd04a04bda0a030d3046baa3
+  bytes: 7606
 - path: empty/bex-empty-12.yaml
   role: behavior-fixture
   sha256: 243ca7548da6ce8613ee7de3f244f284754b3e8d6b3f26f3b7d6fdf0ebe73914
@@ -160,8 +160,8 @@ files:
   bytes: 759
 - path: empty/bex-empty-14.yaml
   role: behavior-fixture
-  sha256: b054d6bc597cab1dc7bab2d34afc71c320fb4e6cc0e49fe2d39acfd286902dfe
-  bytes: 2296
+  sha256: 399ef3e9acd351167fff0a8135b887e972fd329dbbb4c292c8eb04a8e52b0547
+  bytes: 2286
 - path: empty/bex-empty-15.yaml
   role: behavior-fixture
   sha256: cb8b0bf930f637d1dcdf7a4448798d97ddbff0e80fd544d4bdd6c50499229878
@@ -560,8 +560,8 @@ files:
   bytes: 370
 - path: projection-catalog.yaml
   role: support
-  sha256: 880754a85a52deacdf4ef86b8ea0079f24643e125f745469ac53a60037528e5d
-  bytes: 4548
+  sha256: 9edcecfa37f6731f2fb6191808c7a386d8792e0772ae15b4bae7ceb0f083f89b
+  bytes: 5152
 - path: r/bex-r-01.yaml
   role: behavior-fixture
   sha256: 5f5466a3d0cbefb69d1c5820cf98066ff84edc780fdac1828f62a979b6c88a1a
@@ -635,7 +635,7 @@ packageIdentityAlgorithm:
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity is null before hashing
   lineEndings: LF
-packageIdentity: sha256:592018fb7614d1d3b976cd855a69a400e887c36a663cf9192ef6ad5d55bb47c5
+packageIdentity: sha256:dc2a1a999d8af0cf67ec96c8deb5c0242c9b9ec5a6a290574b8365c4e5545ec2
 gasSchedule: blue-bex/gas/2.0
 gasManifestPackageIdentity: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 gasManifestSha256: 1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d

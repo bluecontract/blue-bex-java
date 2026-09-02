@@ -84,7 +84,7 @@ expected:
     - actual: gas.semanticIdentityMergeCount
       op: equals
       expected: 1
-    - actual: gas.transient.transientObjectMemberProduced
+    - actual: gas.transientObjectMemberProduced
       op: equals
       expected: 1
     - actual: host.runtimeChildMergeCount

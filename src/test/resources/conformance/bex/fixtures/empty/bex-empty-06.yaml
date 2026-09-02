@@ -22,6 +22,7 @@ context:
   documentScope: /
 expected:
   errorClass: output-conversion-error
+  totalGas: 14
   changes: []
   events: []
   assertions:
@@ -58,6 +59,7 @@ expected:
       - $return:
           $null: true
     errorClass: output-conversion-error
+    totalGas: 41
     changes: []
     events: []
     assertions:
@@ -102,6 +104,7 @@ expected:
       - $return:
           $document: /missing
     errorClass: output-conversion-error
+    totalGas: 45
     changes: []
     events: []
     assertions:
@@ -149,6 +152,7 @@ expected:
           val:
             $null: true
     errorClass: output-conversion-error
+    totalGas: 46
     changes: []
     events: []
     assertions:
@@ -193,6 +197,7 @@ expected:
       - $appendEvent:
           $null: true
     errorClass: output-conversion-error
+    totalGas: 46
     changes: []
     events: []
     assertions:
@@ -242,6 +247,7 @@ expected:
             x:
               $null: true
     errorClass: output-conversion-error
+    totalGas: 49
     changes: []
     events: []
     assertions:
@@ -262,7 +268,7 @@ expected:
       expected: 0
     - actual: host.runtimeChildMergeCount
       op: equals
-      expected: 1
+      expected: 2
     - actual: runtime.bufferedEffectsCommitted
       op: equals
       expected: false
@@ -287,6 +293,7 @@ expected:
           $nodeBlueId:
             $document: /missing
     errorClass: output-conversion-error
+    totalGas: 51
     changes: []
     events: []
     assertions:

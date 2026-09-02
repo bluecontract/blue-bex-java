@@ -182,7 +182,7 @@ gas microfixtures: 30
 normative operators: 86
 runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
 gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
-fixture package: sha256:bb78e22d4cf9f76e88423a34917d1b09a286015432c0ba2ac07192b7f30ec35c
+fixture package: sha256:dc2a1a999d8af0cf67ec96c8deb5c0242c9b9ec5a6a290574b8365c4e5545ec2
 ```
 
 Run the complete package and generate machine-readable evidence with:
