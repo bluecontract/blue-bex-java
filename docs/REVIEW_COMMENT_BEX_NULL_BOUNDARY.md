@@ -92,6 +92,15 @@ tests, those vectors cover:
 - warm, cold, and batched execution parity;
 - deterministic gas and canonical/semantic/item identity projections.
 
+`BEX-EMPTY-14` separates two notions that must not be conflated. Exact empty
+content has an identical full portable trace across inline/reference,
+warm/cold, and batched/unbatched provider forms. A transient object containing
+an evaluated null member reaches the same exact `{}` identity and performs the
+same single output-boundary and host-ledger merge, but it also records the
+permitted transient-member construction and one semantic-identity admission.
+Full exact/transient trace equality would contradict the construction-work
+rule; the fixture asserts the stable work and the intentional delta explicitly.
+
 This decision intentionally introduces no compatibility alias. Nothing had
 been published, so the rejected `null -> {}` behavior is not retained.
 

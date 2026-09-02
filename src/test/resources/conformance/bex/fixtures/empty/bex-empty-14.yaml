@@ -3,7 +3,7 @@ id: bex-empty-14
 vectors:
 - BEX-EMPTY-14
 category: e
-description: Exact empty-object input has representation-neutral identity and portable gas across provider forms.
+description: Exact empty-object input has representation-neutral identity and portable gas across provider forms; a transient null-member object converges only after its permitted BEX construction and semantic-admission work.
 program:
   expr:
     $document: /x
@@ -29,6 +29,15 @@ expected:
     op: sameAcrossVariants
   - actual: gasTrace
     op: sameAcrossVariants
+  - actual: gas.blueOutputBoundary
+    op: equals
+    expected: 1
+  - actual: gas.semanticIdentityMergeCount
+    op: equals
+    expected: 0
+  - actual: host.runtimeChildMergeCount
+    op: equals
+    expected: 1
   variants:
   - name: exact-inline
     rootForm: inline
@@ -54,3 +63,30 @@ expected:
     rootForm: reference
     cache: warm
     batching: batched
+  cases:
+  - name: transient-null-member
+    program:
+      expr:
+        transient:
+          $null: true
+    result:
+      transient: null
+    assertions:
+    - actual: output.boundaryValue
+      op: equals
+      expected: {}
+    - actual: output.nodeBlueId
+      op: equals
+      expected: 5ajuwjHoLj33yG5t5UFsJtUb3vnRaJQEMPqSLz6VyoHK
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 1
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 1
+    - actual: gas.transient.transientObjectMemberProduced
+      op: equals
+      expected: 1
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
