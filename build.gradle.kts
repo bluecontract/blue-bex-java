@@ -56,9 +56,11 @@ if (System.getenv("CI") != null) {
 fun configuredVersion(localStageVersion: String?): String {
     if (!localStageVersion.isNullOrBlank()) {
         val selected = localStageVersion.trim()
-        require(Regex("""\d+\.\d+\.\d+(?:-rc\.\d+)?""")
+        require(Regex(
+            """\d+\.\d+\.\d+(?:-rc\.\d+|-dev\.[0-9a-f]{40})?""")
             .matches(selected)) {
-            "bexLocalStageVersion must be a release or RC version"
+            "bexLocalStageVersion must be a release, RC, or " +
+                "commit-bound development version"
         }
         return selected
     }

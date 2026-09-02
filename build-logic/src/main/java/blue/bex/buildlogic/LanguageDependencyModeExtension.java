@@ -7,11 +7,14 @@ import org.gradle.api.provider.Property;
 public abstract class LanguageDependencyModeExtension {
     public LanguageDependencyModeExtension(ObjectFactory objects) {
         getVersion().convention("3.1.0-rc.21");
+        getVersionPropertyName().convention("blueLanguageVersion");
         getCompositePropertyName().convention("blueLanguageCompositePath");
         getRepositoryPropertyName().convention("blueLanguageRepository");
     }
 
     public abstract Property<String> getVersion();
+
+    public abstract Property<String> getVersionPropertyName();
 
     public abstract Property<String> getCompositePropertyName();
 

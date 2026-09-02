@@ -44,6 +44,44 @@ final class VerifySdkStageReportTaskTest {
                 .contains("\"status\": \"failed\""));
     }
 
+    @Test
+    void acceptsOnlyCleanCommitBoundDevelopmentVersion() throws Exception {
+        String commit = "2222222222222222222222222222222222222222";
+        String version = "1.1.0-dev." + commit;
+        VerifySdkStageReportTask task = task();
+        Path baseline = task.getCandidateBaseline().get().getAsFile().toPath();
+        Files.writeString(
+                baseline,
+                Files.readString(baseline).replace(
+                        "\"candidateVersion\": \"1.1.0-rc.4\"",
+                        "\"candidateVersion\": \"commit-bound-development\""));
+        Path report = task.getConformanceReport().get().getAsFile().toPath();
+        Files.writeString(
+                report,
+                Files.readString(report)
+                        .replace("\"projectVersion\": \"1.1.0-rc.4\"",
+                                "\"projectVersion\": \"" + version + "\"")
+                        .replace("\"currentModeFailures\": []",
+                                "\"sourceState\": {"
+                                        + "\"commit\": \"" + commit + "\","
+                                        + "\"releaseInputsCommitted\": true,"
+                                        + "\"worktreeDirty\": false},"
+                                        + "\"currentModeFailures\": []"));
+        task.getProjectVersion().set(version);
+
+        task.verify();
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("\"bexSourceCommit\": \"" + commit + "\""));
+
+        Files.writeString(
+                report,
+                Files.readString(report).replace(
+                        "\"commit\": \"" + commit + "\"",
+                        "\"commit\": \"3333333333333333333333333333333333333333\""));
+        assertThrows(GradleException.class, task::verify);
+    }
+
     private VerifySdkStageReportTask task() throws Exception {
         Project project = ProjectBuilder.builder()
                 .withProjectDir(temporaryDirectory.toFile())

@@ -49,6 +49,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         Map<?, ?> resolution = object(dependency.get("resolution"));
         Map<?, ?> provenance = object(resolution.get("provenance"));
         Map<?, ?> versionAutomation = object(report.get("versionAutomation"));
+        Map<?, ?> sourceState = object(report.get("sourceState"));
         Map<?, ?> languageIdentity = object(
                 report.get("languageReleaseIdentity"));
         Map<?, ?> publishedInspection = object(
@@ -59,6 +60,8 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                 "blue.language:blue-language-java:" + languageVersion;
         String candidateVersion = string(bex.get("candidateVersion"));
         String projectVersion = getProjectVersion().get();
+        String commitBoundSource = commitBoundSource(projectVersion);
+        boolean commitBoundDevelopment = !commitBoundSource.isEmpty();
         List<String> blockers = new ArrayList<>();
         require(blockers,
                 "blue-bex-sdk-stage-baseline/1.0".equals(
@@ -72,8 +75,10 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                         .matches("[0-9a-f]{40}"),
                 "language-source-commit-not-exact");
         require(blockers,
-                candidateVersion.equals(projectVersion),
-                "bex-candidate-version-mismatch");
+                commitBoundDevelopment
+                        ? "commit-bound-development".equals(candidateVersion)
+                        : candidateVersion.equals(projectVersion),
+                "bex-candidate-version-policy-mismatch");
         require(blockers,
                 "blue-bex-hosted-release-report/2.0".equals(
                         report.get("schema")),
@@ -81,6 +86,15 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         require(blockers,
                 projectVersion.equals(report.get("projectVersion")),
                 "conformance-project-version-mismatch");
+        require(blockers,
+                !commitBoundDevelopment
+                        || (commitBoundSource.equals(
+                                    sourceState.get("commit"))
+                                && Boolean.TRUE.equals(
+                                    sourceState.get("releaseInputsCommitted"))
+                                && Boolean.FALSE.equals(
+                                    sourceState.get("worktreeDirty"))),
+                "bex-development-version-is-not-clean-source-bound");
         require(blockers,
                 "staged-repository".equals(dependency.get("mode")),
                 "dependency-mode-is-not-staged-repository");
@@ -135,6 +149,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         receipt.put("status", blockers.isEmpty() ? "passed" : "failed");
         receipt.put("blockers", blockers);
         receipt.put("bexCandidateVersion", projectVersion);
+        receipt.put("bexSourceCommit", sourceState.get("commit"));
         receipt.put("historicalBexReleaseVersion",
                 bex.get("historicalReleaseVersion"));
         receipt.put("languageCandidateVersion", languageVersion);
@@ -176,6 +191,14 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
 
     private static String string(Object value) {
         return value instanceof String ? (String) value : "";
+    }
+
+    private static String commitBoundSource(String version) {
+        if (version != null && version.matches(
+                "[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.[0-9a-f]{40}")) {
+            return version.substring(version.length() - 40);
+        }
+        return "";
     }
 
     private static void require(

@@ -747,7 +747,8 @@ public final class BexConformanceReportMain {
                 dependencyMode);
         boolean explicitStageCandidate = stagedCandidate
                 && projectVersion.matches(
-                        "[0-9]+\\.[0-9]+\\.[0-9]+-rc\\.[0-9]+");
+                        "[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+"
+                                + "|-dev\\.[0-9a-f]{40})");
         return map(
                 "path", ".cz.toml",
                 "sha256", actual,
