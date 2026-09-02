@@ -63,15 +63,13 @@ class BexBlueOutputNullBoundaryTest {
         assertNotNull(output.getProperties());
         assertFalse(output.getProperties().containsKey("omitted"));
         assertFalse(output.getProperties().containsKey("request"));
-        assertTrue(Nodes.isEmptyNode(
-                output.getProperties().get("empty")));
-        assertTrue(Nodes.isEmptyNode(
-                output.getProperties().get("nested")));
+        assertExactEmptyObject(output.getProperties().get("empty"));
+        assertExactEmptyObject(output.getProperties().get("nested"));
 
         Node values = output.getProperties().get("values");
         assertEquals(3, values.getItems().size());
         assertTrue(Nodes.isEmptyPlaceholder(values.getItems().get(0)));
-        assertTrue(Nodes.isEmptyNode(values.getItems().get(1)));
+        assertExactEmptyObject(values.getItems().get(1));
         assertFalse(Nodes.isEmptyPlaceholder(values.getItems().get(1)));
         assertNotNull(values.getItems().get(2).getItems());
         assertTrue(values.getItems().get(2).getItems().isEmpty());
@@ -118,7 +116,7 @@ class BexBlueOutputNullBoundaryTest {
 
         assertNull(absentType.getType());
         assertNotNull(emptyType.getType());
-        assertTrue(Nodes.isEmptyNode(emptyType.getType()));
+        assertExactEmptyObject(emptyType.getType());
         assertFalse(emptyType.getType().isInlineValue());
     }
 
@@ -189,8 +187,8 @@ class BexBlueOutputNullBoundaryTest {
         assertTrue(result.value().get("empty").isObject());
         assertFalse(result.output().node().getProperties()
                 .containsKey("nil"));
-        assertTrue(Nodes.isEmptyNode(result.output().node()
-                .getProperties().get("empty")));
+        assertExactEmptyObject(result.output().node()
+                .getProperties().get("empty"));
     }
 
     @Test
@@ -245,5 +243,12 @@ class BexBlueOutputNullBoundaryTest {
         assertFalse(exactEmpty.isNull());
         assertEquals("object", BexValues.kind(exactEmpty));
         assertEquals(Collections.emptyMap(), exactEmpty.toSimple());
+    }
+
+    private static void assertExactEmptyObject(Node node) {
+        assertNotNull(node);
+        assertNotNull(node.getProperties());
+        assertTrue(node.getProperties().isEmpty());
+        assertFalse(node.isInlineValue());
     }
 }

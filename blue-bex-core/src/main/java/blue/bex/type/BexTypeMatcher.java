@@ -34,11 +34,9 @@ public final class BexTypeMatcher {
         this.blue = blue != null
                 ? blue : BlueLanguage.builder().build();
         this.matcher = FrozenTypeMatcher.withVerifiedReferenceMaterializer(
-                reference -> FrozenNode.fromResolvedNode(
-                        BexValues.referenceBacked(
-                                BexValues.frozen(reference),
-                                this.blue)
-                                .toNode()));
+                reference -> this.blue.processing()
+                        .runtimeAccess()
+                        .materializeTypeReferenceForMatching(reference));
         this.frozenMatcher = new BexFrozenTypeMatcher(
                 matcher, patternValidator);
     }

@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -165,6 +166,14 @@ public final class BexBlueNodeWriter {
         }
         if (!properties.isEmpty()) {
             node.properties(properties);
+        } else if (Nodes.isEmptyNode(node)) {
+            /*
+             * A transient BEX object that has no retained members is still
+             * exact object content.  Keep an explicit empty object payload so
+             * downstream Language presence, schema, mapping, and identity
+             * paths cannot confuse it with a temporary fieldless builder.
+             */
+            node.properties(Collections.<String, Node>emptyMap());
         }
         return node;
     }
