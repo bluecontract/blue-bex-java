@@ -9,6 +9,7 @@ import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexAdmittedValue;
 import blue.bex.output.BexOutputAdmission;
 import blue.bex.output.BexOutputKind;
+import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexChangeset;
 import blue.bex.result.BexExecutionResult;
@@ -73,9 +74,15 @@ public final class BexRuntime implements BexExecutionMachine {
         this.gas = gasSession.meter();
         this.metrics = metrics;
         this.pointerCache = pointerCache;
+        BexSemanticIdentityBoundary semanticIdentityBoundary =
+                context.semanticIdentityBoundary();
+        if (semanticIdentityBoundary == BexSemanticIdentityBoundary.STANDALONE) {
+            semanticIdentityBoundary = BexSemanticIdentityBoundary.standalone(
+                    blue.processing().runtimeAccess());
+        }
         this.outputAdmission = new BexOutputAdmission(
                 gas,
-                context.semanticIdentityBoundary(),
+                semanticIdentityBoundary,
                 context.failureBoundary());
         BexResultOverlay activeOverlay =
                 new BexResultOverlay(
@@ -200,16 +207,8 @@ public final class BexRuntime implements BexExecutionMachine {
 
     public BexValue nodeBlueId(BexValue value) {
         gas.charge(BexGasCounter.NODE_IDENTITY_REQUESTED);
-        if (value == null || value.isUndefined()) {
-            throw new blue.bex.BexException(
-                    "$nodeBlueId operand must not be undefined");
-        }
-        if (value.isExact()) {
+        if (value != null && value.isExact()) {
             return BexValues.scalar(value.exactBlueId());
-        }
-        if (value.isNull()) {
-            throw new blue.bex.BexException(
-                    "$nodeBlueId operand must not be null");
         }
         return BexValues.scalar(outputAdmission
                 .admit(value, BexOutputKind.NODE_IDENTITY)

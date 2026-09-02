@@ -207,7 +207,7 @@ class BexBlueOutputNullBoundaryTest {
                                         op("$null", true))))),
                         defaultContext()));
         assertTrue(identityFailure.getMessage().contains(
-                "$nodeBlueId operand must not be null"));
+                "root value is null"));
     }
 
     @Test
