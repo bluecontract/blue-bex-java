@@ -1,5 +1,6 @@
 package blue.bex.buildlogic;
 
+import blue.bex.buildlogic.tasks.AssembleImmutableDevelopmentRepositoryTask;
 import blue.bex.buildlogic.tasks.GenerateModernizationReportTask;
 import blue.bex.buildlogic.tasks.GenerateReleaseReportTask;
 import blue.bex.buildlogic.tasks.GenerateWorkingReportTask;
@@ -58,6 +59,48 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
         TaskProvider<Task> sdkStage = lifecycle(
                 project, "bexSdkStageVerify",
                 "Verifies the isolated SDK candidate without publishing it.");
+        TaskProvider<AssembleImmutableDevelopmentRepositoryTask>
+                immutableDevelopmentRepository = project.getTasks().register(
+                        "assembleImmutableDevelopmentRepository",
+                        AssembleImmutableDevelopmentRepositoryTask.class,
+                        task -> {
+                            task.setGroup("publishing");
+                            task.setDescription(
+                                    "Seals a commit-bound BEX Maven repository.");
+                            task.getVersion().set(project.provider(
+                                    () -> String.valueOf(project.getVersion())));
+                            task.getLanguageVersion().set(
+                                    project.getProviders().gradleProperty(
+                                            "blueLanguageVersion"));
+                            task.getMutableRepository().set(
+                                    project.getLayout().dir(
+                                            project.getProviders().gradleProperty(
+                                                    "bexSdkStagingRepository")
+                                                    .map(project::file)));
+                            task.getImmutableRepositoryPath().set(
+                                    project.getProviders().gradleProperty(
+                                            "bexDevelopmentRepository"));
+                            task.getLanguageArtifactManifest().set(
+                                    project.getLayout().file(
+                                            project.getProviders().gradleProperty(
+                                                    "blueLanguageRepository")
+                                                    .map(path -> project.file(
+                                                            path + "/artifact-manifest.json"))));
+                            task.getSpecification().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "specifications/blue-bex-specification-2.0.md"));
+                            task.getFixtureManifest().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "src/test/resources/conformance/bex/fixtures/manifest.yaml"));
+                            task.getRegistryManifest().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "src/test/resources/conformance/bex/registry/manifest.yaml"));
+                            task.getGasManifest().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "src/test/resources/conformance/bex/gas-manifest.yaml"));
+                            task.getCheckout().set(
+                                    project.getLayout().getProjectDirectory());
+                        });
         TaskProvider<VerifySdkStageReportTask> sdkStageReport =
                 project.getTasks().register(
                         "verifyBexSdkStageReport",
@@ -366,6 +409,8 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                             project, "blueLanguageRepository", true);
                     requireLocalStageProperty(
                             project, "bexSdkStagingRepository", false);
+                    requireLocalStageProperty(
+                            project, "blueLanguageVersion", false);
                     String selectedVersion = requireLocalStageProperty(
                             project, "bexLocalStageVersion", false);
                     if (!selectedVersion.equals(
@@ -384,6 +429,13 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                     }
                 });
             });
+            immutableDevelopmentRepository.configure(task -> task.dependsOn(
+                    core.getTasks().named(
+                            "publishAllPublicationsToStagingRepository"),
+                    contracts.getTasks().named(
+                            "publishAllPublicationsToStagingRepository"),
+                    aggregate.getTasks().named(
+                            "publishAllPublicationsToStagingRepository")));
             sdkStageReport.configure(task -> task.dependsOn(
                     suite.getTasks().named("writeBexConformanceReport")));
             modernization.configure(task -> task.dependsOn(
