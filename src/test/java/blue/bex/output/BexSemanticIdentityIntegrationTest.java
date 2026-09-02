@@ -45,7 +45,6 @@ import static blue.bex.test.BexTestFixtures.stepDo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -311,7 +310,6 @@ class BexSemanticIdentityIntegrationTest {
                 BexValues.scalar(BigInteger.valueOf(7L)),
                 BexValues.scalar(new BigDecimal("7.5")),
                 BexValues.scalar(true),
-                BexValues.nullValue(),
                 BexValues.fromSimple(Arrays.asList("x", 1)),
                 BexValues.fromSimple(map(
                         "outer", map("inner", 1),
@@ -358,13 +356,13 @@ class BexSemanticIdentityIntegrationTest {
     }
 
     @Test
-    void memoizedHostIdentityPreservesNullThenEmptyObjectShapes() {
-        assertMemoizedNullAndEmptyObjectShapes(true);
+    void nullIsRejectedBeforeAnEmptyObjectIsAdmitted() {
+        assertNullRejectedIndependentlyOfEmptyObject(true);
     }
 
     @Test
-    void memoizedHostIdentityPreservesEmptyObjectThenNullShapes() {
-        assertMemoizedNullAndEmptyObjectShapes(false);
+    void emptyObjectAdmissionDoesNotMakeNullAdmissible() {
+        assertNullRejectedIndependentlyOfEmptyObject(false);
     }
 
     @Test
@@ -638,7 +636,7 @@ class BexSemanticIdentityIntegrationTest {
         assertSame(failure, observed);
     }
 
-    private static void assertMemoizedNullAndEmptyObjectShapes(
+    private static void assertNullRejectedIndependentlyOfEmptyObject(
             boolean nullFirst) {
         RecordingBoundary boundary = new RecordingBoundary();
         BexOutputAdmission admission = admission(boundary);
@@ -646,12 +644,10 @@ class BexSemanticIdentityIntegrationTest {
         BexValue suppliedEmptyObject =
                 BexValues.fromSimple(Collections.emptyMap());
 
-        BexAdmittedValue admittedNull;
         BexAdmittedValue admittedEmptyObject;
         if (nullFirst) {
-            admittedNull = admission.admit(
-                    suppliedNull,
-                    BexOutputKind.ROOT_RESULT);
+            assertThrows(BexException.class, () -> admission.admit(
+                    suppliedNull, BexOutputKind.ROOT_RESULT));
             admittedEmptyObject = admission.admit(
                     suppliedEmptyObject,
                     BexOutputKind.ROOT_RESULT);
@@ -659,30 +655,18 @@ class BexSemanticIdentityIntegrationTest {
             admittedEmptyObject = admission.admit(
                     suppliedEmptyObject,
                     BexOutputKind.ROOT_RESULT);
-            admittedNull = admission.admit(
-                    suppliedNull,
-                    BexOutputKind.ROOT_RESULT);
+            assertThrows(BexException.class, () -> admission.admit(
+                    suppliedNull, BexOutputKind.ROOT_RESULT));
         }
 
-        assertEquals(2, boundary.calls);
-        assertEquals(2L, admission.semanticIdentityMergeCount());
-        assertNotSame(admittedNull, admittedEmptyObject);
-        assertTrue(admittedNull.value().isExact());
-        assertEquals("null", BexValues.kind(
-                admittedNull.value()));
-        assertNull(admittedNull.value().toSimple());
+        assertEquals(1, boundary.calls);
+        assertEquals(1L, admission.semanticIdentityMergeCount());
         assertTrue(admittedEmptyObject.value().isExact());
         assertEquals("object", BexValues.kind(
                 admittedEmptyObject.value()));
         assertEquals(
                 Collections.emptyMap(),
                 admittedEmptyObject.value().toSimple());
-        assertEquals(
-                admittedNull.nodeBlueId(),
-                admittedEmptyObject.nodeBlueId());
-        assertEquals(
-                admittedNull.value().exactBlueId(),
-                admittedEmptyObject.value().exactBlueId());
     }
 
     private static void assertAdmittedScalar(

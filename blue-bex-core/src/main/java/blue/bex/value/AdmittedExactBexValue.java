@@ -66,8 +66,7 @@ final class AdmittedExactBexValue implements BexValue {
 
     @Override
     public boolean isNull() {
-        return establishedValue.isNull()
-                && !usesEmptyObjectShapeWitness();
+        return establishedValue.isNull();
     }
 
     @Override
@@ -77,8 +76,7 @@ final class AdmittedExactBexValue implements BexValue {
 
     @Override
     public boolean isObject() {
-        return establishedValue.isObject()
-                || usesEmptyObjectShapeWitness();
+        return establishedValue.isObject();
     }
 
     @Override
@@ -183,19 +181,6 @@ final class AdmittedExactBexValue implements BexValue {
                     "Admitted exact value has no frozen host representation");
         }
         return ((FrozenNodeBexValue) establishedValue).canonicalNode();
-    }
-
-    /*
-     * Blue's resolved frozen representation retains an empty object member as
-     * an empty node, which is also the representation of BEX null. The exact
-     * host value remains authoritative for every modeled field and for
-     * identity; the supplied value is used only as the otherwise-lost shape
-     * witness when it is precisely an empty object.
-     */
-    private boolean usesEmptyObjectShapeWitness() {
-        return establishedValue.isNull()
-                && suppliedValue.isObject()
-                && suppliedValue.size() == 0;
     }
 
     @Override

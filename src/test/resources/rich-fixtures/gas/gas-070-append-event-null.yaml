@@ -1,5 +1,5 @@
 fixtureId: GAS-070
-title: Append null event charges zero estimated size
+title: Append null event fails at the Blue output boundary
 tags: [gas]
 programSource: |
   type: Blue/BEX Program
@@ -7,7 +7,5 @@ programSource: |
     - $appendEvent:
         $null: true
 expectation:
-  outcome: success
-  events:
-    - null
-  gasUsed: 9
+  outcome: runtime-error
+  errorContains: root value is null

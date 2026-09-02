@@ -207,6 +207,10 @@ public final class BexRuntime implements BexExecutionMachine {
         if (value.isExact()) {
             return BexValues.scalar(value.exactBlueId());
         }
+        if (value.isNull()) {
+            throw new blue.bex.BexException(
+                    "$nodeBlueId operand must not be null");
+        }
         return BexValues.scalar(outputAdmission
                 .admit(value, BexOutputKind.NODE_IDENTITY)
                 .nodeBlueId());

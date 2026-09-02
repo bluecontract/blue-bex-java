@@ -52,9 +52,9 @@ public final class BexOutputAdmission {
          */
         gas.charge(BexGasCounter.BLUE_OUTPUT_BOUNDARY, 1L, kind.reason());
         if (value == null || value.isUndefined()) {
-            throw new BexException("Blue output conversion failed: root value is undefined");
+            throw new BexException(
+                    "Blue output conversion failed: root value is undefined");
         }
-
         if (value.isExact()) {
             String exactId = BlueIds.requireBlueIdOrCyclicMember(
                     value.exactBlueId(), "BEX exact output blueId");
@@ -74,6 +74,10 @@ public final class BexOutputAdmission {
                     exactId,
                     false,
                     carried.exactCapability());
+        }
+        if (value.isNull()) {
+            throw new BexException(
+                    "Blue output conversion failed: root value is null");
         }
 
         BexAdmittedValue prior = admittedTransientValues.get(value);

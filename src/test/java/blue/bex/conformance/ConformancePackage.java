@@ -200,7 +200,7 @@ final class ConformancePackage {
      */
     static Node syntaxNode(Object value) {
         if (value == null) {
-            return new Node();
+            return new Node().value(null).inlineValue(true);
         }
         if (value instanceof Map) {
             Map<String, Node> properties =

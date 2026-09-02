@@ -40,7 +40,11 @@ abstract class BexExpressionCompiler extends BexCompilerSupport {
             }
         }
         if (node.isEmptyNode()) {
-            return sourceExpr(currentFunction, pointer, null, new LiteralExpr(BexValues.nullValue()));
+            BexValue value = node.isInlineValue()
+                    ? BexValues.nullValue()
+                    : BexValues.map(Collections.<String, BexValue>emptyMap());
+            return sourceExpr(currentFunction, pointer, null,
+                    new LiteralExpr(value));
         }
         if (isScalarNode(node)) {
             return sourceExpr(currentFunction, pointer, null,

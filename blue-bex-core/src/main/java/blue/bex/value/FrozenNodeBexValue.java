@@ -101,7 +101,9 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     @Override
     public boolean isNull() {
         FrozenNode semantic = semanticNode();
-        return semantic != null && semantic.isEmptyNode();
+        return semantic != null
+                && semantic.isEmptyNode()
+                && semantic.isInlineValue();
     }
 
     @Override
@@ -117,8 +119,12 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     public boolean isObject() {
         FrozenNode semantic = semanticNode();
         return semantic != null
+                && semantic.getValue() == null
+                && semantic.getItems() == null
                 && (semantic.getProperties() != null
-                || hasObjectCompatibleLanguageFields(semantic));
+                || hasObjectCompatibleLanguageFields(semantic)
+                || (semantic.isEmptyNode()
+                && !semantic.isInlineValue()));
     }
 
     @Override
@@ -327,7 +333,9 @@ final class FrozenNodeBexValue extends AbstractBexValue {
             return out;
         }
         if (semantic.getProperties() != null
-                || hasObjectCompatibleLanguageFields(semantic)) {
+                || hasObjectCompatibleLanguageFields(semantic)
+                || (semantic.isEmptyNode()
+                && !semantic.isInlineValue())) {
             LinkedHashMap<String, Object> out = new LinkedHashMap<>();
             for (String key : keys()) {
                 BexValue value = get(key);
