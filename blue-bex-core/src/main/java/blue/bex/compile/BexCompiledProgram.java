@@ -176,8 +176,33 @@ public final class BexCompiledProgram {
             this.name = name;
             this.slot = slot;
             this.pattern = pattern;
-            this.typed = pattern != null && !pattern.isEmptyNode();
+            /*
+             * A metadata-only declaration is an explicitly untyped BEX
+             * argument. An exact {} is instead an empty Blue pattern: it is
+             * checked so undefined is rejected, while every non-undefined
+             * value matches it through BexPatternValidator.
+             */
+            this.typed = pattern != null
+                    && hasExplicitTypeConstraint(pattern);
             this.sourcePointer = sourcePointer;
+        }
+
+        private static boolean hasExplicitTypeConstraint(
+                FrozenNode pattern) {
+            return pattern.getType() != null
+                    || pattern.getItemType() != null
+                    || pattern.getKeyType() != null
+                    || pattern.getValueType() != null
+                    || pattern.getValue() != null
+                    || pattern.getItems() != null
+                    || pattern.getProperties() != null
+                    || pattern.getContracts() != null
+                    || pattern.getReferenceBlueId() != null
+                    || pattern.getSchema() != null
+                    || pattern.getMergePolicy() != null
+                    || pattern.getPreviousBlueId() != null
+                    || pattern.getPosition() != null
+                    || pattern.getBlue() != null;
         }
 
         public String name() { return name; }

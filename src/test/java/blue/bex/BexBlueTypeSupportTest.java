@@ -34,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BexBlueTypeSupportTest {
     private static final String INTEGER_TYPE_BLUE_ID =
             BlueCoreTypeRegistry.INSTANCE.blueId("Integer");
+    private static final String DICTIONARY_TYPE_BLUE_ID =
+            BlueCoreTypeRegistry.INSTANCE.blueId("Dictionary");
     private static final TestBlue YAML_BLUE = new TestBlue();
     private static final Node HOTEL_ORDER_TYPE = YAML_BLUE.yamlToNode(yaml(
             "status:",
@@ -210,6 +212,44 @@ class BexBlueTypeSupportTest {
                 "        anything: works"));
 
         assertEquals(m("anything", "works"), simple(result.value()));
+    }
+
+    @Test
+    void exactEmptyArgumentPatternMatchesNonUndefinedButNotUndefined() {
+        BexExecutionResult present = run(yaml(
+                "type: Blue/BEX Program",
+                "functions:",
+                "  f:",
+                "    args:",
+                "      input: {}",
+                "    expr:",
+                "      $kind:",
+                "        $var: input",
+                "expr:",
+                "  $call:",
+                "    function: f",
+                "    args:",
+                "      input: 7"));
+
+        assertEquals("integer", simple(present.value()));
+
+        BexException undefined = assertThrows(BexException.class, () -> run(
+                yaml(
+                        "type: Blue/BEX Program",
+                        "functions:",
+                        "  f:",
+                        "    args:",
+                        "      input: {}",
+                        "    expr:",
+                        "      $var: input",
+                        "expr:",
+                        "  $call:",
+                        "    function: f",
+                        "    args:",
+                        "      input:",
+                        "        $document: /missing")));
+        assertTrue(undefined.getMessage().contains(
+                "does not match declared Blue pattern"));
     }
 
     @Test
@@ -536,13 +576,16 @@ class BexBlueTypeSupportTest {
     @Test
     void computedObjectPreservesValueTypeLanguageField() {
         BexExecutionResult result = run(stepExpr(obj(
-                "valueType", pattern("type: Integer"),
+                "type", reference(DICTIONARY_TYPE_BLUE_ID),
+                "valueType", reference(INTEGER_TYPE_BLUE_ID),
                 "amount", op("$integer", "2"))));
         Node node = BexNodeWriter.toNode(result.value());
 
         assertEquals(BigInteger.valueOf(2), node.getProperties().get("amount").getValue());
+        assertEquals(DICTIONARY_TYPE_BLUE_ID, node.getType().getBlueId());
         assertTrue(node.getValueType() != null);
-        assertTrue(node.getValueType().getType() != null);
+        assertEquals(INTEGER_TYPE_BLUE_ID,
+                node.getValueType().getBlueId());
     }
 
     @Test

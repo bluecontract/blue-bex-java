@@ -21,6 +21,37 @@ public final class BexPatternValidator {
     private static final String BOOLEAN_TYPE_BLUE_ID =
             BlueCoreTypeRegistry.INSTANCE.blueId("Boolean");
 
+    /**
+     * Reports whether a static BEX pattern carries no matching constraint.
+     *
+     * <p>Blue Language now preserves an explicit empty object payload, so
+     * {@link FrozenNode#isEmptyNode()} alone no longer recognizes the BEX
+     * specification's empty-pattern wildcard. Name and description are
+     * metadata; they do not turn an otherwise empty pattern into a
+     * constraint.</p>
+     *
+     * @param pattern frozen static pattern, or {@code null}
+     * @return {@code true} when the pattern imposes no value constraint
+     */
+    static boolean isUnconstrainedPattern(FrozenNode pattern) {
+        return pattern == null
+                || (pattern.getType() == null
+                && pattern.getItemType() == null
+                && pattern.getKeyType() == null
+                && pattern.getValueType() == null
+                && pattern.getValue() == null
+                && pattern.getItems() == null
+                && (pattern.getProperties() == null
+                || pattern.getProperties().isEmpty())
+                && pattern.getContracts() == null
+                && pattern.getReferenceBlueId() == null
+                && pattern.getSchema() == null
+                && pattern.getMergePolicy() == null
+                && pattern.getPreviousBlueId() == null
+                && pattern.getPosition() == null
+                && pattern.getBlue() == null);
+    }
+
     public boolean requiresPresence(FrozenNode target) {
         Schema schema = target.getSchema();
         if (schema != null && Boolean.TRUE.equals(

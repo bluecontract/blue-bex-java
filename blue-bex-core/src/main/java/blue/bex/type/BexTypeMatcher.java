@@ -114,7 +114,7 @@ public final class BexTypeMatcher {
             FrozenNode pattern,
             BexTypeMatchWorkRecorder gas,
             CandidatePosition position) {
-        if (pattern.isEmptyNode()) {
+        if (BexPatternValidator.isUnconstrainedPattern(pattern)) {
             return true;
         }
         if (candidate == null
