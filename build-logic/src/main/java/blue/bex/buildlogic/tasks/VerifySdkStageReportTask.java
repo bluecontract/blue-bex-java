@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.DirectoryProperty;
@@ -41,6 +42,19 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             Pattern.compile("3\\.1\\.0-dev\\.([0-9a-f]{40})");
     private static final Pattern SHA_256_IDENTITY =
             Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final String LANGUAGE_GROUP = "blue.language";
+    private static final List<String> LANGUAGE_ARTIFACTS =
+            Collections.unmodifiableList(Arrays.asList(
+                    "blue-language-model",
+                    "blue-language-core",
+                    "blue-language-mapping",
+                    "blue-language-ipfs",
+                    "blue-contracts-core",
+                    "blue-language-java"));
+    private static final List<LanguageArtifactKind> LANGUAGE_KINDS =
+            Collections.unmodifiableList(Arrays.asList(
+                    new LanguageArtifactKind("pom", ".pom"),
+                    new LanguageArtifactKind("runtime", ".jar")));
 
     @InputFile
     @PathSensitive(PathSensitivity.NONE)
@@ -382,7 +396,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                     exactNumber(document.get("builtWithJava"), 17),
                     "language-artifact-manifest-java-version-mismatch");
             require(blockers,
-                    "blue.language".equals(document.get("groupId")),
+                    LANGUAGE_GROUP.equals(document.get("groupId")),
                     "language-artifact-manifest-group-mismatch");
             require(blockers,
                     string(document.get("sourceTree"))
@@ -401,9 +415,16 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                         "language-artifact-manifest-" + field
                                 + "-not-exact");
             }
-            require(blockers,
-                    document.get("artifacts") instanceof List<?>,
-                    "language-artifact-manifest-artifacts-not-list");
+            if (LANGUAGE_DEVELOPMENT_VERSION.matcher(version).matches()) {
+                inspectLanguageArtifacts(
+                        repository,
+                        version,
+                        document.get("artifacts"),
+                        blockers);
+            } else {
+                blockers.add(
+                        "language-artifact-manifest-version-not-commit-bound");
+            }
         } catch (Exception exception) {
             blockers.add("language-artifact-manifest-unreadable");
         }
@@ -426,6 +447,167 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                 "contractsFixturePackageIdentity",
                 "contractsReleaseIdentity",
                 "artifacts"));
+    }
+
+    private static void inspectLanguageArtifacts(
+            Path repository,
+            String version,
+            Object artifactsValue,
+            List<String> blockers) throws Exception {
+        List<ExpectedLanguageArtifact> expected =
+                expectedLanguageArtifacts(version);
+        List<?> artifacts;
+        if (artifactsValue instanceof List<?>) {
+            artifacts = (List<?>) artifactsValue;
+        } else {
+            blockers.add("language-artifact-manifest-artifacts-not-list");
+            artifacts = Collections.emptyList();
+        }
+        require(blockers,
+                artifacts.size() == expected.size(),
+                "language-artifact-manifest-artifact-count-mismatch");
+
+        Set<String> canonicalRecordFields = new LinkedHashSet<>(Arrays.asList(
+                "bytes",
+                "checksumPath",
+                "coordinate",
+                "kind",
+                "path",
+                "sha256"));
+        for (int index = 0; index < expected.size(); index++) {
+            ExpectedLanguageArtifact expectedArtifact = expected.get(index);
+            if (index >= artifacts.size()) {
+                blockers.add("language-artifact-manifest-artifact-record-missing");
+                continue;
+            }
+            Object recordValue = artifacts.get(index);
+            if (!(recordValue instanceof Map<?, ?>)) {
+                blockers.add("language-artifact-manifest-artifact-not-object");
+                continue;
+            }
+            Map<?, ?> record = (Map<?, ?>) recordValue;
+            Set<String> actualRecordFields = record.keySet().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            require(blockers,
+                    canonicalRecordFields.equals(actualRecordFields),
+                    "language-artifact-manifest-artifact-fields-noncanonical");
+            require(blockers,
+                    expectedArtifact.coordinate.equals(
+                                    string(record.get("coordinate")))
+                            && expectedArtifact.kind.equals(
+                                    string(record.get("kind")))
+                            && expectedArtifact.path.equals(
+                                    string(record.get("path")))
+                            && (expectedArtifact.path + ".sha256").equals(
+                                    string(record.get("checksumPath"))),
+                    "language-artifact-manifest-artifact-record-noncanonical");
+            require(blockers,
+                    SHA_256_IDENTITY.matcher(
+                            string(record.get("sha256"))).matches(),
+                    "language-artifact-manifest-artifact-sha256-not-exact");
+
+            Path payload = repository.resolve(expectedArtifact.path);
+            Path checksum = repository.resolve(
+                    expectedArtifact.path + ".sha256");
+            boolean payloadRegular = regularNonSymbolic(payload);
+            boolean checksumRegular = regularNonSymbolic(checksum);
+            require(blockers,
+                    payloadRegular,
+                    "language-development-repository-artifact-missing-or-symbolic");
+            require(blockers,
+                    checksumRegular,
+                    "language-development-repository-checksum-missing-or-symbolic");
+            if (payloadRegular) {
+                String digest = sha256(payload.toFile());
+                require(blockers,
+                        ("sha256:" + digest).equals(
+                                string(record.get("sha256"))),
+                        "language-development-repository-artifact-hash-mismatch");
+                require(blockers,
+                        exactNumber(record.get("bytes"), Files.size(payload)),
+                        "language-development-repository-artifact-size-mismatch");
+                if (checksumRegular) {
+                    String expectedChecksum = digest + "  "
+                            + payload.getFileName() + "\n";
+                    require(blockers,
+                            expectedChecksum.equals(Files.readString(
+                                    checksum, StandardCharsets.UTF_8)),
+                            "language-development-repository-artifact-checksum-mismatch");
+                }
+            }
+        }
+        if (artifacts.size() > expected.size()) {
+            blockers.add("language-artifact-manifest-artifact-record-unexpected");
+        }
+        inspectLanguageRepositoryClosure(repository, expected, blockers);
+    }
+
+    private static List<ExpectedLanguageArtifact> expectedLanguageArtifacts(
+            String version) {
+        List<String> artifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        Collections.sort(artifacts);
+        List<ExpectedLanguageArtifact> expected = new ArrayList<>();
+        for (String artifact : artifacts) {
+            String base = "blue/language/" + artifact + "/" + version + "/"
+                    + artifact + "-" + version;
+            for (LanguageArtifactKind kind : LANGUAGE_KINDS) {
+                expected.add(new ExpectedLanguageArtifact(
+                        LANGUAGE_GROUP + ":" + artifact + ":" + version,
+                        kind.name,
+                        base + kind.suffix));
+            }
+        }
+        return expected;
+    }
+
+    private static void inspectLanguageRepositoryClosure(
+            Path repository,
+            List<ExpectedLanguageArtifact> expectedArtifacts,
+            List<String> blockers) throws Exception {
+        Set<String> expectedFiles = new LinkedHashSet<>();
+        expectedFiles.add(LANGUAGE_MANIFEST_FILE);
+        expectedFiles.add(LANGUAGE_MANIFEST_FILE + ".sha256");
+        for (ExpectedLanguageArtifact artifact : expectedArtifacts) {
+            expectedFiles.add(artifact.path);
+            expectedFiles.add(artifact.path + ".sha256");
+        }
+
+        Set<String> actualFiles = new LinkedHashSet<>();
+        try (Stream<Path> paths = Files.walk(repository)) {
+            for (Path path : paths.collect(Collectors.toList())) {
+                if (path.equals(repository)) {
+                    continue;
+                }
+                String relative = repository.relativize(path).toString()
+                        .replace(path.getFileSystem().getSeparator(), "/");
+                if (Files.isSymbolicLink(path)) {
+                    blockers.add(
+                            "language-development-repository-symbolic-link-present");
+                } else if (Files.isRegularFile(
+                        path, LinkOption.NOFOLLOW_LINKS)) {
+                    actualFiles.add(relative);
+                } else if (!Files.isDirectory(
+                        path, LinkOption.NOFOLLOW_LINKS)) {
+                    blockers.add(
+                            "language-development-repository-nonregular-path-present");
+                }
+            }
+        }
+        require(blockers,
+                actualFiles.size() == 26,
+                "language-development-repository-file-count-mismatch");
+        require(blockers,
+                expectedFiles.equals(actualFiles),
+                "language-development-repository-file-closure-mismatch");
+        require(blockers,
+                actualFiles.stream().noneMatch(path -> path.endsWith(".module")),
+                "language-development-repository-gradle-module-metadata-present");
+    }
+
+    private static boolean regularNonSymbolic(Path path) {
+        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isSymbolicLink(path);
     }
 
     private static boolean sameRepository(
@@ -484,6 +666,29 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             this.identity = identity;
             this.version = version;
             this.sourceCommit = sourceCommit;
+        }
+    }
+
+    private static final class LanguageArtifactKind {
+        private final String name;
+        private final String suffix;
+
+        private LanguageArtifactKind(String name, String suffix) {
+            this.name = name;
+            this.suffix = suffix;
+        }
+    }
+
+    private static final class ExpectedLanguageArtifact {
+        private final String coordinate;
+        private final String kind;
+        private final String path;
+
+        private ExpectedLanguageArtifact(
+                String coordinate, String kind, String path) {
+            this.coordinate = coordinate;
+            this.kind = kind;
+            this.path = path;
         }
     }
 }

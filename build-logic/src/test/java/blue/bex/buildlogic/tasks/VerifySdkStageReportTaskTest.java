@@ -3,9 +3,16 @@ package blue.bex.buildlogic.tasks;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import groovy.json.JsonOutput;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.testfixtures.ProjectBuilder;
@@ -19,6 +26,13 @@ final class VerifySdkStageReportTaskTest {
             "3.1.0-dev." + LANGUAGE_COMMIT;
     private static final String SPECIFICATION_SHA256 =
             "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751";
+    private static final List<String> LANGUAGE_ARTIFACTS = Arrays.asList(
+            "blue-language-model",
+            "blue-language-core",
+            "blue-language-mapping",
+            "blue-language-ipfs",
+            "blue-contracts-core",
+            "blue-language-java");
 
     @TempDir
     Path temporaryDirectory;
@@ -222,6 +236,65 @@ final class VerifySdkStageReportTaskTest {
                 .contains("staged-language-repository-path-mismatch"));
     }
 
+    @Test
+    void rejectsGradleMetadataOutsideExactLanguageRepositoryClosure()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path repository = task.getLanguageRepository().get().getAsFile()
+                .toPath();
+        Path metadata = repository.resolve(
+                "blue/language/blue-language-java/" + LANGUAGE_VERSION
+                        + "/blue-language-java-" + LANGUAGE_VERSION
+                        + ".module");
+        write(metadata, "not part of the handoff\n");
+
+        assertThrows(GradleException.class, task::verify);
+        String receipt = Files.readString(
+                task.getOutputFile().get().getAsFile().toPath());
+        assertTrue(receipt.contains(
+                "language-development-repository-file-count-mismatch"));
+        assertTrue(receipt.contains(
+                "language-development-repository-file-closure-mismatch"));
+        assertTrue(receipt.contains(
+                "language-development-repository-gradle-module-metadata-present"));
+    }
+
+    @Test
+    void rejectsRepinnedManifestWithNoncanonicalArtifactShape()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        rewriteManifestAndPin(task, contents -> contents.replaceFirst(
+                "\"bytes\":",
+                "\"classifier\": null,\n            \"bytes\":"));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains(
+                        "language-artifact-manifest-artifact-fields-noncanonical"));
+    }
+
+    @Test
+    void rejectsArtifactWhoseBytesNoLongerMatchManifestOrSidecar()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path repository = task.getLanguageRepository().get().getAsFile()
+                .toPath();
+        Path runtime = repository.resolve(
+                "blue/language/blue-language-java/" + LANGUAGE_VERSION
+                        + "/blue-language-java-" + LANGUAGE_VERSION
+                        + ".jar");
+        write(runtime, "tampered runtime\n");
+
+        assertThrows(GradleException.class, task::verify);
+        String receipt = Files.readString(
+                task.getOutputFile().get().getAsFile().toPath());
+        assertTrue(receipt.contains(
+                "language-development-repository-artifact-hash-mismatch"));
+        assertTrue(receipt.contains(
+                "language-development-repository-artifact-checksum-mismatch"));
+    }
+
     private VerifySdkStageReportTask task() throws Exception {
         Project project = ProjectBuilder.builder()
                 .withProjectDir(temporaryDirectory.toFile())
@@ -309,27 +382,69 @@ final class VerifySdkStageReportTaskTest {
 
     private Path languageRepository() throws Exception {
         Path repository = temporaryDirectory.resolve("language-repository");
-        Files.createDirectories(repository);
+        List<Map<String, Object>> records = new ArrayList<>();
+        List<String> artifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        artifacts.sort(String::compareTo);
+        for (String artifact : artifacts) {
+            String base = "blue/language/" + artifact + "/"
+                    + LANGUAGE_VERSION + "/" + artifact + "-"
+                    + LANGUAGE_VERSION;
+            addLanguageArtifact(
+                    repository, records, artifact, base, "pom", ".pom");
+            addLanguageArtifact(
+                    repository, records, artifact, base, "runtime", ".jar");
+        }
+        records.sort(Comparator
+                .comparing((Map<String, Object> record) ->
+                        String.valueOf(record.get("coordinate")))
+                .thenComparing(record -> String.valueOf(record.get("kind")))
+                .thenComparing(record -> String.valueOf(record.get("path"))));
+
+        Map<String, Object> document = new TreeMap<>();
+        document.put("artifacts", records);
+        document.put("builtWithJava", 17);
+        document.put("contractsFixturePackageIdentity",
+                "sha256:3333333333333333333333333333333333333333333333333333333333333333");
+        document.put("contractsReleaseIdentity",
+                "sha256:4444444444444444444444444444444444444444444444444444444444444444");
+        document.put("contractsSpecificationIdentity",
+                "sha256:2222222222222222222222222222222222222222222222222222222222222222");
+        document.put("groupId", "blue.language");
+        document.put("releaseReadinessClaimed", false);
+        document.put("schema", "blue-development-maven-repository/1.0");
+        document.put("sourceCommit", LANGUAGE_COMMIT);
+        document.put("sourceDirty", false);
+        document.put("sourceTree",
+                "1111111111111111111111111111111111111111");
+        document.put("stagePurpose", "DEVELOPMENT");
+        document.put("version", LANGUAGE_VERSION);
         Path manifest = repository.resolve("artifact-manifest.json");
-        Files.writeString(manifest, """
-                {
-                  "schema": "blue-development-maven-repository/1.0",
-                  "stagePurpose": "DEVELOPMENT",
-                  "releaseReadinessClaimed": false,
-                  "builtWithJava": 17,
-                  "groupId": "blue.language",
-                  "version": "%s",
-                  "sourceCommit": "%s",
-                  "sourceTree": "1111111111111111111111111111111111111111",
-                  "sourceDirty": false,
-                  "contractsSpecificationIdentity": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-                  "contractsFixturePackageIdentity": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-                  "contractsReleaseIdentity": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-                  "artifacts": []
-                }
-                """.formatted(LANGUAGE_VERSION, LANGUAGE_COMMIT));
+        write(manifest,
+                JsonOutput.prettyPrint(JsonOutput.toJson(document)) + "\n");
         writeManifestSidecar(manifest);
         return repository;
+    }
+
+    private static void addLanguageArtifact(
+            Path repository,
+            List<Map<String, Object>> records,
+            String artifact,
+            String base,
+            String kind,
+            String suffix) throws Exception {
+        String relative = base + suffix;
+        Path payload = repository.resolve(relative);
+        write(payload, artifact + " " + kind + "\n");
+        writeManifestSidecar(payload);
+        Map<String, Object> record = new TreeMap<>();
+        record.put("bytes", Files.size(payload));
+        record.put("checksumPath", relative + ".sha256");
+        record.put("coordinate",
+                "blue.language:" + artifact + ":" + LANGUAGE_VERSION);
+        record.put("kind", kind);
+        record.put("path", relative);
+        record.put("sha256", "sha256:" + sha256(payload));
+        records.add(record);
     }
 
     private void rewriteManifestAndPin(
@@ -348,9 +463,13 @@ final class VerifySdkStageReportTaskTest {
     }
 
     private static void writeManifestSidecar(Path manifest) throws Exception {
-        Files.writeString(
-                manifest.resolveSibling("artifact-manifest.json.sha256"),
-                sha256(manifest) + "  artifact-manifest.json\n");
+        write(manifest.resolveSibling(manifest.getFileName() + ".sha256"),
+                sha256(manifest) + "  " + manifest.getFileName() + "\n");
+    }
+
+    private static void write(Path path, String value) throws Exception {
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, value);
     }
 
     private static String sha256(Path path) throws Exception {
