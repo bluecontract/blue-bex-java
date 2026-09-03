@@ -69,16 +69,21 @@ blue-bex-conformance/build/reports/jmh/results.json
 blue-bex-conformance/build/reports/jmh/environment.json
 ```
 
-An explicit Language composite remains available only for developer integration
-with an unpublished Language checkout:
+An unpublished Language candidate is consumed only through its immutable,
+commit-bound development repository:
 
 ```bash
-./gradlew --no-daemon bexCheck \
-  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+./gradlew --no-daemon clean bexSdkStageVerify \
+  -PblueLanguageRepository=/absolute/path/to/immutable-language-repository \
+  -PblueLanguageVersion=3.1.0-dev.<language-source-commit> \
+  -PbexLocalStageVersion=1.1.0-dev.<bex-source-commit> \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-mutable-bex-stage
 ```
 
-That optional developer mode is not release evidence and is never used by the
-final-publication gate.
+The repository must use schema `blue-development-maven-repository/1.0`, bind a
+clean Language source commit and tree, and contain only the six reviewed
+runtime/POM coordinates and their checksums. This development lane is not
+public-release evidence and is never used by the final-publication gate.
 
 ## Reproducibility claims
 

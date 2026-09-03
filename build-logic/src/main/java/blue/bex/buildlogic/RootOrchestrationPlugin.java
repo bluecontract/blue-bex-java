@@ -80,12 +80,11 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                             task.getImmutableRepositoryPath().set(
                                     project.getProviders().gradleProperty(
                                             "bexDevelopmentRepository"));
-                            task.getLanguageArtifactManifest().set(
-                                    project.getLayout().file(
+                            task.getLanguageRepository().set(
+                                    project.getLayout().dir(
                                             project.getProviders().gradleProperty(
                                                     "blueLanguageRepository")
-                                                    .map(path -> project.file(
-                                                            path + "/artifact-manifest.json"))));
+                                                    .map(project::file)));
                             task.getSpecification().set(
                                     project.getLayout().getProjectDirectory().file(
                                             "specifications/blue-bex-specification-2.0.md"));

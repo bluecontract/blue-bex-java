@@ -45,8 +45,17 @@ import org.gradle.api.tasks.TaskAction;
 public abstract class AssembleImmutableDevelopmentRepositoryTask
         extends DefaultTask {
     private static final String MANIFEST_FILE = "artifact-manifest.json";
+    private static final String LANGUAGE_MANIFEST_SCHEMA =
+            "blue-development-maven-repository/1.0";
+    private static final String LANGUAGE_GROUP = "blue.language";
+    private static final int LANGUAGE_BUILD_JAVA = 17;
     private static final Pattern DEVELOPMENT_VERSION = Pattern.compile(
             "[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.([0-9a-f]{40})");
+    private static final Pattern LANGUAGE_DEVELOPMENT_VERSION = Pattern.compile(
+            "3\\.1\\.0-dev\\.([0-9a-f]{40})");
+    private static final Pattern GIT_TREE = Pattern.compile("[0-9a-f]{40}");
+    private static final Pattern SHA_256_IDENTITY = Pattern.compile(
+            "sha256:[0-9a-f]{64}");
     private static final Pattern PACKAGE_IDENTITY = Pattern.compile(
             "(?m)^packageIdentity:\\s*(sha256:[0-9a-f]{64})\\s*$");
     private static final List<String> ARTIFACTS = Collections.unmodifiableList(
@@ -60,6 +69,18 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
                     new ArtifactKind("pom", ".pom"),
                     new ArtifactKind("runtime", ".jar"),
                     new ArtifactKind("sources", "-sources.jar")));
+    private static final List<String> LANGUAGE_ARTIFACTS =
+            Collections.unmodifiableList(Arrays.asList(
+                    "blue-language-model",
+                    "blue-language-core",
+                    "blue-language-mapping",
+                    "blue-language-ipfs",
+                    "blue-contracts-core",
+                    "blue-language-java"));
+    private static final List<ArtifactKind> LANGUAGE_KINDS =
+            Collections.unmodifiableList(Arrays.asList(
+                    new ArtifactKind("pom", ".pom"),
+                    new ArtifactKind("runtime", ".jar")));
 
     @Input
     public abstract Property<String> getVersion();
@@ -74,9 +95,9 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
     @Input
     public abstract Property<String> getImmutableRepositoryPath();
 
-    @InputFile
-    @PathSensitive(PathSensitivity.NONE)
-    public abstract RegularFileProperty getLanguageArtifactManifest();
+    @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract DirectoryProperty getLanguageRepository();
 
     @InputFile
     @PathSensitive(PathSensitivity.RELATIVE)
@@ -129,7 +150,7 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
         }
 
         LanguageBinding language = languageBinding(
-                getLanguageArtifactManifest().get().getAsFile().toPath(),
+                getLanguageRepository().get().getAsFile().toPath(),
                 getLanguageVersion().get());
         Path parent = target.getParent();
         if (parent == null) {
@@ -188,9 +209,16 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
     }
 
     private static LanguageBinding languageBinding(
-            Path manifestPath,
+            Path repositoryPath,
             String expectedVersion) {
         try {
+            Path repository = repositoryPath.toAbsolutePath().normalize();
+            if (!Files.isDirectory(repository)
+                    || Files.isSymbolicLink(repository)) {
+                throw new GradleException(
+                        "Language development repository is missing or symbolic");
+            }
+            Path manifestPath = repository.resolve(MANIFEST_FILE);
             if (!Files.isRegularFile(manifestPath)
                     || Files.isSymbolicLink(manifestPath)) {
                 throw new GradleException(
@@ -216,24 +244,54 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
                         "Language artifact manifest is not a JSON object");
             }
             Map<?, ?> manifest = (Map<?, ?>) parsed;
-            String schema = text(manifest.get("schema"));
-            String version = text(manifest.get("version"));
-            String sourceCommit = text(manifest.get("sourceCommit"));
-            if (!"blue-staged-dependency-repository/1.0".equals(schema)) {
+            validateLanguageManifestFields(manifest);
+            String schema = string(manifest.get("schema"));
+            String version = string(manifest.get("version"));
+            String sourceCommit = string(manifest.get("sourceCommit"));
+            String sourceTree = string(manifest.get("sourceTree"));
+            if (!LANGUAGE_MANIFEST_SCHEMA.equals(schema)) {
                 throw new GradleException(
                         "Unsupported Language artifact manifest schema");
+            }
+            if (!"DEVELOPMENT".equals(string(manifest.get("stagePurpose")))) {
+                throw new GradleException(
+                        "Language artifact manifest is not a DEVELOPMENT handoff");
+            }
+            if (!Boolean.FALSE.equals(manifest.get("releaseReadinessClaimed"))) {
+                throw new GradleException(
+                        "Language development manifest must not claim release readiness");
+            }
+            if (!exactNumber(manifest.get("builtWithJava"), LANGUAGE_BUILD_JAVA)) {
+                throw new GradleException(
+                        "Language development manifest must record builtWithJava 17");
+            }
+            if (!LANGUAGE_GROUP.equals(string(manifest.get("groupId")))) {
+                throw new GradleException(
+                        "Language development manifest has an unexpected groupId");
             }
             if (!expectedVersion.equals(version)) {
                 throw new GradleException(
                         "Language artifact manifest version does not match "
                                 + "blueLanguageVersion");
             }
-            Matcher versionMatcher = DEVELOPMENT_VERSION.matcher(version);
+            Matcher versionMatcher = LANGUAGE_DEVELOPMENT_VERSION.matcher(version);
             if (!versionMatcher.matches()
                     || !sourceCommit.equals(versionMatcher.group(1))) {
                 throw new GradleException(
                         "Language artifact manifest is not commit-bound");
             }
+            if (!GIT_TREE.matcher(sourceTree).matches()) {
+                throw new GradleException(
+                        "Language artifact manifest sourceTree is not an exact Git tree");
+            }
+            if (!Boolean.FALSE.equals(manifest.get("sourceDirty"))) {
+                throw new GradleException(
+                        "Language development manifest must bind a clean source tree");
+            }
+            requireSha256(manifest, "contractsSpecificationIdentity");
+            requireSha256(manifest, "contractsFixturePackageIdentity");
+            requireSha256(manifest, "contractsReleaseIdentity");
+            validateLanguageArtifacts(repository, manifest);
             return new LanguageBinding(
                     version,
                     sourceCommit,
@@ -242,6 +300,157 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             throw new GradleException(
                     "Cannot verify Language artifact manifest", exception);
         }
+    }
+
+    private static void validateLanguageManifestFields(Map<?, ?> manifest) {
+        Set<String> required = new LinkedHashSet<>(Arrays.asList(
+                "schema",
+                "stagePurpose",
+                "releaseReadinessClaimed",
+                "builtWithJava",
+                "groupId",
+                "version",
+                "sourceCommit",
+                "sourceTree",
+                "sourceDirty",
+                "contractsSpecificationIdentity",
+                "contractsFixturePackageIdentity",
+                "contractsReleaseIdentity",
+                "artifacts"));
+        Set<String> actual = manifest.keySet().stream()
+                .map(String::valueOf)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> missing = new LinkedHashSet<>(required);
+        missing.removeAll(actual);
+        Set<String> unexpected = new LinkedHashSet<>(actual);
+        unexpected.removeAll(required);
+        if (!missing.isEmpty() || !unexpected.isEmpty()) {
+            throw new GradleException(
+                    "Language development manifest fields differ; missing="
+                            + missing + ", unexpected=" + unexpected);
+        }
+    }
+
+    private static void validateLanguageArtifacts(
+            Path repository,
+            Map<?, ?> manifest) throws IOException, NoSuchAlgorithmException {
+        Object artifactsValue = manifest.get("artifacts");
+        if (!(artifactsValue instanceof List<?>)) {
+            throw new GradleException(
+                    "Language development manifest artifacts must be a list");
+        }
+        List<?> artifacts = (List<?>) artifactsValue;
+        List<ExpectedLanguageArtifact> expected = expectedLanguageArtifacts(
+                string(manifest.get("version")));
+        if (artifacts.size() != expected.size()) {
+            throw new GradleException(
+                    "Language development manifest must contain exactly 12 artifact records");
+        }
+        Set<String> expectedFiles = new LinkedHashSet<>();
+        expectedFiles.add(MANIFEST_FILE);
+        expectedFiles.add(MANIFEST_FILE + ".sha256");
+        Set<String> recordFields = new LinkedHashSet<>(Arrays.asList(
+                "coordinate",
+                "kind",
+                "path",
+                "checksumPath",
+                "sha256",
+                "bytes"));
+        for (int index = 0; index < expected.size(); index++) {
+            Object recordValue = artifacts.get(index);
+            if (!(recordValue instanceof Map<?, ?>)) {
+                throw new GradleException(
+                        "Language artifact record " + index + " is not an object");
+            }
+            Map<?, ?> record = (Map<?, ?>) recordValue;
+            Set<String> actualFields = record.keySet().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            if (!recordFields.equals(actualFields)) {
+                throw new GradleException(
+                        "Language artifact record " + index
+                                + " fields differ from the canonical schema");
+            }
+            ExpectedLanguageArtifact expectedRecord = expected.get(index);
+            if (!expectedRecord.coordinate.equals(string(record.get("coordinate")))
+                    || !expectedRecord.kind.equals(string(record.get("kind")))
+                    || !expectedRecord.path.equals(string(record.get("path")))
+                    || !(expectedRecord.path + ".sha256").equals(
+                            string(record.get("checksumPath")))) {
+                throw new GradleException(
+                        "Language artifact record " + index
+                                + " is missing, duplicated, or noncanonical");
+            }
+            Path payload = repository.resolve(expectedRecord.path);
+            Path checksum = repository.resolve(expectedRecord.path + ".sha256");
+            requireRegularLanguageFile(payload, expectedRecord.path);
+            requireRegularLanguageFile(checksum, expectedRecord.path + ".sha256");
+            String digest = sha256(payload);
+            if (!("sha256:" + digest).equals(string(record.get("sha256")))) {
+                throw new GradleException(
+                        "Language artifact digest differs for "
+                                + expectedRecord.coordinate + ":" + expectedRecord.kind);
+            }
+            if (!exactNumber(record.get("bytes"), Files.size(payload))) {
+                throw new GradleException(
+                        "Language artifact byte count differs for "
+                                + expectedRecord.coordinate + ":" + expectedRecord.kind);
+            }
+            String checksumText = digest + "  " + payload.getFileName() + "\n";
+            if (!checksumText.equals(Files.readString(
+                    checksum, StandardCharsets.UTF_8))) {
+                throw new GradleException(
+                        "Language artifact checksum differs for "
+                                + expectedRecord.coordinate + ":" + expectedRecord.kind);
+            }
+            expectedFiles.add(expectedRecord.path);
+            expectedFiles.add(expectedRecord.path + ".sha256");
+        }
+        Set<String> actualFiles = regularFiles(repository);
+        if (!expectedFiles.equals(actualFiles)) {
+            throw new GradleException(
+                    "Language development repository file closure mismatch; expected="
+                            + expectedFiles + ", actual=" + actualFiles);
+        }
+    }
+
+    private static List<ExpectedLanguageArtifact> expectedLanguageArtifacts(
+            String version) {
+        List<ExpectedLanguageArtifact> expected = new ArrayList<>();
+        List<String> sortedArtifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        Collections.sort(sortedArtifacts);
+        for (String artifact : sortedArtifacts) {
+            String base = "blue/language/" + artifact + "/" + version + "/"
+                    + artifact + "-" + version;
+            for (ArtifactKind kind : LANGUAGE_KINDS) {
+                expected.add(new ExpectedLanguageArtifact(
+                        LANGUAGE_GROUP + ":" + artifact + ":" + version,
+                        kind.name,
+                        base + kind.suffix));
+            }
+        }
+        return expected;
+    }
+
+    private static void requireRegularLanguageFile(Path file, String relative) {
+        if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) {
+            throw new GradleException(
+                    "Language development repository is missing regular file "
+                            + relative);
+        }
+    }
+
+    private static void requireSha256(Map<?, ?> manifest, String field) {
+        if (!SHA_256_IDENTITY.matcher(string(manifest.get(field))).matches()) {
+            throw new GradleException(
+                    "Language development manifest " + field
+                            + " is not a SHA-256 identity");
+        }
+    }
+
+    private static boolean exactNumber(Object value, long expected) {
+        return value instanceof Number
+                && value.toString().equals(Long.toString(expected));
     }
 
     private static List<Map<String, Object>> copyArtifacts(
@@ -312,8 +521,8 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
         return matcher.group(1);
     }
 
-    private static String text(Object value) {
-        return value instanceof String ? ((String) value).trim() : "";
+    private static String string(Object value) {
+        return value instanceof String ? (String) value : "";
     }
 
     private static void writeChecksum(Path input)
@@ -475,6 +684,21 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             this.version = version;
             this.sourceCommit = sourceCommit;
             this.manifestIdentity = manifestIdentity;
+        }
+    }
+
+    private static final class ExpectedLanguageArtifact {
+        private final String coordinate;
+        private final String kind;
+        private final String path;
+
+        private ExpectedLanguageArtifact(
+                String coordinate,
+                String kind,
+                String path) {
+            this.coordinate = coordinate;
+            this.kind = kind;
+            this.path = path;
         }
     }
 }

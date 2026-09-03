@@ -48,14 +48,20 @@ No new BEX fixture is required merely because Contracts supports
 ## Run the working suite
 
 ```bash
-./gradlew --no-daemon clean bexWorkingVerification \
-  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+./gradlew --no-daemon clean bexSdkStageVerify \
+  -PblueLanguageRepository=/absolute/path/to/immutable-language-repository \
+  -PblueLanguageVersion=3.1.0-dev.<language-source-commit> \
+  -PbexLocalStageVersion=1.1.0-dev.<bex-source-commit> \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-mutable-bex-stage
 ```
 
 The gate includes all ordinary tests, all fixture/vector/gas/operator coverage,
-local composite compile/runtime smoke, hosted adapters, Java 8 bytecode, public
-API descriptors, artifacts, BEX-owned archive determinism, and a clean
-machine-readable report.
+immutable-repository compile/runtime smoke, hosted adapters, Java 8 bytecode,
+public API descriptors, artifacts, BEX-owned archive determinism, and a clean
+machine-readable report. The repository must use the
+`blue-development-maven-repository/1.0` schema and contain the exact six-module
+Language runtime/POM closure; included-build substitution is not accepted by
+this lane.
 
 A green working result requires:
 
