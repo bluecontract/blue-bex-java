@@ -132,3 +132,4 @@ JUnit test names instead of being inserted into that namespace:
 | `C-BEX-NULL-01` | `BEX-EMPTY-06` plus `cBexNull01FailureDiscardsPreviouslyBufferedPatchAndEvent`, which buffers one valid patch and event before a null event fails and proves both buffers are cleared |
 | `C-BEX-NULL-02` | `BEX-EMPTY-01`, `BEX-EMPTY-09`, `BEX-EMPTY-10`, plus `cBexNull02RecursivelyNormalizesNullByStructuralPosition` |
 | `C-BEX-NULL-03` | `BEX-EMPTY-05` plus `cBexNull03ExplicitPlaceholderConvergesWithListNullButEmptyObjectDoesNot` |
+| `C-BEX-NULL-04` | `cBexNull04RetainsNestedContainerAndRejectsScalarTypedEmptyObject`, which preserves `{x:{}}` after recursive null omission and then proves ordinary Language snapshot validation rejects the retained `{}` when typed as `Text` |

@@ -39,6 +39,7 @@ import static blue.bex.test.BexTestFixtures.list;
 import static blue.bex.test.BexTestFixtures.obj;
 import static blue.bex.test.BexTestFixtures.op;
 import static blue.bex.test.BexTestFixtures.stepExpr;
+import static blue.language.model.wire.BlueLanguageConstants.TEXT_TYPE_BLUE_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,6 +93,24 @@ class BexBlueOutputNullBoundaryTest {
         assertTrue(Nodes.isEmptyPlaceholder(output.getItems().get(0)));
         assertTrue(Nodes.isEmptyPlaceholder(output.getItems().get(1)));
         assertFalse(Nodes.isEmptyPlaceholder(output.getItems().get(2)));
+    }
+
+    @Test
+    void cBexNull04RetainsNestedContainerAndRejectsScalarTypedEmptyObject() {
+        Node admitted = BexBlueNodeWriter.toNode(BexValues.fromSimple(
+                Collections.singletonMap("x", Collections.singletonMap(
+                        "y", null))));
+
+        Node x = admitted.getProperties().get("x");
+        assertExactEmptyObject(x);
+
+        try (BlueLanguage blue = BlueLanguage.builder().build()) {
+            Node scalarTyped = x.clone().type(
+                    new Node().blueId(TEXT_TYPE_BLUE_ID));
+
+            assertThrows(RuntimeException.class,
+                    () -> blue.snapshots().resolve(scalarTyped));
+        }
     }
 
     @Test
