@@ -5,6 +5,7 @@ import groovy.json.JsonSlurper;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,6 +32,10 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
     @PathSensitive(PathSensitivity.RELATIVE)
     public abstract RegularFileProperty getCandidateBaseline();
 
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract RegularFileProperty getCurrentSpecification();
+
     @Input
     public abstract Property<String> getProjectVersion();
 
@@ -54,6 +59,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                 report.get("languageReleaseIdentity"));
         Map<?, ?> publishedInspection = object(
                 report.get("publishedHostApiInspection"));
+        Map<?, ?> specification = object(report.get("specification"));
 
         String languageVersion = string(language.get("candidateVersion"));
         String languageCoordinate =
@@ -62,6 +68,10 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         String projectVersion = getProjectVersion().get();
         String commitBoundSource = commitBoundSource(projectVersion);
         boolean commitBoundDevelopment = !commitBoundSource.isEmpty();
+        String lockedSpecificationSha256 =
+                string(bex.get("currentSpecificationSha256"));
+        String currentSpecificationSha256 =
+                sha256(getCurrentSpecification().get().getAsFile());
         List<String> blockers = new ArrayList<>();
         require(blockers,
                 "blue-bex-sdk-stage-baseline/1.0".equals(
@@ -70,6 +80,13 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         require(blockers,
                 "candidate-source-lock".equals(baseline.get("status")),
                 "candidate-baseline-not-source-locked");
+        require(blockers,
+                lockedSpecificationSha256.matches("[0-9a-f]{64}"),
+                "bex-current-specification-lock-missing");
+        require(blockers,
+                currentSpecificationSha256.equals(
+                        lockedSpecificationSha256),
+                "bex-current-specification-lock-mismatch");
         require(blockers,
                 string(language.get("sourceCommit"))
                         .matches("[0-9a-f]{40}"),
@@ -138,6 +155,21 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                         && "staged-repository-candidate".equals(
                         languageIdentity.get("selectionKind")),
                 "exact-staged-language-artifact-not-proven");
+        require(blockers,
+                "specifications/blue-bex-specification-2.0.md".equals(
+                        specification.get("path")),
+                "conformance-specification-path-mismatch");
+        require(blockers,
+                currentSpecificationSha256.equals(
+                                specification.get("sha256"))
+                        && lockedSpecificationSha256.equals(
+                                specification.get("sha256")),
+                "conformance-specification-hash-mismatch");
+        require(blockers,
+                Boolean.TRUE.equals(
+                        specification.get(
+                                "currentSpecificationAvailable")),
+                "conformance-current-specification-unavailable");
         Object currentFailures = report.get("currentModeFailures");
         require(blockers,
                 currentFailures instanceof List<?>
@@ -152,6 +184,10 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         receipt.put("bexSourceCommit", sourceState.get("commit"));
         receipt.put("historicalBexReleaseVersion",
                 bex.get("historicalReleaseVersion"));
+        receipt.put("bexSpecificationPath",
+                "specifications/blue-bex-specification-2.0.md");
+        receipt.put("bexSpecificationSha256",
+                currentSpecificationSha256);
         receipt.put("languageCandidateVersion", languageVersion);
         receipt.put("languageSourceCommit", language.get("sourceCommit"));
         receipt.put("languageCoordinate", languageCoordinate);
@@ -199,6 +235,21 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             return version.substring(version.length() - 40);
         }
         return "";
+    }
+
+    private static String sha256(File file) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(Files.readAllBytes(file.toPath()));
+            StringBuilder result = new StringBuilder(64);
+            for (byte value : digest) {
+                result.append(String.format("%02x", value & 0xff));
+            }
+            return result.toString();
+        } catch (Exception exception) {
+            throw new GradleException(
+                    "Cannot hash current BEX specification", exception);
+        }
     }
 
     private static void require(

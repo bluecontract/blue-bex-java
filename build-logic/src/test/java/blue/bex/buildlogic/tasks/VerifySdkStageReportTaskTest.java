@@ -25,6 +25,8 @@ final class VerifySdkStageReportTaskTest {
         assertTrue(receipt.contains("\"status\": \"passed\""));
         assertTrue(receipt.contains(
                 "e0dfc897ea7d158895325fae2bf84e103b8c1989"));
+        assertTrue(receipt.contains(
+                "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751"));
     }
 
     @Test
@@ -82,6 +84,52 @@ final class VerifySdkStageReportTaskTest {
         assertThrows(GradleException.class, task::verify);
     }
 
+    @Test
+    void rejectsTamperedCurrentSpecification() throws Exception {
+        VerifySdkStageReportTask task = task();
+        Files.writeString(
+                task.getCurrentSpecification().get().getAsFile().toPath(),
+                "tampered specification\n");
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("bex-current-specification-lock-mismatch"));
+    }
+
+    @Test
+    void rejectsMissingSpecificationLock() throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path baseline = task.getCandidateBaseline().get().getAsFile().toPath();
+        Files.writeString(
+                baseline,
+                Files.readString(baseline).replace(
+                        "\"currentSpecificationSha256\": "
+                                + "\"208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751\",",
+                        ""));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("bex-current-specification-lock-missing"));
+    }
+
+    @Test
+    void rejectsMismatchedSpecificationReport() throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path report = task.getConformanceReport().get().getAsFile().toPath();
+        Files.writeString(
+                report,
+                Files.readString(report).replace(
+                        "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751",
+                        "0000000000000000000000000000000000000000000000000000000000000000"));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("conformance-specification-hash-mismatch"));
+    }
+
     private VerifySdkStageReportTask task() throws Exception {
         Project project = ProjectBuilder.builder()
                 .withProjectDir(temporaryDirectory.toFile())
@@ -101,6 +149,7 @@ final class VerifySdkStageReportTaskTest {
                   },
                   "bex": {
                     "candidateVersion": "1.1.0-rc.4",
+                    "currentSpecificationSha256": "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751",
                     "historicalReleaseVersion": "1.1.0-rc.3"
                   }
                 }
@@ -111,6 +160,11 @@ final class VerifySdkStageReportTaskTest {
                   "schema": "blue-bex-hosted-release-report/2.0",
                   "projectVersion": "1.1.0-rc.4",
                   "currentModeFailures": [],
+                  "specification": {
+                    "path": "specifications/blue-bex-specification-2.0.md",
+                    "sha256": "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751",
+                    "currentSpecificationAvailable": true
+                  },
                   "dependency": {
                     "mode": "staged-repository",
                     "declaredCoordinate": "blue.language:blue-language-java:3.1.0-rc.21",
@@ -141,6 +195,10 @@ final class VerifySdkStageReportTaskTest {
                 """);
         task.getCandidateBaseline().fileValue(baseline.toFile());
         task.getConformanceReport().fileValue(report.toFile());
+        Path specification = temporaryDirectory.resolve(
+                "blue-bex-specification-2.0.md");
+        Files.writeString(specification, "current specification\n");
+        task.getCurrentSpecification().fileValue(specification.toFile());
         task.getProjectVersion().set("1.1.0-rc.4");
         task.getOutputFile().fileValue(
                 temporaryDirectory.resolve("receipt.json").toFile());

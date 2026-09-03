@@ -118,6 +118,10 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                     project.getLayout().getProjectDirectory().file(
                                             "gradle/verification/"
                                                     + "sdk-stage-language-baseline.json"));
+                            task.getCurrentSpecification().set(
+                                    project.getLayout().getProjectDirectory().file(
+                                            "specifications/"
+                                                    + "blue-bex-specification-2.0.md"));
                             task.getProjectVersion().set(project.provider(
                                     () -> String.valueOf(project.getVersion())));
                             task.getOutputFile().set(
