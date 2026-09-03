@@ -121,6 +121,11 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                     project.getLayout().getProjectDirectory().file(
                                             "specifications/"
                                                     + "blue-bex-specification-2.0.md"));
+                            task.getLanguageRepository().set(
+                                    project.getLayout().dir(
+                                            project.getProviders().gradleProperty(
+                                                    "blueLanguageRepository")
+                                                    .map(project::file)));
                             task.getProjectVersion().set(project.provider(
                                     () -> String.valueOf(project.getVersion())));
                             task.getOutputFile().set(

@@ -5,17 +5,26 @@ import groovy.json.JsonSlurper;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.InputDirectory;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
@@ -24,6 +33,15 @@ import org.gradle.api.tasks.TaskAction;
 
 /** Fails closed unless the isolated SDK-stage conformance evidence is exact. */
 public abstract class VerifySdkStageReportTask extends DefaultTask {
+    private static final String LANGUAGE_MANIFEST_FILE =
+            "artifact-manifest.json";
+    private static final String LANGUAGE_MANIFEST_SCHEMA =
+            "blue-development-maven-repository/1.0";
+    private static final Pattern LANGUAGE_DEVELOPMENT_VERSION =
+            Pattern.compile("3\\.1\\.0-dev\\.([0-9a-f]{40})");
+    private static final Pattern SHA_256_IDENTITY =
+            Pattern.compile("sha256:[0-9a-f]{64}");
+
     @InputFile
     @PathSensitive(PathSensitivity.NONE)
     public abstract RegularFileProperty getConformanceReport();
@@ -35,6 +53,10 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
     @InputFile
     @PathSensitive(PathSensitivity.RELATIVE)
     public abstract RegularFileProperty getCurrentSpecification();
+
+    @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract DirectoryProperty getLanguageRepository();
 
     @Input
     public abstract Property<String> getProjectVersion();
@@ -62,6 +84,9 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         Map<?, ?> specification = object(report.get("specification"));
 
         String languageVersion = string(language.get("candidateVersion"));
+        String languageSourceCommit = string(language.get("sourceCommit"));
+        String lockedLanguageManifestIdentity =
+                string(language.get("artifactManifestIdentity"));
         String languageCoordinate =
                 "blue.language:blue-language-java:" + languageVersion;
         String candidateVersion = string(bex.get("candidateVersion"));
@@ -73,6 +98,8 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         String currentSpecificationSha256 =
                 sha256(getCurrentSpecification().get().getAsFile());
         List<String> blockers = new ArrayList<>();
+        LanguageManifestEvidence languageManifest = inspectLanguageManifest(
+                getLanguageRepository().get().getAsFile(), blockers);
         require(blockers,
                 "blue-bex-sdk-stage-baseline/1.0".equals(
                         baseline.get("schema")),
@@ -88,9 +115,36 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                         lockedSpecificationSha256),
                 "bex-current-specification-lock-mismatch");
         require(blockers,
-                string(language.get("sourceCommit"))
-                        .matches("[0-9a-f]{40}"),
+                languageSourceCommit.matches("[0-9a-f]{40}"),
                 "language-source-commit-not-exact");
+        String baselineLanguageVersionSource =
+                languageCommitBoundSource(languageVersion);
+        require(blockers,
+                !baselineLanguageVersionSource.isEmpty()
+                        && languageSourceCommit.equals(
+                                baselineLanguageVersionSource),
+                "language-candidate-version-source-commit-mismatch");
+        require(blockers,
+                SHA_256_IDENTITY.matcher(
+                        lockedLanguageManifestIdentity).matches(),
+                "language-artifact-manifest-lock-missing");
+        require(blockers,
+                lockedLanguageManifestIdentity.equals(
+                        languageManifest.identity),
+                "language-artifact-manifest-lock-mismatch");
+        require(blockers,
+                languageVersion.equals(languageManifest.version),
+                "language-candidate-version-manifest-mismatch");
+        require(blockers,
+                languageSourceCommit.equals(languageManifest.sourceCommit),
+                "language-source-commit-manifest-mismatch");
+        String manifestLanguageVersionSource =
+                languageCommitBoundSource(languageManifest.version);
+        require(blockers,
+                !manifestLanguageVersionSource.isEmpty()
+                        && languageManifest.sourceCommit.equals(
+                                manifestLanguageVersionSource),
+                "language-artifact-manifest-not-commit-bound");
         require(blockers,
                 commitBoundDevelopment
                         ? "commit-bound-development".equals(candidateVersion)
@@ -134,6 +188,11 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                 Boolean.TRUE.equals(provenance.get(
                         "stagedRepositoryArtifactsMatchResolved")),
                 "staged-language-artifact-hash-mismatch");
+        require(blockers,
+                sameRepository(
+                        string(provenance.get("recordedRepository")),
+                        languageManifest.repository),
+                "staged-language-repository-path-mismatch");
         require(blockers,
                 Boolean.TRUE.equals(
                         versionAutomation.get("matchesProjectVersion"))
@@ -189,8 +248,18 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         receipt.put("bexSpecificationSha256",
                 currentSpecificationSha256);
         receipt.put("languageCandidateVersion", languageVersion);
-        receipt.put("languageSourceCommit", language.get("sourceCommit"));
+        receipt.put("languageSourceCommit", languageSourceCommit);
         receipt.put("languageCoordinate", languageCoordinate);
+        receipt.put("expectedLanguageArtifactManifestIdentity",
+                lockedLanguageManifestIdentity);
+        receipt.put("languageArtifactManifestIdentity",
+                languageManifest.identity);
+        receipt.put("languageArtifactManifestVersion",
+                languageManifest.version);
+        receipt.put("languageArtifactManifestSourceCommit",
+                languageManifest.sourceCommit);
+        receipt.put("verifiedLanguageRepository",
+                languageManifest.repository);
         receipt.put("historicalPublishedLanguageVersion",
                 language.get("historicalPublishedVersion"));
         receipt.put("stagedRepository", provenance.get("recordedRepository"));
@@ -237,6 +306,147 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         return "";
     }
 
+    private static String languageCommitBoundSource(String version) {
+        java.util.regex.Matcher matcher =
+                LANGUAGE_DEVELOPMENT_VERSION.matcher(version);
+        return matcher.matches() ? matcher.group(1) : "";
+    }
+
+    private static LanguageManifestEvidence inspectLanguageManifest(
+            File repositoryFile,
+            List<String> blockers) {
+        Path repository = repositoryFile.toPath().toAbsolutePath().normalize();
+        String repositoryPath = repository.toString();
+        String identity = "";
+        String version = "";
+        String sourceCommit = "";
+        if (!Files.isDirectory(repository, LinkOption.NOFOLLOW_LINKS)
+                || Files.isSymbolicLink(repository)) {
+            blockers.add("language-repository-missing-or-symbolic");
+            return new LanguageManifestEvidence(
+                    repositoryPath, identity, version, sourceCommit);
+        }
+        try {
+            repository = repository.toRealPath();
+            repositoryPath = repository.toString();
+            Path manifest = repository.resolve(LANGUAGE_MANIFEST_FILE);
+            Path sidecar = repository.resolve(
+                    LANGUAGE_MANIFEST_FILE + ".sha256");
+            if (!Files.isRegularFile(manifest, LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(manifest)) {
+                blockers.add("language-artifact-manifest-missing-or-symbolic");
+                return new LanguageManifestEvidence(
+                        repositoryPath, identity, version, sourceCommit);
+            }
+            String digest = sha256(manifest.toFile());
+            identity = "sha256:" + digest;
+            if (!Files.isRegularFile(sidecar, LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(sidecar)) {
+                blockers.add(
+                        "language-artifact-manifest-sidecar-missing-or-symbolic");
+            } else {
+                String expectedSidecar = digest + "  "
+                        + LANGUAGE_MANIFEST_FILE + "\n";
+                require(blockers,
+                        expectedSidecar.equals(Files.readString(
+                                sidecar, StandardCharsets.UTF_8)),
+                        "language-artifact-manifest-sidecar-mismatch");
+            }
+            Object parsed = new JsonSlurper().parse(manifest.toFile());
+            if (!(parsed instanceof Map<?, ?>)) {
+                blockers.add("language-artifact-manifest-not-object");
+                return new LanguageManifestEvidence(
+                        repositoryPath, identity, version, sourceCommit);
+            }
+            Map<?, ?> document = (Map<?, ?>) parsed;
+            version = string(document.get("version"));
+            sourceCommit = string(document.get("sourceCommit"));
+            require(blockers,
+                    canonicalLanguageManifestFields().equals(
+                            document.keySet().stream()
+                                    .map(String::valueOf)
+                                    .collect(Collectors.toCollection(
+                                            LinkedHashSet::new))),
+                    "language-artifact-manifest-fields-noncanonical");
+            require(blockers,
+                    LANGUAGE_MANIFEST_SCHEMA.equals(document.get("schema")),
+                    "language-artifact-manifest-schema-mismatch");
+            require(blockers,
+                    "DEVELOPMENT".equals(document.get("stagePurpose")),
+                    "language-artifact-manifest-not-development");
+            require(blockers,
+                    Boolean.FALSE.equals(
+                            document.get("releaseReadinessClaimed")),
+                    "language-artifact-manifest-claims-release-readiness");
+            require(blockers,
+                    exactNumber(document.get("builtWithJava"), 17),
+                    "language-artifact-manifest-java-version-mismatch");
+            require(blockers,
+                    "blue.language".equals(document.get("groupId")),
+                    "language-artifact-manifest-group-mismatch");
+            require(blockers,
+                    string(document.get("sourceTree"))
+                            .matches("[0-9a-f]{40}"),
+                    "language-artifact-manifest-source-tree-not-exact");
+            require(blockers,
+                    Boolean.FALSE.equals(document.get("sourceDirty")),
+                    "language-artifact-manifest-source-dirty");
+            for (String field : Arrays.asList(
+                    "contractsSpecificationIdentity",
+                    "contractsFixturePackageIdentity",
+                    "contractsReleaseIdentity")) {
+                require(blockers,
+                        SHA_256_IDENTITY.matcher(
+                                string(document.get(field))).matches(),
+                        "language-artifact-manifest-" + field
+                                + "-not-exact");
+            }
+            require(blockers,
+                    document.get("artifacts") instanceof List<?>,
+                    "language-artifact-manifest-artifacts-not-list");
+        } catch (Exception exception) {
+            blockers.add("language-artifact-manifest-unreadable");
+        }
+        return new LanguageManifestEvidence(
+                repositoryPath, identity, version, sourceCommit);
+    }
+
+    private static Set<String> canonicalLanguageManifestFields() {
+        return new LinkedHashSet<>(Arrays.asList(
+                "schema",
+                "stagePurpose",
+                "releaseReadinessClaimed",
+                "builtWithJava",
+                "groupId",
+                "version",
+                "sourceCommit",
+                "sourceTree",
+                "sourceDirty",
+                "contractsSpecificationIdentity",
+                "contractsFixturePackageIdentity",
+                "contractsReleaseIdentity",
+                "artifacts"));
+    }
+
+    private static boolean sameRepository(
+            String recordedRepository,
+            String actualRepository) {
+        if (recordedRepository.isEmpty() || actualRepository.isEmpty()) {
+            return false;
+        }
+        try {
+            return Files.isSameFile(
+                    Path.of(recordedRepository), Path.of(actualRepository));
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
+    private static boolean exactNumber(Object value, long expected) {
+        return value instanceof Number
+                && value.toString().equals(Long.toString(expected));
+    }
+
     private static String sha256(File file) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
@@ -248,7 +458,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             return result.toString();
         } catch (Exception exception) {
             throw new GradleException(
-                    "Cannot hash current BEX specification", exception);
+                    "Cannot hash file " + file, exception);
         }
     }
 
@@ -256,6 +466,24 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             List<String> blockers, boolean condition, String blocker) {
         if (!condition) {
             blockers.add(blocker);
+        }
+    }
+
+    private static final class LanguageManifestEvidence {
+        private final String repository;
+        private final String identity;
+        private final String version;
+        private final String sourceCommit;
+
+        private LanguageManifestEvidence(
+                String repository,
+                String identity,
+                String version,
+                String sourceCommit) {
+            this.repository = repository;
+            this.identity = identity;
+            this.version = version;
+            this.sourceCommit = sourceCommit;
         }
     }
 }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.testfixtures.ProjectBuilder;
@@ -12,8 +13,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 final class VerifySdkStageReportTaskTest {
+    private static final String LANGUAGE_COMMIT =
+            "e0dfc897ea7d158895325fae2bf84e103b8c1989";
+    private static final String LANGUAGE_VERSION =
+            "3.1.0-dev." + LANGUAGE_COMMIT;
+    private static final String SPECIFICATION_SHA256 =
+            "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751";
+
     @TempDir
     Path temporaryDirectory;
+
+    private String languageManifestIdentity;
 
     @Test
     void passesOnlyExactBlockerFreeStagedEvidence() throws Exception {
@@ -24,9 +34,10 @@ final class VerifySdkStageReportTaskTest {
                 task.getOutputFile().get().getAsFile().toPath());
         assertTrue(receipt.contains("\"status\": \"passed\""));
         assertTrue(receipt.contains(
-                "e0dfc897ea7d158895325fae2bf84e103b8c1989"));
+                LANGUAGE_COMMIT));
         assertTrue(receipt.contains(
-                "208510d68ae278c63ad60d90c6a9724cf1e52e2e533ac5753904a645b7c13751"));
+                SPECIFICATION_SHA256));
+        assertTrue(receipt.contains(languageManifestIdentity));
     }
 
     @Test
@@ -130,6 +141,87 @@ final class VerifySdkStageReportTaskTest {
                 .contains("conformance-specification-hash-mismatch"));
     }
 
+    @Test
+    void rejectsLanguageManifestWhoseBytesDifferFromPinnedIdentity()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path manifest = task.getLanguageRepository().get().getAsFile()
+                .toPath().resolve("artifact-manifest.json");
+        Files.writeString(manifest, Files.readString(manifest) + " \n");
+
+        assertThrows(GradleException.class, task::verify);
+        String receipt = Files.readString(
+                task.getOutputFile().get().getAsFile().toPath());
+        assertTrue(receipt.contains(
+                "language-artifact-manifest-lock-mismatch"));
+        assertTrue(receipt.contains(
+                "language-artifact-manifest-sidecar-mismatch"));
+    }
+
+    @Test
+    void rejectsMissingLanguageManifestIdentityLock() throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path baseline = task.getCandidateBaseline().get().getAsFile().toPath();
+        Files.writeString(baseline, Files.readString(baseline).replace(
+                "    \"artifactManifestIdentity\": \""
+                        + languageManifestIdentity + "\",\n",
+                ""));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("language-artifact-manifest-lock-missing"));
+    }
+
+    @Test
+    void rejectsManifestCandidateAndSourceDifferentFromBaseline()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        String otherCommit = "4444444444444444444444444444444444444444";
+        rewriteManifestAndPin(task, contents -> contents.replace(
+                LANGUAGE_COMMIT, otherCommit));
+
+        assertThrows(GradleException.class, task::verify);
+        String receipt = Files.readString(
+                task.getOutputFile().get().getAsFile().toPath());
+        assertTrue(receipt.contains(
+                "language-candidate-version-manifest-mismatch"));
+        assertTrue(receipt.contains(
+                "language-source-commit-manifest-mismatch"));
+    }
+
+    @Test
+    void rejectsInternallyInconsistentManifestVersionAndSourceCommit()
+            throws Exception {
+        VerifySdkStageReportTask task = task();
+        String otherCommit = "5555555555555555555555555555555555555555";
+        rewriteManifestAndPin(task, contents -> contents.replace(
+                "\"version\": \"" + LANGUAGE_VERSION + "\"",
+                "\"version\": \"3.1.0-dev." + otherCommit + "\""));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("language-artifact-manifest-not-commit-bound"));
+    }
+
+    @Test
+    void rejectsReportBoundToDifferentLanguageRepository() throws Exception {
+        VerifySdkStageReportTask task = task();
+        Path otherRepository = temporaryDirectory.resolve("other-repository");
+        Files.createDirectory(otherRepository);
+        Path report = task.getConformanceReport().get().getAsFile().toPath();
+        Files.writeString(report, Files.readString(report).replace(
+                task.getLanguageRepository().get().getAsFile()
+                        .getCanonicalPath(),
+                otherRepository.toFile().getCanonicalPath()));
+
+        assertThrows(GradleException.class, task::verify);
+        assertTrue(Files.readString(
+                task.getOutputFile().get().getAsFile().toPath())
+                .contains("staged-language-repository-path-mismatch"));
+    }
+
     private VerifySdkStageReportTask task() throws Exception {
         Project project = ProjectBuilder.builder()
                 .withProjectDir(temporaryDirectory.toFile())
@@ -137,14 +229,18 @@ final class VerifySdkStageReportTaskTest {
         VerifySdkStageReportTask task = project.getTasks().create(
                 "verifySdkStage",
                 VerifySdkStageReportTask.class);
+        Path languageRepository = languageRepository();
+        Path manifest = languageRepository.resolve("artifact-manifest.json");
+        languageManifestIdentity = "sha256:" + sha256(manifest);
         Path baseline = temporaryDirectory.resolve("baseline.json");
         Files.writeString(baseline, """
                 {
                   "schema": "blue-bex-sdk-stage-baseline/1.0",
                   "status": "candidate-source-lock",
                   "language": {
-                    "candidateVersion": "3.1.0-rc.21",
-                    "sourceCommit": "e0dfc897ea7d158895325fae2bf84e103b8c1989",
+                    "candidateVersion": "%s",
+                    "sourceCommit": "%s",
+                    "artifactManifestIdentity": "%s",
                     "historicalPublishedVersion": "3.1.0-rc.20"
                   },
                   "bex": {
@@ -153,7 +249,10 @@ final class VerifySdkStageReportTaskTest {
                     "historicalReleaseVersion": "1.1.0-rc.3"
                   }
                 }
-                """);
+                """.formatted(
+                LANGUAGE_VERSION,
+                LANGUAGE_COMMIT,
+                languageManifestIdentity));
         Path report = temporaryDirectory.resolve("report.json");
         Files.writeString(report, """
                 {
@@ -167,7 +266,7 @@ final class VerifySdkStageReportTaskTest {
                   },
                   "dependency": {
                     "mode": "staged-repository",
-                    "declaredCoordinate": "blue.language:blue-language-java:3.1.0-rc.21",
+                    "declaredCoordinate": "blue.language:blue-language-java:%s",
                     "resolution": {
                       "status": "passed",
                       "artifacts": [],
@@ -175,7 +274,7 @@ final class VerifySdkStageReportTaskTest {
                         "kind": "isolated-staged-repository",
                         "repositoryPolicy": "explicit-staged-repository-before-maven-central",
                         "stagedRepositoryArtifactsMatchResolved": true,
-                        "recordedRepository": "/stage"
+                        "recordedRepository": "%s"
                       }
                     }
                   },
@@ -192,9 +291,12 @@ final class VerifySdkStageReportTaskTest {
                     "coordinate": "blue.language:blue-language-java:3.1.0-rc.20"
                   }
                 }
-                """);
+                """.formatted(
+                LANGUAGE_VERSION,
+                languageRepository.toFile().getCanonicalPath()));
         task.getCandidateBaseline().fileValue(baseline.toFile());
         task.getConformanceReport().fileValue(report.toFile());
+        task.getLanguageRepository().set(languageRepository.toFile());
         Path specification = temporaryDirectory.resolve(
                 "blue-bex-specification-2.0.md");
         Files.writeString(specification, "current specification\n");
@@ -203,5 +305,61 @@ final class VerifySdkStageReportTaskTest {
         task.getOutputFile().fileValue(
                 temporaryDirectory.resolve("receipt.json").toFile());
         return task;
+    }
+
+    private Path languageRepository() throws Exception {
+        Path repository = temporaryDirectory.resolve("language-repository");
+        Files.createDirectories(repository);
+        Path manifest = repository.resolve("artifact-manifest.json");
+        Files.writeString(manifest, """
+                {
+                  "schema": "blue-development-maven-repository/1.0",
+                  "stagePurpose": "DEVELOPMENT",
+                  "releaseReadinessClaimed": false,
+                  "builtWithJava": 17,
+                  "groupId": "blue.language",
+                  "version": "%s",
+                  "sourceCommit": "%s",
+                  "sourceTree": "1111111111111111111111111111111111111111",
+                  "sourceDirty": false,
+                  "contractsSpecificationIdentity": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+                  "contractsFixturePackageIdentity": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+                  "contractsReleaseIdentity": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+                  "artifacts": []
+                }
+                """.formatted(LANGUAGE_VERSION, LANGUAGE_COMMIT));
+        writeManifestSidecar(manifest);
+        return repository;
+    }
+
+    private void rewriteManifestAndPin(
+            VerifySdkStageReportTask task,
+            java.util.function.UnaryOperator<String> rewrite)
+            throws Exception {
+        Path manifest = task.getLanguageRepository().get().getAsFile()
+                .toPath().resolve("artifact-manifest.json");
+        Files.writeString(manifest, rewrite.apply(Files.readString(manifest)));
+        writeManifestSidecar(manifest);
+        String newIdentity = "sha256:" + sha256(manifest);
+        Path baseline = task.getCandidateBaseline().get().getAsFile().toPath();
+        Files.writeString(baseline, Files.readString(baseline).replace(
+                languageManifestIdentity, newIdentity));
+        languageManifestIdentity = newIdentity;
+    }
+
+    private static void writeManifestSidecar(Path manifest) throws Exception {
+        Files.writeString(
+                manifest.resolveSibling("artifact-manifest.json.sha256"),
+                sha256(manifest) + "  artifact-manifest.json\n");
+    }
+
+    private static String sha256(Path path) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(Files.readAllBytes(path));
+        StringBuilder result = new StringBuilder(64);
+        for (byte value : digest) {
+            result.append(String.format("%02x", value & 0xff));
+        }
+        return result.toString();
     }
 }
