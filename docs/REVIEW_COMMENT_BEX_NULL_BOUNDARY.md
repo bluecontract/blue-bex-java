@@ -129,7 +129,7 @@ JUnit test names instead of being inserted into that namespace:
 
 | Acceptance item | Executable BEX evidence |
 | --- | --- |
-| `C-BEX-NULL-01` | `BEX-EMPTY-06` plus `cBexNull01FailureDiscardsPreviouslyBufferedPatchAndEvent`, which buffers one valid patch and event before a null event fails and proves both buffers are cleared |
-| `C-BEX-NULL-02` | `BEX-EMPTY-01`, `BEX-EMPTY-09`, `BEX-EMPTY-10`, plus `cBexNull02RecursivelyNormalizesNullByStructuralPosition` |
-| `C-BEX-NULL-03` | `BEX-EMPTY-05` plus `cBexNull03ExplicitPlaceholderConvergesWithListNullButEmptyObjectDoesNot` |
-| `C-BEX-NULL-04` | `cBexNull04RetainsNestedContainerAndRejectsScalarTypedEmptyObject`, which preserves `{x:{}}` after recursive null omission and then proves ordinary Language snapshot validation rejects the retained `{}` when typed as `Text` |
+| `C-BEX-NULL-01` | `BEX-EMPTY-06`, `cBexNull01FailureDiscardsPreviouslyBufferedPatchAndEvent`, and `BexContractsNullBoundaryAcceptanceTest.cBexNull01AllTransientNullBoundariesLeaveContractsUnchanged`; the last test executes all five null failure boundaries through the public Contracts `DocumentProcessor` and proves the document, Root events, initialization state, and checkpoint state remain uncommitted |
+| `C-BEX-NULL-02` | `BEX-EMPTY-01`, `BEX-EMPTY-09`, `BEX-EMPTY-10`, `cBexNull02RecursivelyNormalizesNullByStructuralPosition`, and the successful real-composition case in `BexContractsNullBoundaryAcceptanceTest` |
+| `C-BEX-NULL-03` | `BEX-EMPTY-05`, `cBexNull03ExplicitPlaceholderConvergesWithListNullButEmptyObjectDoesNot`, and the successful real-composition case in `BexContractsNullBoundaryAcceptanceTest` |
+| `C-BEX-NULL-04` | `cBexNull04RetainsNestedContainerAndRejectsScalarTypedEmptyObject`, which preserves `{x:{}}` after recursive null omission and proves Language rejects `{}` when typed as `Text`; `BexContractsNullBoundaryAcceptanceTest` also proves nested-container preservation through the public Contracts composition |
