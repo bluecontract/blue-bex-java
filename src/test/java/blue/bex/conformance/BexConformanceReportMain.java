@@ -708,7 +708,7 @@ public final class BexConformanceReportMain {
         return artifacts;
     }
 
-    private static Map<String, Object> specificationEvidence(
+    static Map<String, Object> specificationEvidence(
             Path projectDir,
             Map<String, String> baseline) throws IOException {
         Path specification = projectDir.resolve("specifications")
@@ -723,7 +723,23 @@ public final class BexConformanceReportMain {
                 "sha256", actual,
                 "baselineSha256", expected,
                 "matchesBaseline",
-                actual.equals(expected));
+                actual.equals(expected),
+                "currentSpecificationAvailable",
+                ConformancePackage.SHA_256.matcher(actual).matches());
+    }
+
+    static String specificationIdentityFailure(
+            Map<String, Object> dependencyResolution,
+            Map<String, Object> specification) {
+        if ("staged-repository".equals(dependencyResolution.get("mode"))) {
+            return Boolean.TRUE.equals(
+                    specification.get("currentSpecificationAvailable"))
+                    ? null
+                    : "current-specification-unavailable";
+        }
+        return Boolean.TRUE.equals(specification.get("matchesBaseline"))
+                ? null
+                : "specification-identity-differs-from-baseline";
     }
 
     static Map<String, Object> versionAutomationEvidence(
@@ -1197,10 +1213,11 @@ public final class BexConformanceReportMain {
                 failures,
                 gatePassed(releaseGates, "java8Bytecode"),
                 "packaged-java8-bytecode-gate-not-passing");
-        require(
-                failures,
-                Boolean.TRUE.equals(specification.get("matchesBaseline")),
-                "specification-identity-differs-from-baseline");
+        String specificationFailure = specificationIdentityFailure(
+                dependencyResolution, specification);
+        if (specificationFailure != null) {
+            failures.add(specificationFailure);
+        }
         require(
                 failures,
                 Boolean.TRUE.equals(

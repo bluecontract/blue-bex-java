@@ -305,6 +305,67 @@ class BexConformanceReportTruthfulnessTest {
     }
 
     @Test
+    void stagedCandidateAcceptsThePresentCurrentSpecification(
+            @TempDir Path temporaryDirectory) throws Exception {
+        Path specifications = Files.createDirectories(
+                temporaryDirectory.resolve("specifications"));
+        Files.write(
+                specifications.resolve("blue-bex-specification-2.0.md"),
+                "current staged specification\n".getBytes(
+                        StandardCharsets.UTF_8));
+        Map<String, String> historical =
+                Collections.singletonMap(
+                        "specificationSha256",
+                        "0000000000000000000000000000000000000000000000000000000000000000");
+        Map<String, Object> specification =
+                BexConformanceReportMain.specificationEvidence(
+                        temporaryDirectory, historical);
+
+        assertFalse(Boolean.TRUE.equals(
+                specification.get("matchesBaseline")));
+        assertTrue(Boolean.TRUE.equals(
+                specification.get("currentSpecificationAvailable")));
+        assertEquals(
+                null,
+                BexConformanceReportMain.specificationIdentityFailure(
+                        Collections.<String, Object>singletonMap(
+                                "mode", "staged-repository"),
+                        specification));
+    }
+
+    @Test
+    void historicalReleaseStillRequiresItsRecordedSpecification() {
+        Map<String, Object> specification =
+                new LinkedHashMap<String, Object>();
+        specification.put("matchesBaseline", Boolean.FALSE);
+        specification.put("currentSpecificationAvailable", Boolean.TRUE);
+
+        assertEquals(
+                "specification-identity-differs-from-baseline",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        Collections.<String, Object>singletonMap(
+                                "mode", "standalone-published"),
+                        specification));
+    }
+
+    @Test
+    void stagedCandidateRejectsAMissingCurrentSpecification(
+            @TempDir Path temporaryDirectory) throws Exception {
+        Map<String, Object> specification =
+                BexConformanceReportMain.specificationEvidence(
+                        temporaryDirectory,
+                        Collections.<String, String>emptyMap());
+
+        assertEquals("unavailable", specification.get("sha256"));
+        assertEquals(
+                "current-specification-unavailable",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        Collections.<String, Object>singletonMap(
+                                "mode", "staged-repository"),
+                        specification));
+    }
+
+    @Test
     void onlyFreshStandaloneRunCanReplaceModeEvidence() {
         Map<String, Object> dependency =
                 new LinkedHashMap<String, Object>();
