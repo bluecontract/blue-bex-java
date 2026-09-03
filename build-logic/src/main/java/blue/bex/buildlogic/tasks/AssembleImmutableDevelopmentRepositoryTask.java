@@ -49,6 +49,7 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             "blue-development-maven-repository/1.0";
     private static final String LANGUAGE_GROUP = "blue.language";
     private static final int LANGUAGE_BUILD_JAVA = 17;
+    private static final int BEX_BUILD_JAVA = 17;
     private static final Pattern DEVELOPMENT_VERSION = Pattern.compile(
             "[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.([0-9a-f]{40})");
     private static final Pattern LANGUAGE_DEVELOPMENT_VERSION = Pattern.compile(
@@ -118,8 +119,20 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
     @Internal
     public abstract DirectoryProperty getCheckout();
 
+    @Input
+    public int getBuiltWithJava() {
+        return Runtime.version().feature();
+    }
+
     @TaskAction
     public void assemble() {
+        int builtWithJava = getBuiltWithJava();
+        if (builtWithJava != BEX_BUILD_JAVA) {
+            throw new GradleException(
+                    "Immutable BEX development repository must be built with Java "
+                            + BEX_BUILD_JAVA + "; current Gradle JVM is Java "
+                            + builtWithJava);
+        }
         Path source = getMutableRepository().get().getAsFile().toPath()
                 .toAbsolutePath().normalize();
         Path target = getProject().file(getImmutableRepositoryPath().get())
@@ -148,6 +161,11 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             throw new GradleException(
                     "BEX development repository requires a clean source checkout");
         }
+        String sourceTree = git(checkout, "rev-parse", "HEAD^{tree}").trim();
+        if (!GIT_TREE.matcher(sourceTree).matches()) {
+            throw new GradleException(
+                    "BEX source tree is not an exact Git tree identity");
+        }
 
         LanguageBinding language = languageBinding(
                 getLanguageRepository().get().getAsFile().toPath(),
@@ -166,6 +184,7 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
                     source, temporary, version);
             Map<String, Object> manifest = new TreeMap<>();
             manifest.put("artifacts", artifacts);
+            manifest.put("builtWithJava", builtWithJava);
             manifest.put("bexFixturePackageIdentity", packageIdentity(
                     getFixtureManifest().get().getAsFile().toPath()));
             manifest.put("bexGasPackageIdentity", packageIdentity(
@@ -179,8 +198,12 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
                     language.manifestIdentity);
             manifest.put("languageSourceCommit", language.sourceCommit);
             manifest.put("languageVersion", language.version);
+            manifest.put("releaseReadinessClaimed", false);
             manifest.put("schema", "blue-bex-development-repository/1.0");
             manifest.put("sourceCommit", sourceCommit);
+            manifest.put("sourceDirty", false);
+            manifest.put("sourceTree", sourceTree);
+            manifest.put("stagePurpose", "DEVELOPMENT");
             manifest.put("version", version);
             String json = JsonOutput.prettyPrint(JsonOutput.toJson(manifest))
                     + "\n";

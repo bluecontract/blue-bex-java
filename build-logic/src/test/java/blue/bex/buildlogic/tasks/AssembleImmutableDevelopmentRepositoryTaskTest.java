@@ -61,8 +61,32 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
         }
         Map<?, ?> receipt = (Map<?, ?>) new JsonSlurper().parse(
                 manifest.toFile());
+        assertEquals(17, receipt.size());
+        assertTrue(receipt.keySet().containsAll(Arrays.asList(
+                "artifacts",
+                "bexFixturePackageIdentity",
+                "bexGasPackageIdentity",
+                "bexRegistryPackageIdentity",
+                "bexSpecificationIdentity",
+                "builtWithJava",
+                "groupId",
+                "languageRepositoryManifestIdentity",
+                "languageSourceCommit",
+                "languageVersion",
+                "releaseReadinessClaimed",
+                "schema",
+                "sourceCommit",
+                "sourceDirty",
+                "sourceTree",
+                "stagePurpose",
+                "version")));
         assertEquals(fixture.bexVersion, receipt.get("version"));
         assertEquals(fixture.bexCommit, receipt.get("sourceCommit"));
+        assertEquals(fixture.bexTree, receipt.get("sourceTree"));
+        assertEquals(false, receipt.get("sourceDirty"));
+        assertEquals(17, ((Number) receipt.get("builtWithJava")).intValue());
+        assertEquals("DEVELOPMENT", receipt.get("stagePurpose"));
+        assertEquals(false, receipt.get("releaseReadinessClaimed"));
         assertEquals(LANGUAGE_VERSION, receipt.get("languageVersion"));
         assertEquals("sha256:" + sha256(fixture.languageManifest),
                 receipt.get("languageRepositoryManifestIdentity"));
@@ -209,6 +233,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
         git(checkout, "add", ".");
         git(checkout, "commit", "-m", "fixture");
         String bexCommit = git(checkout, "rev-parse", "HEAD").trim();
+        String bexTree = git(checkout, "rev-parse", "HEAD^{tree}").trim();
         String bexVersion = "1.1.0-dev." + bexCommit;
 
         Path mutable = temporary.resolve("mutable");
@@ -252,7 +277,8 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
                 languageRepository,
                 languageManifest,
                 bexVersion,
-                bexCommit);
+                bexCommit,
+                bexTree);
     }
 
     private Path languageRepository() throws Exception {
@@ -388,6 +414,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
         private final Path languageManifest;
         private final String bexVersion;
         private final String bexCommit;
+        private final String bexTree;
 
         private Fixture(
                 AssembleImmutableDevelopmentRepositoryTask task,
@@ -396,7 +423,8 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
                 Path languageRepository,
                 Path languageManifest,
                 String bexVersion,
-                String bexCommit) {
+                String bexCommit,
+                String bexTree) {
             this.task = task;
             this.mutable = mutable;
             this.immutable = immutable;
@@ -404,6 +432,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
             this.languageManifest = languageManifest;
             this.bexVersion = bexVersion;
             this.bexCommit = bexCommit;
+            this.bexTree = bexTree;
         }
     }
 }

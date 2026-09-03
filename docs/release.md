@@ -42,9 +42,11 @@ The staged Language repository is authoritative for the `blue.language` group;
 Maven Central is excluded for that group, so missing candidate modules fail
 closed. The BEX target is never overwritten. An existing destination is
 accepted only when its complete byte tree is identical. Its
-`artifact-manifest.json` and checksum bind the BEX source commit, exact
-Language version/source/manifest, BEX specification identity, fixture/registry/
-gas package identities, and every runtime/POM/source/Javadoc artifact hash.
+`artifact-manifest.json` and checksum bind the BEX source commit and tree,
+record `stagePurpose: DEVELOPMENT`, `releaseReadinessClaimed: false`,
+`builtWithJava: 17`, and `sourceDirty: false`, and bind the exact Language
+version/source/manifest, BEX specification identity, fixture/registry/gas
+package identities, and every runtime/POM/source/Javadoc artifact hash.
 
 This lane is development evidence only. Public release gates continue to
 consume authenticated Maven Central artifacts.
