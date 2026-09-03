@@ -1,7 +1,7 @@
 fixturePackage: blue-bex-conformance
 specificationVersion: '2.0'
 schemaVersion: blue-bex-fixture/2.0
-registryPackageIdentity: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+registryPackageIdentity: sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b
 vectorCount: 75
 behaviorFixtureCount: 120
 gasFixtureCount: 30
@@ -204,7 +204,7 @@ files:
   bytes: 630
 - path: g/bex-g-09.yaml
   role: behavior-fixture
-  sha256: 6714c4d282e84f519c79184d5fd107c079b2292350a4ad0c7503dd9a0e5269fc
+  sha256: 05ac53a23c95ce055c321ce7c983c24b7abf18d7020cc0394126e37cd4a0862e
   bytes: 529
 - path: g/bex-g-10.yaml
   role: behavior-fixture
@@ -635,7 +635,7 @@ packageIdentityAlgorithm:
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity is null before hashing
   lineEndings: LF
-packageIdentity: sha256:dc2a1a999d8af0cf67ec96c8deb5c0242c9b9ec5a6a290574b8365c4e5545ec2
+packageIdentity: sha256:fdb896bf467c0ab8f3b2c9af3b609c9e7d0dc368dd3061f4b2909d0ee1fa89c3
 gasSchedule: blue-bex/gas/2.0
 gasManifestPackageIdentity: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 gasManifestSha256: 1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d

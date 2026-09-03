@@ -154,9 +154,9 @@ normative vectors: 75
 behavior fixtures: 120
 gas microfixtures: 30
 normative operators: 86
-runtime registry: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+runtime registry: sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b
 gas manifest: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
-fixture package: sha256:dc2a1a999d8af0cf67ec96c8deb5c0242c9b9ec5a6a290574b8365c4e5545ec2
+fixture package: sha256:fdb896bf467c0ab8f3b2c9af3b609c9e7d0dc368dd3061f4b2909d0ee1fa89c3
 ```
 
 These identities MUST be rebuilt after any identity-bearing registry,

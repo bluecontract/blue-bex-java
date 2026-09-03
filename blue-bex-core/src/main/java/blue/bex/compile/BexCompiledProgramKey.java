@@ -8,7 +8,7 @@ import java.util.Objects;
 public final class BexCompiledProgramKey {
     public static final String COMPILER_IDENTITY = "blue-bex-java/compiler/2.0";
     public static final String BEX_RUNTIME_REGISTRY_IDENTITY =
-            "sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1";
+            "sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b";
 
     private final BexCompilationInput.Kind kind;
     private final String programIdentity;

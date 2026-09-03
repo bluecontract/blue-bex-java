@@ -62,9 +62,9 @@ final class BexEngineFixtureAdapter {
     static final String FIXTURE_INTRINSIC =
             "5Zbnaiu1hzRNEpuQmKNHuSmkiq5VqdZ5ros49gwGB674";
     static final String SORT_FIXTURE_INTRINSIC =
-            "2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG";
+            "3x6byASNDdnEf9o2EgzAVqewP1zuqyNmzccAmyiYfQsw";
     private static final String FIXTURE_REGISTRY_IDENTITY =
-            "sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1";
+            "sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b";
 
     private static final Pattern OPERATOR_IN_MESSAGE =
             Pattern.compile("(\\$[A-Za-z][A-Za-z0-9]*)");

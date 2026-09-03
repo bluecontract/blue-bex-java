@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BexRepresentationInvarianceTest {
     private static final String SORT_INTRINSIC =
-            "2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG";
+            "3x6byASNDdnEf9o2EgzAVqewP1zuqyNmzccAmyiYfQsw";
     private static final String REPRESENTATION_REGISTRY =
             "sha256:858952520d947dcffa773f7479434d86367b22f1a4ddabde90b8c19826710a62";
 
@@ -628,7 +628,7 @@ class BexRepresentationInvarianceTest {
                                 + "values:\n"
                                 + "  type:\n"
                                 + "    blueId: "
-                                + "8DSFoWG9MqRSUhStqoPLrwVQiYByRh18NWbDEarN8MKF");
+                                + "85ip88snCGrgUNdi1rUFqqAxcxwVGKV2g4LjsKoyKmXK");
                 return new LogicalInputs(
                         program, document, event, intrinsicType);
             }
