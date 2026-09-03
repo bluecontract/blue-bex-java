@@ -21,6 +21,8 @@ import blue.bex.value.BexBlueNodeWriter;
 import blue.bex.value.BexNodeWriter;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.language.api.BlueLanguageErrorCategory;
+import blue.language.api.BlueLanguageErrorClassifier;
 import blue.language.model.Node;
 import blue.language.model.Nodes;
 import blue.language.runtime.BlueLanguage;
@@ -108,8 +110,14 @@ class BexBlueOutputNullBoundaryTest {
             Node scalarTyped = x.clone().type(
                     new Node().blueId(TEXT_TYPE_BLUE_ID));
 
-            assertThrows(RuntimeException.class,
+            IllegalArgumentException failure = assertThrows(
+                    IllegalArgumentException.class,
                     () -> blue.snapshots().resolve(scalarTyped));
+            assertEquals(
+                    BlueLanguageErrorCategory.TypeCompatibilityViolation,
+                    BlueLanguageErrorClassifier.classify(failure));
+            assertTrue(failure.getMessage().contains(
+                    "payload kinds conflict"));
         }
     }
 
