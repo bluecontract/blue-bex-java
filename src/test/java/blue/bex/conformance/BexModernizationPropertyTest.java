@@ -336,7 +336,7 @@ class BexModernizationPropertyTest {
             BexValue value) {
         return BexExecutionContext.builder()
                 .document(new FrozenBexDocumentView(
-                        FrozenNode.fromResolvedNode(new Node())))
+                        FrozenNode.fromResolvedNode(blue.language.model.Nodes.emptyObject())))
                 .binding("subject", value)
                 .binding("peer", value)
                 .gasLimit(10_000_000L)

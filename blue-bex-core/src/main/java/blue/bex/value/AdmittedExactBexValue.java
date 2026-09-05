@@ -26,13 +26,26 @@ final class AdmittedExactBexValue implements BexValue {
     AdmittedExactBexValue(FrozenNode frozenValue,
                           String blueId,
                           BexValue suppliedValue) {
+        this(frozenValue, frozenValue, blueId, suppliedValue);
+    }
+
+    AdmittedExactBexValue(FrozenNode frozenValue,
+                          FrozenNode resolvedValue,
+                          String blueId,
+                          BexValue suppliedValue) {
+        this(frozenValue, resolvedValue, blueId, suppliedValue, null);
+    }
+
+    AdmittedExactBexValue(FrozenNode frozenValue, FrozenNode resolvedValue,
+                          String blueId, BexValue suppliedValue,
+                          blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
         this(
                 BexValues.exact(
                         Objects.requireNonNull(
                                 frozenValue, "frozenValue"),
-                        frozenValue,
+                        Objects.requireNonNull(resolvedValue, "resolvedValue"),
                         Objects.requireNonNull(
-                                blueId, "blueId")),
+                                blueId, "blueId"), typeIdentities),
                 suppliedValue);
     }
 
@@ -47,6 +60,11 @@ final class AdmittedExactBexValue implements BexValue {
         this.suppliedValue = suppliedValue != null
                 ? suppliedValue
                 : BexValues.UNDEFINED;
+    }
+
+    @Override
+    public blue.language.identity.CanonicalTypeIdentityLookup canonicalTypeIdentities() {
+        return establishedValue.canonicalTypeIdentities();
     }
 
     @Override

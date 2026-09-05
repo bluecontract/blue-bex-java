@@ -118,8 +118,9 @@ public final class BexOutputAdmission {
         EstablishedTransientIdentity identity =
                 new EstablishedTransientIdentity(
                         established.frozenValue(),
+                        established.resolvedValue(),
                         blueId,
-                        established.exactCapability());
+                        established.exactCapability(), established.canonicalTypeIdentities());
         BexAdmittedValue admitted =
                 identity.admit(value);
         admittedTransientValues.put(value, admitted);
@@ -128,26 +129,33 @@ public final class BexOutputAdmission {
 
     private static final class EstablishedTransientIdentity {
         private final FrozenNode frozenValue;
+        private final FrozenNode resolvedValue;
         private final String blueId;
         private final BexExactValueCapability exactCapability;
+        private final blue.language.identity.CanonicalTypeIdentityLookup typeIdentities;
 
         private EstablishedTransientIdentity(
                 FrozenNode frozenValue,
+                FrozenNode resolvedValue,
                 String blueId,
-                BexExactValueCapability exactCapability) {
+                BexExactValueCapability exactCapability,
+                blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
             this.frozenValue = Objects.requireNonNull(
                     frozenValue, "frozenValue");
+            this.resolvedValue = Objects.requireNonNull(resolvedValue, "resolvedValue");
             this.blueId = Objects.requireNonNull(
                     blueId, "blueId");
             this.exactCapability = exactCapability;
+            this.typeIdentities = typeIdentities;
         }
 
         private BexAdmittedValue admit(
                 BexValue suppliedValue) {
             BexValue exact = BexValues.admittedExact(
                     frozenValue,
+                    resolvedValue,
                     blueId,
-                    suppliedValue);
+                    suppliedValue, typeIdentities);
             return new BexAdmittedValue(
                     exact,
                     exact,

@@ -221,7 +221,7 @@ class BexEngineConformanceTest {
                 "expr", op("$add", list(op("$var", "a"), op("$var", "b"), op("$var", "c")))
         );
         Node missing = obj(
-                "args", obj("a", obj(), "b", obj()),
+                "args", obj("a", obj(), "b", new Node().description("Optional untyped argument")),
                 "expr", op("$coalesce", list(op("$var", "b"), "missing"))
         );
         Node step = obj(
@@ -275,28 +275,27 @@ class BexEngineConformanceTest {
 
     @Test
     void nodeBexValueMetadataReadsExcludePhysicalBlueId() {
-        Node type = new Node().value("EventType");
+        Node type = new Node().name("EventType");
         Node event = new Node()
                 .name("EventRoot")
                 .description("metadata")
                 .blueId("event-blue-id")
                 .type(type)
-                .value("payload-value")
-                .properties(props("kind", "Created"));
+                .value("payload-value");
         BexExecutionContext context = BexExecutionContext.builder()
                 .document(defaultDocumentView())
                 .event(BexValues.nodeCursorTrustedImmutable(event))
                 .gasLimit(1_000_000)
                 .build();
         Node step = stepExpr(obj(
-                "name", op("$event", "/name"),
-                "description", op("$event", "/description"),
-                "blueId", op("$event", "/blueId"),
-                "value", op("$event", "/value"),
-                "type", op("$event", "/type/value")
+                "observedName", op("$event", "/name"),
+                "observedDescription", op("$event", "/description"),
+                "physicalBlueId", op("$event", "/blueId"),
+                "observedValue", op("$event", "/value"),
+                "observedType", op("$event", "/type/name")
         ));
 
-        assertEquals(m("description", "metadata", "name", "EventRoot", "type", "EventType", "value", "payload-value"),
+        assertEquals(m("observedDescription", "metadata", "observedName", "EventRoot", "observedType", "EventType", "observedValue", "payload-value"),
                 simple(runStep(step, context).value()));
     }
 

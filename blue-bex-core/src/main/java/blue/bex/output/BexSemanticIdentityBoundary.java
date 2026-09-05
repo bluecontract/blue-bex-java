@@ -1,6 +1,7 @@
 package blue.bex.output;
 
 import blue.language.model.Node;
+import blue.language.merge.ResolvedSnapshot;
 import blue.language.snapshot.FrozenNode;
 import blue.language.identity.DirectBlueIdCalculator;
 import blue.language.runtime.LanguageRuntimeAccess;
@@ -42,13 +43,11 @@ public interface BexSemanticIdentityBoundary {
         LanguageRuntimeAccess runtime = Objects.requireNonNull(
                 languageRuntime, "languageRuntime");
         return node -> {
-            Node canonical = runtime.canonicalize(
+            ResolvedSnapshot snapshot = runtime.canonicalizeWithEvidence(
                     Objects.requireNonNull(node, "node").clone());
-            FrozenNode frozen = FrozenNode.fromResolvedNode(canonical);
             return new BexEstablishedIdentity(
-                    DirectBlueIdCalculator.calculateBlueId(
-                            frozen.toNode()),
-                    frozen);
+                    snapshot.blueId(), snapshot.frozenCanonicalRoot(),
+                    snapshot.frozenResolvedRoot(), null, snapshot.canonicalTypeIdentities());
         };
     }
 

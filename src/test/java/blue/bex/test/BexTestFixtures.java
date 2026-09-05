@@ -76,7 +76,7 @@ public final class BexTestFixtures {
     public static Node noOpStatement() {
         return obj("$returnIf", obj(
                 "cond", false,
-                "expr", null));
+                "expr", obj()));
     }
 
     public static Node obj(Object... keysAndValues) {

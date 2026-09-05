@@ -622,7 +622,8 @@ contracts:
                   initialSnapshot:
                     $var: snapshot
               key: type
-              val: MyOS/Call Operation Requested
+              val:
+                name: MyOS/Call Operation Requested
         - $returnIf:
             cond: false
             expr: null
@@ -843,7 +844,8 @@ contracts:
                   entitlement:
                     $var: entitlement
               key: type
-              val: MyOS/Call Operation Requested
+              val:
+                name: MyOS/Call Operation Requested
         - $returnIf:
             cond: false
             expr: null

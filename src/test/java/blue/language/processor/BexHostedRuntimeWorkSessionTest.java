@@ -27,6 +27,7 @@ import blue.bex.test.TestBlue;
 import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
+import blue.language.model.Nodes;
 import blue.language.provider.CyclicAwareNodeProvider;
 import blue.language.provider.CyclicSetProofResult;
 import blue.language.api.NodeProviderOutcome;
@@ -1097,7 +1098,7 @@ class BexHostedRuntimeWorkSessionTest {
                          execution.createContext(
                                  "/",
                                  execution.bundleForScope("/"),
-                                 new Node(),
+                                 Nodes.emptyObject(),
                                  false)) {
                 BexExecutionContext context =
                         BexContractsExecutionContext.builder(

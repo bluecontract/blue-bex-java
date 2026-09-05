@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static blue.bex.test.BexTestFixtures.bi;
 import static blue.bex.test.BexTestFixtures.defaultContext;
+import static blue.bex.test.BexTestFixtures.defaultDocumentView;
 import static blue.bex.test.BexTestFixtures.frozen;
 import static blue.bex.test.BexTestFixtures.l;
 import static blue.bex.test.BexTestFixtures.list;
@@ -32,7 +33,7 @@ class BexUseCaseConformanceTest {
     @Test
     void existsDistinguishesMissingFromPresentFalsyValues() {
         assertEquals(false, simple(run(stepExpr(op("$exists", op("$document", "/missing"))), defaultContext()).value()));
-        assertEquals(true, simple(run(stepExpr(op("$exists", op("$literal", null))), defaultContext()).value()));
+        assertEquals(true, simple(run(stepExpr(op("$exists", op("$binding", "runtimeNull"))), BexExecutionContext.builder().document(defaultDocumentView()).binding("runtimeNull", BexValues.nullValue()).gasLimit(1_000_000).build()).value()));
         assertEquals(true, simple(run(stepExpr(op("$exists", "")), defaultContext()).value()));
         assertEquals(true, simple(run(stepExpr(op("$exists", false)), defaultContext()).value()));
         assertEquals(true, simple(run(stepExpr(op("$exists", list())), defaultContext()).value()));
@@ -285,7 +286,7 @@ class BexUseCaseConformanceTest {
         BexExecutionResult result = run(stepDo(list(
                 op("$appendChange", obj("op", "replace", "path", "/status", "val", "confirmed")),
                 op("$appendEvent", obj(
-                        "type", "General/Event",
+                        "type", obj("name", "General/Event"),
                         "kind", "Order Confirmed",
                         "partner", op("$document", "/hotelName"),
                         "amount", op("$document", "/amount"))),
@@ -295,7 +296,7 @@ class BexUseCaseConformanceTest {
         )), documentContext(obj("status", "pending", "hotelName", "Blue Hotel", "amount", 120)));
 
         assertEquals(m(
-                "events", l(m("amount", bi(120), "kind", "Order Confirmed", "partner", "Blue Hotel", "type", "General/Event")),
+                "events", l(m("amount", bi(120), "kind", "Order Confirmed", "partner", "Blue Hotel", "type", m("name", "General/Event"))),
                 "status", "confirmed"), simple(result.value()));
     }
 
@@ -304,7 +305,7 @@ class BexUseCaseConformanceTest {
         assertEquals(l(m(
                         "amount", bi(500),
                         "reason", "Both partner orders confirmed",
-                        "type", "PayNote/Complete Payment Requested")),
+                        "type", m("name", "PayNote/Complete Payment Requested"))),
                 simple(runPayNote("confirmed", "confirmed").value()));
         assertEquals(l(), simple(runPayNote("confirmed", "pending").value()));
     }
@@ -316,7 +317,7 @@ class BexUseCaseConformanceTest {
                                 op("$eq", list(op("$document", "/hotelOrder/status"), "confirmed")),
                                 op("$eq", list(op("$document", "/restaurantOrder/status"), "confirmed")))),
                         "then", list(op("$appendEvent", obj(
-                                "type", "PayNote/Complete Payment Requested",
+                                "type", obj("name", "PayNote/Complete Payment Requested"),
                                 "amount", op("$document", "/amount/expectedTotal"),
                                 "reason", "Both partner orders confirmed"))))),
                 op("$return", op("$events", true))

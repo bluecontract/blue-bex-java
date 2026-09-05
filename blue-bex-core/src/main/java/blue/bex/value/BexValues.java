@@ -103,6 +103,13 @@ public final class BexValues {
     public static BexValue exact(FrozenNode canonicalNode,
                                  FrozenNode resolvedNode,
                                  String exactBlueId) {
+        return exact(canonicalNode, resolvedNode, exactBlueId, null);
+    }
+
+    /** Retains resolver-issued type identities alongside exact canonical and semantic content. */
+    public static BexValue exact(FrozenNode canonicalNode, FrozenNode resolvedNode,
+                                String exactBlueId,
+                                blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
         if (canonicalNode == null && resolvedNode == null) {
             return UNDEFINED;
         }
@@ -130,7 +137,8 @@ public final class BexValues {
                     new Node().blueId(retainedBlueId));
             semantic = canonical;
         }
-        return new FrozenNodeBexValue(canonical, semantic, retainedBlueId);
+        return new FrozenNodeBexValue(canonical, semantic, retainedBlueId,
+                retainedBlueId != null && retainedBlueId.indexOf('#') >= 0 ? null : typeIdentities);
     }
 
     /**
@@ -148,6 +156,23 @@ public final class BexValues {
                 frozenValue,
                 exactBlueId,
                 semanticValue);
+    }
+
+    /** Retains canonical and resolved content issued by one output boundary. */
+    public static BexValue admittedExact(FrozenNode canonicalValue,
+                                        FrozenNode resolvedValue,
+                                        String exactBlueId,
+                                        BexValue suppliedValue) {
+        return new AdmittedExactBexValue(
+                canonicalValue, resolvedValue, exactBlueId, suppliedValue);
+    }
+
+    /** Retains all identity evidence issued by one output admission. */
+    public static BexValue admittedExact(FrozenNode canonicalValue, FrozenNode resolvedValue,
+                                        String exactBlueId, BexValue suppliedValue,
+                                        blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
+        return new AdmittedExactBexValue(
+                canonicalValue, resolvedValue, exactBlueId, suppliedValue, typeIdentities);
     }
 
     /**

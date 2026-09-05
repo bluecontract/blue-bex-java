@@ -15,7 +15,9 @@ import java.util.Objects;
 public final class BexEstablishedIdentity {
     private final String blueId;
     private final FrozenNode frozenValue;
+    private final FrozenNode resolvedValue;
     private final BexExactValueCapability exactCapability;
+    private final blue.language.identity.CanonicalTypeIdentityLookup typeIdentities;
 
     public BexEstablishedIdentity(String blueId, FrozenNode frozenValue) {
         this(blueId, frozenValue, null);
@@ -25,6 +27,24 @@ public final class BexEstablishedIdentity {
             String blueId,
             FrozenNode frozenValue,
             BexExactValueCapability exactCapability) {
+        this(blueId, frozenValue, frozenValue, exactCapability);
+    }
+
+    /** Retains both lanes established by the same semantic boundary. */
+    public BexEstablishedIdentity(
+            String blueId,
+            FrozenNode frozenValue,
+            FrozenNode resolvedValue,
+            BexExactValueCapability exactCapability) {
+        this(blueId, frozenValue, resolvedValue, exactCapability, null);
+    }
+
+    /** Keeps the originating resolver's type evidence without inventing new authority. */
+    public BexEstablishedIdentity(String blueId, FrozenNode frozenValue, FrozenNode resolvedValue,
+            BexExactValueCapability exactCapability,
+            blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
+        this.typeIdentities = typeIdentities;
+        this.resolvedValue = Objects.requireNonNull(resolvedValue, "resolvedValue");
         this.blueId = BlueIds.requireBlueIdOrCyclicMember(
                 Objects.requireNonNull(blueId, "blueId"),
                 "BEX established output blueId");
@@ -33,12 +53,22 @@ public final class BexEstablishedIdentity {
         this.exactCapability = exactCapability;
     }
 
+    /** Returns the optional same-resolution type evidence. */
+    public blue.language.identity.CanonicalTypeIdentityLookup canonicalTypeIdentities() {
+        return typeIdentities;
+    }
+
     public String blueId() {
         return blueId;
     }
 
     public FrozenNode frozenValue() {
         return frozenValue;
+    }
+
+    /** Returns the boundary-established semantic view; never rehashed by BEX. */
+    public FrozenNode resolvedValue() {
+        return resolvedValue;
     }
 
     /**
