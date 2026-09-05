@@ -54,6 +54,8 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             "[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.([0-9a-f]{40})");
     private static final Pattern LANGUAGE_DEVELOPMENT_VERSION = Pattern.compile(
             "3\\.1\\.0-dev\\.([0-9a-f]{40})");
+    private static final Pattern LOCAL_RC_VERSION = Pattern.compile("1\\.1\\.0-rc\\.[1-9][0-9]*");
+    private static final Pattern LANGUAGE_LOCAL_RC_VERSION = Pattern.compile("3\\.1\\.0-rc\\.[1-9][0-9]*");
     private static final Pattern GIT_TREE = Pattern.compile("[0-9a-f]{40}");
     private static final Pattern SHA_256_IDENTITY = Pattern.compile(
             "sha256:[0-9a-f]{64}");
@@ -147,13 +149,15 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
         }
         String version = getVersion().get();
         Matcher versionMatcher = DEVELOPMENT_VERSION.matcher(version);
-        if (!versionMatcher.matches()) {
+        boolean development = versionMatcher.matches();
+        boolean localRc = LOCAL_RC_VERSION.matcher(version).matches();
+        if (!development && !localRc) {
             throw new GradleException(
                     "Immutable BEX development repository requires a "
-                            + "commit-bound dev version");
+                            + "commit-bound dev version or explicit 1.1.0-rc.N version");
         }
         String sourceCommit = git(checkout, "rev-parse", "HEAD").trim();
-        if (!sourceCommit.equals(versionMatcher.group(1))) {
+        if (development && !sourceCommit.equals(versionMatcher.group(1))) {
             throw new GradleException(
                     "BEX development version does not match source HEAD");
         }
@@ -170,6 +174,9 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
         LanguageBinding language = languageBinding(
                 getLanguageRepository().get().getAsFile().toPath(),
                 getLanguageVersion().get());
+        if (localRc && !LANGUAGE_LOCAL_RC_VERSION.matcher(language.version).matches()) {
+            throw new GradleException("Local RC BEX must bind an exact local RC Language repository");
+        }
         Path parent = target.getParent();
         if (parent == null) {
             throw new GradleException(
@@ -199,11 +206,12 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             manifest.put("languageSourceCommit", language.sourceCommit);
             manifest.put("languageVersion", language.version);
             manifest.put("releaseReadinessClaimed", false);
-            manifest.put("schema", "blue-bex-development-repository/1.0");
+            manifest.put("schema", localRc ? "blue-bex-local-rc-repository/1.0"
+                    : "blue-bex-development-repository/1.0");
             manifest.put("sourceCommit", sourceCommit);
             manifest.put("sourceDirty", false);
             manifest.put("sourceTree", sourceTree);
-            manifest.put("stagePurpose", "DEVELOPMENT");
+            manifest.put("stagePurpose", localRc ? "LOCAL_RC" : "DEVELOPMENT");
             manifest.put("version", version);
             String json = JsonOutput.prettyPrint(JsonOutput.toJson(manifest))
                     + "\n";
@@ -272,11 +280,13 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             String version = string(manifest.get("version"));
             String sourceCommit = string(manifest.get("sourceCommit"));
             String sourceTree = string(manifest.get("sourceTree"));
-            if (!LANGUAGE_MANIFEST_SCHEMA.equals(schema)) {
+            boolean localRc = LANGUAGE_LOCAL_RC_VERSION.matcher(version).matches();
+            String expectedSchema = localRc ? "blue-local-rc-maven-repository/1.0" : LANGUAGE_MANIFEST_SCHEMA;
+            if (!expectedSchema.equals(schema)) {
                 throw new GradleException(
                         "Unsupported Language artifact manifest schema");
             }
-            if (!"DEVELOPMENT".equals(string(manifest.get("stagePurpose")))) {
+            if (!(localRc ? "LOCAL_RC" : "DEVELOPMENT").equals(string(manifest.get("stagePurpose")))) {
                 throw new GradleException(
                         "Language artifact manifest is not a DEVELOPMENT handoff");
             }
@@ -298,8 +308,9 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
                                 + "blueLanguageVersion");
             }
             Matcher versionMatcher = LANGUAGE_DEVELOPMENT_VERSION.matcher(version);
-            if (!versionMatcher.matches()
-                    || !sourceCommit.equals(versionMatcher.group(1))) {
+            if (!GIT_TREE.matcher(sourceCommit).matches()
+                    || (!localRc && (!versionMatcher.matches()
+                    || !sourceCommit.equals(versionMatcher.group(1))))) {
                 throw new GradleException(
                         "Language artifact manifest is not commit-bound");
             }
@@ -441,11 +452,13 @@ public abstract class AssembleImmutableDevelopmentRepositoryTask
             String version) {
         List<ExpectedLanguageArtifact> expected = new ArrayList<>();
         List<String> sortedArtifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        boolean localRc = LANGUAGE_LOCAL_RC_VERSION.matcher(version).matches();
+        if (localRc) sortedArtifacts.add("blue-conformance");
         Collections.sort(sortedArtifacts);
         for (String artifact : sortedArtifacts) {
             String base = "blue/language/" + artifact + "/" + version + "/"
                     + artifact + "-" + version;
-            for (ArtifactKind kind : LANGUAGE_KINDS) {
+            for (ArtifactKind kind : localRc ? KINDS : LANGUAGE_KINDS) {
                 expected.add(new ExpectedLanguageArtifact(
                         LANGUAGE_GROUP + ":" + artifact + ":" + version,
                         kind.name,

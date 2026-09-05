@@ -40,6 +40,21 @@ final class VerifySdkStageReportTaskTest {
     private String languageManifestIdentity;
 
     @Test
+    void localRcRequiresCompleteLanguagePublicationsAndCleanLockedBexSource() throws Exception {
+        VerifySdkStageReportTask task = task(true);
+        task.verify();
+        Path report = task.getConformanceReport().get().getAsFile().toPath();
+        String clean = Files.readString(report);
+        Files.writeString(report, clean.replace("\"worktreeDirty\": false", "\"worktreeDirty\": true"));
+        assertThrows(GradleException.class, task::verify);
+        Files.writeString(report, clean);
+        Path sources = task.getLanguageRepository().get().getAsFile().toPath().resolve(
+                "blue/language/blue-conformance/3.1.0-rc.24/blue-conformance-3.1.0-rc.24-sources.jar");
+        Files.writeString(sources, "tampered source archive");
+        assertThrows(GradleException.class, task::verify);
+    }
+
+    @Test
     void passesOnlyExactBlockerFreeStagedEvidence() throws Exception {
         VerifySdkStageReportTask task = task();
         task.verify();
@@ -296,13 +311,18 @@ final class VerifySdkStageReportTaskTest {
     }
 
     private VerifySdkStageReportTask task() throws Exception {
+        return task(false);
+    }
+
+    private VerifySdkStageReportTask task(boolean localRc) throws Exception {
+        String languageVersion = localRc ? "3.1.0-rc.24" : LANGUAGE_VERSION;
         Project project = ProjectBuilder.builder()
                 .withProjectDir(temporaryDirectory.toFile())
                 .build();
         VerifySdkStageReportTask task = project.getTasks().create(
                 "verifySdkStage",
                 VerifySdkStageReportTask.class);
-        Path languageRepository = languageRepository();
+        Path languageRepository = languageRepository(localRc);
         Path manifest = languageRepository.resolve("artifact-manifest.json");
         languageManifestIdentity = "sha256:" + sha256(manifest);
         Path baseline = temporaryDirectory.resolve("baseline.json");
@@ -323,7 +343,7 @@ final class VerifySdkStageReportTaskTest {
                   }
                 }
                 """.formatted(
-                LANGUAGE_VERSION,
+                languageVersion,
                 LANGUAGE_COMMIT,
                 languageManifestIdentity));
         Path report = temporaryDirectory.resolve("report.json");
@@ -365,7 +385,7 @@ final class VerifySdkStageReportTaskTest {
                   }
                 }
                 """.formatted(
-                LANGUAGE_VERSION,
+                languageVersion,
                 languageRepository.toFile().getCanonicalPath()));
         task.getCandidateBaseline().fileValue(baseline.toFile());
         task.getConformanceReport().fileValue(report.toFile());
@@ -377,22 +397,39 @@ final class VerifySdkStageReportTaskTest {
         task.getProjectVersion().set("1.1.0-rc.4");
         task.getOutputFile().fileValue(
                 temporaryDirectory.resolve("receipt.json").toFile());
+        if (localRc) {
+            String commit = "2222222222222222222222222222222222222222";
+            Files.writeString(baseline, Files.readString(baseline).replace(
+                    "\"candidateVersion\": \"1.1.0-rc.4\"",
+                    "\"candidateVersion\": \"1.1.0-rc.5\", \"sourceCommit\": \"" + commit + "\""));
+            Files.writeString(report, Files.readString(report)
+                    .replace("\"projectVersion\": \"1.1.0-rc.4\"", "\"projectVersion\": \"1.1.0-rc.5\"")
+                    .replace("\"currentModeFailures\": []", "\"sourceState\": {\"commit\": \"" + commit
+                            + "\", \"releaseInputsCommitted\": true, \"worktreeDirty\": false}, \"currentModeFailures\": []"));
+            task.getProjectVersion().set("1.1.0-rc.5");
+        }
         return task;
     }
 
-    private Path languageRepository() throws Exception {
+    private Path languageRepository(boolean localRc) throws Exception {
+        String version = localRc ? "3.1.0-rc.24" : LANGUAGE_VERSION;
         Path repository = temporaryDirectory.resolve("language-repository");
         List<Map<String, Object>> records = new ArrayList<>();
         List<String> artifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        if (localRc) artifacts.add("blue-conformance");
         artifacts.sort(String::compareTo);
         for (String artifact : artifacts) {
             String base = "blue/language/" + artifact + "/"
-                    + LANGUAGE_VERSION + "/" + artifact + "-"
-                    + LANGUAGE_VERSION;
+                    + version + "/" + artifact + "-"
+                    + version;
             addLanguageArtifact(
-                    repository, records, artifact, base, "pom", ".pom");
+                    repository, records, artifact, base, "pom", ".pom", version);
             addLanguageArtifact(
-                    repository, records, artifact, base, "runtime", ".jar");
+                    repository, records, artifact, base, "runtime", ".jar", version);
+            if (localRc) {
+                addLanguageArtifact(repository, records, artifact, base, "sources", "-sources.jar", version);
+                addLanguageArtifact(repository, records, artifact, base, "javadoc", "-javadoc.jar", version);
+            }
         }
         records.sort(Comparator
                 .comparing((Map<String, Object> record) ->
@@ -411,13 +448,13 @@ final class VerifySdkStageReportTaskTest {
                 "sha256:2222222222222222222222222222222222222222222222222222222222222222");
         document.put("groupId", "blue.language");
         document.put("releaseReadinessClaimed", false);
-        document.put("schema", "blue-development-maven-repository/1.0");
+        document.put("schema", localRc ? "blue-local-rc-maven-repository/1.0" : "blue-development-maven-repository/1.0");
         document.put("sourceCommit", LANGUAGE_COMMIT);
         document.put("sourceDirty", false);
         document.put("sourceTree",
                 "1111111111111111111111111111111111111111");
-        document.put("stagePurpose", "DEVELOPMENT");
-        document.put("version", LANGUAGE_VERSION);
+        document.put("stagePurpose", localRc ? "LOCAL_RC" : "DEVELOPMENT");
+        document.put("version", version);
         Path manifest = repository.resolve("artifact-manifest.json");
         write(manifest,
                 JsonOutput.prettyPrint(JsonOutput.toJson(document)) + "\n");
@@ -431,7 +468,7 @@ final class VerifySdkStageReportTaskTest {
             String artifact,
             String base,
             String kind,
-            String suffix) throws Exception {
+            String suffix, String version) throws Exception {
         String relative = base + suffix;
         Path payload = repository.resolve(relative);
         write(payload, artifact + " " + kind + "\n");
@@ -440,7 +477,7 @@ final class VerifySdkStageReportTaskTest {
         record.put("bytes", Files.size(payload));
         record.put("checksumPath", relative + ".sha256");
         record.put("coordinate",
-                "blue.language:" + artifact + ":" + LANGUAGE_VERSION);
+                "blue.language:" + artifact + ":" + version);
         record.put("kind", kind);
         record.put("path", relative);
         record.put("sha256", "sha256:" + sha256(payload));

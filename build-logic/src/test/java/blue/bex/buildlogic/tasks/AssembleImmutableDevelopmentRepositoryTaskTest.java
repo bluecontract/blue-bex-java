@@ -46,6 +46,27 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
     Path temporary;
 
     @Test
+    void sealsLocalRcWithExactLanguagePublicationsAndRejectsTampering() throws Exception {
+        Fixture fixture = fixture(true);
+        fixture.task.assemble();
+        Map<?, ?> manifest = (Map<?, ?>) new JsonSlurper().parse(
+                fixture.immutable.resolve("artifact-manifest.json").toFile());
+        assertEquals("blue-bex-local-rc-repository/1.0", manifest.get("schema"));
+        assertEquals("LOCAL_RC", manifest.get("stagePurpose"));
+        assertEquals("1.1.0-rc.5", manifest.get("version"));
+        assertEquals(fixture.bexCommit, manifest.get("sourceCommit"));
+        assertEquals("3.1.0-rc.24", manifest.get("languageVersion"));
+        assertEquals(false, manifest.get("releaseReadinessClaimed"));
+        try (Stream<Path> paths = Files.walk(fixture.languageRepository)) {
+            assertEquals(58L, paths.filter(Files::isRegularFile).count());
+        }
+        Path languageSources = fixture.languageRepository.resolve(
+                "blue/language/blue-conformance/3.1.0-rc.24/blue-conformance-3.1.0-rc.24-sources.jar");
+        write(languageSources, "tampered source archive");
+        assertThrows(GradleException.class, fixture.task::assemble);
+    }
+
+    @Test
     void sealsCommitBoundRepositoryAndNeverOverwritesIt() throws Exception {
         Fixture fixture = fixture();
 
@@ -218,6 +239,10 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
     }
 
     private Fixture fixture() throws Exception {
+        return fixture(false);
+    }
+
+    private Fixture fixture(boolean localRc) throws Exception {
         Path checkout = temporary.resolve("checkout");
         Files.createDirectories(checkout);
         write(checkout.resolve("specification.md"), "BEX specification\n");
@@ -234,7 +259,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
         git(checkout, "commit", "-m", "fixture");
         String bexCommit = git(checkout, "rev-parse", "HEAD").trim();
         String bexTree = git(checkout, "rev-parse", "HEAD^{tree}").trim();
-        String bexVersion = "1.1.0-dev." + bexCommit;
+        String bexVersion = localRc ? "1.1.0-rc.5" : "1.1.0-dev." + bexCommit;
 
         Path mutable = temporary.resolve("mutable");
         for (String artifact : Arrays.asList(
@@ -249,7 +274,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
             write(mutable.resolve(base + ".pom"), artifact + " pom\n");
         }
 
-        Path languageRepository = languageRepository();
+        Path languageRepository = languageRepository(localRc);
         Path languageManifest = languageRepository.resolve(
                 "artifact-manifest.json");
         Project project = ProjectBuilder.builder()
@@ -261,7 +286,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
                         AssembleImmutableDevelopmentRepositoryTask.class);
         Path immutable = temporary.resolve("immutable");
         task.getVersion().set(bexVersion);
-        task.getLanguageVersion().set(LANGUAGE_VERSION);
+        task.getLanguageVersion().set(localRc ? "3.1.0-rc.24" : LANGUAGE_VERSION);
         task.getMutableRepository().set(mutable.toFile());
         task.getImmutableRepositoryPath().set(immutable.toString());
         task.getLanguageRepository().set(languageRepository.toFile());
@@ -281,18 +306,24 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
                 bexTree);
     }
 
-    private Path languageRepository() throws Exception {
+    private Path languageRepository(boolean localRc) throws Exception {
+        String version = localRc ? "3.1.0-rc.24" : LANGUAGE_VERSION;
         Path repository = temporary.resolve("language");
         List<Map<String, Object>> records = new ArrayList<>();
         List<String> artifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        if (localRc) artifacts.add("blue-conformance");
         artifacts.sort(String::compareTo);
         for (String artifact : artifacts) {
-            String base = "blue/language/" + artifact + "/" + LANGUAGE_VERSION
-                    + "/" + artifact + "-" + LANGUAGE_VERSION;
+            String base = "blue/language/" + artifact + "/" + version
+                    + "/" + artifact + "-" + version;
             addLanguageArtifact(
-                    repository, records, artifact, base, "pom", ".pom");
+                    repository, records, artifact, base, "pom", ".pom", version);
             addLanguageArtifact(
-                    repository, records, artifact, base, "runtime", ".jar");
+                    repository, records, artifact, base, "runtime", ".jar", version);
+            if (localRc) {
+                addLanguageArtifact(repository, records, artifact, base, "sources", "-sources.jar", version);
+                addLanguageArtifact(repository, records, artifact, base, "javadoc", "-javadoc.jar", version);
+            }
         }
         records.sort(Comparator
                 .comparing((Map<String, Object> record) ->
@@ -311,12 +342,12 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
                 "sha256:" + repeat('f', 64));
         manifest.put("groupId", "blue.language");
         manifest.put("releaseReadinessClaimed", false);
-        manifest.put("schema", "blue-development-maven-repository/1.0");
+        manifest.put("schema", localRc ? "blue-local-rc-maven-repository/1.0" : "blue-development-maven-repository/1.0");
         manifest.put("sourceCommit", LANGUAGE_COMMIT);
         manifest.put("sourceDirty", false);
         manifest.put("sourceTree", LANGUAGE_TREE);
-        manifest.put("stagePurpose", "DEVELOPMENT");
-        manifest.put("version", LANGUAGE_VERSION);
+        manifest.put("stagePurpose", localRc ? "LOCAL_RC" : "DEVELOPMENT");
+        manifest.put("version", version);
         Path manifestPath = repository.resolve("artifact-manifest.json");
         writeJson(manifestPath, manifest);
         writeChecksum(manifestPath);
@@ -329,7 +360,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
             String artifact,
             String base,
             String kind,
-            String suffix) throws Exception {
+            String suffix, String version) throws Exception {
         String relative = base + suffix;
         Path payload = repository.resolve(relative);
         write(payload, artifact + " " + kind + "\n");
@@ -338,7 +369,7 @@ final class AssembleImmutableDevelopmentRepositoryTaskTest {
         record.put("bytes", Files.size(payload));
         record.put("checksumPath", relative + ".sha256");
         record.put("coordinate",
-                "blue.language:" + artifact + ":" + LANGUAGE_VERSION);
+                "blue.language:" + artifact + ":" + version);
         record.put("kind", kind);
         record.put("path", relative);
         record.put("sha256", "sha256:" + sha256(payload));

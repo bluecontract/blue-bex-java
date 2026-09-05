@@ -131,12 +131,8 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         require(blockers,
                 languageSourceCommit.matches("[0-9a-f]{40}"),
                 "language-source-commit-not-exact");
-        String baselineLanguageVersionSource =
-                languageCommitBoundSource(languageVersion);
         require(blockers,
-                !baselineLanguageVersionSource.isEmpty()
-                        && languageSourceCommit.equals(
-                                baselineLanguageVersionSource),
+                matchesLanguageSource(languageVersion, languageSourceCommit),
                 "language-candidate-version-source-commit-mismatch");
         require(blockers,
                 SHA_256_IDENTITY.matcher(
@@ -152,12 +148,8 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         require(blockers,
                 languageSourceCommit.equals(languageManifest.sourceCommit),
                 "language-source-commit-manifest-mismatch");
-        String manifestLanguageVersionSource =
-                languageCommitBoundSource(languageManifest.version);
         require(blockers,
-                !manifestLanguageVersionSource.isEmpty()
-                        && languageManifest.sourceCommit.equals(
-                                manifestLanguageVersionSource),
+                matchesLanguageSource(languageManifest.version, languageManifest.sourceCommit),
                 "language-artifact-manifest-not-commit-bound");
         require(blockers,
                 commitBoundDevelopment
@@ -180,6 +172,16 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                                 && Boolean.FALSE.equals(
                                     sourceState.get("worktreeDirty"))),
                 "bex-development-version-is-not-clean-source-bound");
+        if (isLocalRcLanguage(languageVersion)) {
+            String lockedSource = string(bex.get("sourceCommit"));
+            require(blockers,
+                    projectVersion.matches("1\\.1\\.0-rc\\.[1-9][0-9]*")
+                            && lockedSource.matches("[0-9a-f]{40}")
+                            && lockedSource.equals(sourceState.get("commit"))
+                            && Boolean.TRUE.equals(sourceState.get("releaseInputsCommitted"))
+                            && Boolean.FALSE.equals(sourceState.get("worktreeDirty")),
+                    "local-rc-bex-source-lock-mismatch-or-dirty");
+        }
         require(blockers,
                 "staged-repository".equals(dependency.get("mode")),
                 "dependency-mode-is-not-staged-repository");
@@ -320,6 +322,15 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
         return "";
     }
 
+    private static boolean isLocalRcLanguage(String version) {
+        return version != null && version.matches("3\\.1\\.0-rc\\.[1-9][0-9]*");
+    }
+
+    private static boolean matchesLanguageSource(String version, String commit) {
+        return commit.matches("[0-9a-f]{40}") && (isLocalRcLanguage(version)
+                || commit.equals(languageCommitBoundSource(version)));
+    }
+
     private static String languageCommitBoundSource(String version) {
         java.util.regex.Matcher matcher =
                 LANGUAGE_DEVELOPMENT_VERSION.matcher(version);
@@ -383,10 +394,11 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                                             LinkedHashSet::new))),
                     "language-artifact-manifest-fields-noncanonical");
             require(blockers,
-                    LANGUAGE_MANIFEST_SCHEMA.equals(document.get("schema")),
+                    (isLocalRcLanguage(version) ? "blue-local-rc-maven-repository/1.0"
+                            : LANGUAGE_MANIFEST_SCHEMA).equals(document.get("schema")),
                     "language-artifact-manifest-schema-mismatch");
             require(blockers,
-                    "DEVELOPMENT".equals(document.get("stagePurpose")),
+                    (isLocalRcLanguage(version) ? "LOCAL_RC" : "DEVELOPMENT").equals(document.get("stagePurpose")),
                     "language-artifact-manifest-not-development");
             require(blockers,
                     Boolean.FALSE.equals(
@@ -415,7 +427,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
                         "language-artifact-manifest-" + field
                                 + "-not-exact");
             }
-            if (LANGUAGE_DEVELOPMENT_VERSION.matcher(version).matches()) {
+            if (matchesLanguageSource(version, sourceCommit)) {
                 inspectLanguageArtifacts(
                         repository,
                         version,
@@ -546,12 +558,19 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
     private static List<ExpectedLanguageArtifact> expectedLanguageArtifacts(
             String version) {
         List<String> artifacts = new ArrayList<>(LANGUAGE_ARTIFACTS);
+        boolean localRc = isLocalRcLanguage(version);
+        if (localRc) artifacts.add("blue-conformance");
+        List<LanguageArtifactKind> kinds = localRc ? Arrays.asList(
+                new LanguageArtifactKind("javadoc", "-javadoc.jar"),
+                new LanguageArtifactKind("pom", ".pom"),
+                new LanguageArtifactKind("runtime", ".jar"),
+                new LanguageArtifactKind("sources", "-sources.jar")) : LANGUAGE_KINDS;
         Collections.sort(artifacts);
         List<ExpectedLanguageArtifact> expected = new ArrayList<>();
         for (String artifact : artifacts) {
             String base = "blue/language/" + artifact + "/" + version + "/"
                     + artifact + "-" + version;
-            for (LanguageArtifactKind kind : LANGUAGE_KINDS) {
+            for (LanguageArtifactKind kind : kinds) {
                 expected.add(new ExpectedLanguageArtifact(
                         LANGUAGE_GROUP + ":" + artifact + ":" + version,
                         kind.name,
@@ -595,7 +614,7 @@ public abstract class VerifySdkStageReportTask extends DefaultTask {
             }
         }
         require(blockers,
-                actualFiles.size() == 26,
+                actualFiles.size() == expectedArtifacts.size() * 2 + 2,
                 "language-development-repository-file-count-mismatch");
         require(blockers,
                 expectedFiles.equals(actualFiles),

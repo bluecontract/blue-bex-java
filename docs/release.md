@@ -51,6 +51,30 @@ package identities, and every runtime/POM/source/Javadoc artifact hash.
 This lane is development evidence only. Public release gates continue to
 consume authenticated Maven Central artifacts.
 
+## Local RC candidate stage
+
+The same immutable export supports the existing `1.1.0-rc.N` line when its
+Language input uses `3.1.0-rc.N`. For this closeout the selected coordinates
+are BEX `1.1.0-rc.5` and Language `3.1.0-rc.24`. Use
+`exportDevelopmentRepository` with `-PbexLocalStageVersion=1.1.0-rc.5` and
+the exact Language version and sealed repository properties above.
+
+RC export requires clean exact source commits, Java 17, and the complete
+seven-module Language publication set, including conformance, sources and
+Javadoc. Language uses `blue-local-rc-maven-repository/1.0`; BEX emits
+`blue-bex-local-rc-repository/1.0`. Both record `stagePurpose: LOCAL_RC` and
+`releaseReadinessClaimed: false`. Existing destination bytes remain immutable.
+
+Run `bexSdkStageVerify` against those exact inputs with
+`-PbexSdkStageBaseline=/absolute/path/to/reviewed-sdk-stage-baseline.json`.
+The baseline uses the existing `blue-bex-sdk-stage-baseline/1.0` schema and
+binds the Language version and source commit plus the final BEX source commit
+and specification digest. An external source lock avoids embedding a commit's
+own hash in its tracked contents. The RC gate verifies clean BEX source and
+the complete Language repository file set and checksums. This local gate
+does not authorize publication; final integrated acceptance must be retained
+separately against the exported bytes.
+
 ## Strict public gate
 
 ```bash

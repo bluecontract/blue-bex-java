@@ -115,9 +115,10 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
                                             "blue-bex-conformance/build/reports/"
                                                     + "bex-conformance/report.json"));
                             task.getCandidateBaseline().set(
-                                    project.getLayout().getProjectDirectory().file(
-                                            "gradle/verification/"
-                                                    + "sdk-stage-language-baseline.json"));
+                                    project.getLayout().file(project.getProviders()
+                                            .gradleProperty("bexSdkStageBaseline").map(project::file))
+                                            .orElse(project.getLayout().getProjectDirectory().file(
+                                                    "gradle/verification/sdk-stage-language-baseline.json")));
                             task.getCurrentSpecification().set(
                                     project.getLayout().getProjectDirectory().file(
                                             "specifications/"
