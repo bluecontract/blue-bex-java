@@ -307,7 +307,10 @@ abstract class BexCompilerSupport {
         rejectBexInStaticField(node.getKeyType(), pointer + "/keyType", "keyType");
         rejectBexInStaticField(node.getValueType(), pointer + "/valueType", "valueType");
         rejectBexInStaticField(node.getBlue(), pointer + "/blue", "blue");
-        rejectBexInStaticField(node.getContracts(), pointer + "/contracts", "contracts");
+        // Contracts can carry a future program under $literal. Only the
+        // specification's static type/blue/schema positions inside them are
+        // forbidden expression positions (BEX 2.0 sections 2.5 and 2.6).
+        rejectBexInStaticBlueDefinitionFields(node.getContracts(), pointer + "/contracts");
         if (node.getSchema() != null) {
             rejectBexInSchema(node.getSchema(), pointer + "/schema");
         }

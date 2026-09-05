@@ -764,6 +764,24 @@ class BexBlueTypeSupportTest {
     }
 
     @Test
+    void literalChildContractsPreserveFutureWorkflowExpressionsAsData() {
+        Node child = obj("quantity", 3).contracts(obj("run", obj(
+                "request", obj("amount", pattern("type: Integer", "schema:", "  required: true")),
+                "do", list(op("$unknownFutureOperator", op("$document", "/quantity"))))));
+        BexExecutionResult result = run(stepExpr(op("$literal", child)));
+        assertEquals(FrozenNode.fromResolvedNode(child).blueId(),
+                BexFrozenWriter.toFrozen(result.value()).blueId());
+        assertTrue(result.events().events().isEmpty());
+    }
+
+    @Test
+    void literalChildContractsStillRejectComputedStaticTypeFields() {
+        Node child = new Node().contracts(obj("run", obj("request", obj(
+                "amount", new Node().type(op("$const", "SomeType"))))));
+        assertThrows(BexException.class, () -> run(stepExpr(op("$literal", child))));
+    }
+
+    @Test
     void literalPayloadStillRejectsBexInsideTypeDefinitionFields() {
         assertThrows(BexException.class, () -> run(yaml(
                 "type: Blue/BEX Program",
