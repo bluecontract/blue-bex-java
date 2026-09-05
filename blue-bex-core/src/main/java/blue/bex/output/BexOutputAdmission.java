@@ -85,7 +85,10 @@ public final class BexOutputAdmission {
             return prior;
         }
 
-        Node node = BexBlueNodeWriter.toNode(value);
+        // Host admission needs the available exact children before it can
+        // establish the rebuilt parent's identity. Collapsing them here would
+        // discard literal-template content that has no provider entry yet.
+        Node node = BexBlueNodeWriter.toSourceNode(value);
 
         final BexEstablishedIdentity established;
         try {

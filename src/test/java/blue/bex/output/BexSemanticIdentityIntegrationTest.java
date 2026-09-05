@@ -87,6 +87,20 @@ class BexSemanticIdentityIntegrationTest {
     }
 
     @Test
+    void transientOutputRetainsAvailableCanonicalChildContentForHostAdmission() {
+        Node workflow = obj("run", obj("steps", list(op("$unknownFutureOperator", true))));
+        FrozenNode canonical = FrozenNode.fromNode(workflow);
+        FrozenNode differentSemantic = FrozenNode.fromResolvedNode(obj("resolvedOnly", true));
+        BexValue exactContracts = BexValues.exact(canonical, differentSemantic, canonical.blueId());
+        BexValue constructed = BexValues.fromSimple(map("quantity", 7, "contracts", exactContracts));
+        RecordingBoundary boundary = new RecordingBoundary();
+        admission(boundary).admit(constructed, BexOutputKind.ROOT_RESULT);
+        Node supplied = boundary.inputs.get(0).getContracts();
+        assertFalse(supplied.isReferenceOnly());
+        assertEquals(canonical.blueId(), DirectBlueIdCalculator.calculateBlueId(supplied));
+    }
+
+    @Test
     void ordinaryNonCyclicExactRootBypassesHostSemanticBoundary() {
         Node content = obj(
                 "kind", "ordinary-exact",
@@ -339,7 +353,7 @@ class BexSemanticIdentityIntegrationTest {
         BexAdmittedValue initial = admission.admit(
                 first, BexOutputKind.NODE_IDENTITY);
         assertSame(initial, admission.admit(
-                first, BexOutputKind.PATCH_VALUE));
+                first, BexOutputKind.ROOT_RESULT));
         BexAdmittedValue recreated = admission.admit(
                 sameStructureDifferentOrder,
                 BexOutputKind.EVENT);
