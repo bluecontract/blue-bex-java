@@ -322,6 +322,7 @@ class public final blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost 
 class public final blue.bex.contracts.ProcessorExecutionContextBexSemanticIdentityBoundary implements blue.bex.output.BexSemanticIdentityBoundary
   constructor public <init>(blue.language.processor.ProcessorExecutionContext)
   method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
+  method public static standalone(blue.language.runtime.LanguageRuntimeAccess):blue.bex.output.BexSemanticIdentityBoundary
   method public establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
 class public final blue.bex.gas.BexGasCharge
   constructor public <init>(long,blue.bex.gas.BexGasCounter,long,long,java.lang.String,java.lang.String,java.lang.String)
