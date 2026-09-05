@@ -83,6 +83,7 @@ class public abstract interface blue.bex.output.BexFailurePolicy :: method publi
 class public abstract interface blue.bex.output.BexFailurePolicy :: method public preserveOrWrap(java.lang.String,java.lang.RuntimeException):java.lang.RuntimeException
 class public abstract interface blue.bex.output.BexFailurePolicy :: method public translate(java.lang.RuntimeException):java.lang.RuntimeException
 class public abstract interface blue.bex.output.BexSemanticIdentityBoundary :: method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
+class public abstract interface blue.bex.output.BexSemanticIdentityBoundary :: method public static standalone(blue.language.runtime.LanguageRuntimeAccess):blue.bex.output.BexSemanticIdentityBoundary
 class public abstract interface blue.bex.runtime.BexRuntimeContext
 class public abstract interface blue.bex.runtime.BexRuntimeContext :: method public abstract binding(java.lang.String):blue.bex.value.BexValue
 class public abstract interface blue.bex.runtime.BexRuntimeContext :: method public abstract currentContract():blue.bex.value.BexValue

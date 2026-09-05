@@ -13,26 +13,26 @@
   "manifests": {
     "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
     "workingCheckpointSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
-    "afterSha256": "a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43",
+    "afterSha256": "1b8d5c894c0de95df0b29e979cd4ebde5c564e900090584d0da38501ef55717f",
     "workingCheckpointPath": "gradle/verification/api/working-checkpoint-public-api.txt",
     "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
     "generatedPath": "blue-bex-conformance/build/reports/bex-release/public-api.txt",
     "workingCheckpointClassificationPath": "gradle/verification/api/working-checkpoint-public-api-classification.json",
     "workingCheckpointClassificationSha256": "b27f400c6bac238e916f75f5ef66337371bea44783fb01f8931eab2835005001",
     "afterClassificationPath": "docs/public-api-classification.json",
-    "afterClassificationSha256": "e8ae8fb201704b860b6691310cc86726d94bd1242c1d301e0b6beec22b38ec16",
+    "afterClassificationSha256": "0168e47fe3da2662d8021c7effd828c162c38713bf959e3a833bfe19280b5c9d",
     "publicTypeCount": 103,
-    "publicDescriptorCount": 1036
+    "publicDescriptorCount": 1037
   },
   "modernizationDelta": {
     "baselineCommit": "169e589",
     "baselineManifestSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
     "removedDescriptorLines": 254,
-    "addedDescriptorLines": 492,
+    "addedDescriptorLines": 493,
     "removedDescriptorsPath": "gradle/verification/api/modernization-removed-descriptors.txt",
     "removedDescriptorsSha256": "7d3ba5a5e69ddf8e2fee0d92c924cae3c4dd36d42e465dc9931c550a99db2d99",
     "addedDescriptorsPath": "gradle/verification/api/modernization-added-descriptors.txt",
-    "addedDescriptorsSha256": "0219d20091f06783915b2a4898297e466e60c8b76944bf9c66bc514fc642a431",
+    "addedDescriptorsSha256": "c73d2fc227bc51ae6719d1ecb1fee7b279497a14b3ff4f7ede23267932dbc928",
     "comparison": "complete bytewise set difference after qualifying every member descriptor with its owning class; :blue-bex-conformance:binaryApiCheck recomputes and compares every line",
     "completeMachineAuditableDelta": true,
     "packageMoves": [
@@ -559,6 +559,15 @@
       "replacement": "replaces the same class declaration without BexIntrinsicCatalog",
       "binaryCompatibility": "compatible interface addition",
       "sourceCompatibility": "compatible interface addition"
+    },
+    {
+      "id": "runtime-bound-standalone-identity-add",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.output.BexSemanticIdentityBoundary :: method public static standalone(blue.language.runtime.LanguageRuntimeAccess):blue.bex.output.BexSemanticIdentityBoundary",
+      "classification": "host SPI",
+      "rationale": "Existing candidate factory binds output admission to the selected Language runtime, retaining resolver-issued identity evidence. The static factory belongs to the interface.",
+      "binaryCompatibility": "additive",
+      "sourceCompatibility": "additive"
     }
   ]
 }
