@@ -118,6 +118,7 @@ class public abstract interface blue.bex.value.BexPatchValueView
 class public abstract interface blue.bex.value.BexPatchValueView :: method public abstract absolutePath():java.lang.String
 class public abstract interface blue.bex.value.BexPatchValueView :: method public abstract op():java.lang.String
 class public abstract interface blue.bex.value.BexPatchValueView :: method public abstract val():blue.bex.value.BexValue
+class public abstract interface blue.bex.value.BexValue :: method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup
 class public abstract interface blue.bex.value.BexValue :: method public semanticKind():blue.bex.value.BexValueKind
 class public abstract interface blue.bex.value.BexValueMetrics
 class public abstract interface blue.bex.value.BexValueMetrics :: method public abstract incrementFrozenOutputConversions():void
@@ -289,7 +290,11 @@ class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeEx
 class public final blue.bex.gas.BexHostGasExhaustion extends java.lang.RuntimeException :: method public weight():long
 class public final blue.bex.output.BexAdmittedValue :: method public exactCapability():blue.bex.output.BexExactValueCapability
 class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
+class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
+class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability,blue.language.identity.CanonicalTypeIdentityLookup)
+class public final blue.bex.output.BexEstablishedIdentity :: method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup
 class public final blue.bex.output.BexEstablishedIdentity :: method public exactCapability():blue.bex.output.BexExactValueCapability
+class public final blue.bex.output.BexEstablishedIdentity :: method public resolvedValue():blue.language.snapshot.FrozenNode
 class public final blue.bex.output.BexOutputAdmission :: constructor public <init>(blue.bex.gas.BexGasMeter,blue.bex.output.BexSemanticIdentityBoundary,blue.bex.output.BexFailurePolicy)
 class public final blue.bex.pointer.BexPointerCache :: method public synchronized get(java.lang.String,blue.bex.result.BexMetricsRecorder):blue.bex.pointer.BexPointer
 class public final blue.bex.result.BexChangeset implements blue.bex.value.BexChangesetValueView
@@ -461,6 +466,7 @@ class public final blue.bex.type.BexTypeMatchWorkRecorder :: method public scala
 class public final blue.bex.type.BexTypeMatcher
 class public final blue.bex.type.BexTypeMatcher :: constructor public <init>(blue.language.runtime.BlueLanguage)
 class public final blue.bex.type.BexTypeMatcher :: method public matches(blue.bex.value.BexValue,blue.language.snapshot.FrozenNode,blue.bex.gas.BexGasMeter,blue.bex.BexSourcePath):boolean
+class public final blue.bex.value.BexBlueNodeWriter :: method public static toSourceNode(blue.bex.value.BexValue):blue.language.model.Node
 class public final blue.bex.value.BexFrozenWriter :: method public static toFrozen(blue.bex.value.BexValue,blue.bex.value.BexValueMetrics):blue.language.snapshot.FrozenNode
 class public final blue.bex.value.BexValueKind extends java.lang.Enum
 class public final blue.bex.value.BexValueKind extends java.lang.Enum :: field public static final BOOLEAN:blue.bex.value.BexValueKind
@@ -474,6 +480,9 @@ class public final blue.bex.value.BexValueKind extends java.lang.Enum :: field p
 class public final blue.bex.value.BexValueKind extends java.lang.Enum :: method public operatorName():java.lang.String
 class public final blue.bex.value.BexValueKind extends java.lang.Enum :: method public static valueOf(java.lang.String):blue.bex.value.BexValueKind
 class public final blue.bex.value.BexValueKind extends java.lang.Enum :: method public static values():blue.bex.value.BexValueKind[]
+class public final blue.bex.value.BexValues :: method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue):blue.bex.value.BexValue
+class public final blue.bex.value.BexValues :: method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue
+class public final blue.bex.value.BexValues :: method public static exact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue
 class public final blue.bex.value.BexValues :: method public static semanticKind(blue.bex.value.BexValue):blue.bex.value.BexValueKind
 class public final blue.bex.value.ChangesetBexValue extends blue.bex.value.AbstractBexValue :: constructor public <init>(blue.bex.value.BexChangesetValueView)
 class public final blue.bex.value.EventsBexValue extends blue.bex.value.AbstractBexValue :: constructor public <init>(blue.bex.value.BexEventsValueView)

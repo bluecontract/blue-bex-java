@@ -101,6 +101,40 @@ class BexSemanticIdentityIntegrationTest {
     }
 
     @Test
+    void returnedEventsRetainTheirInlineTypeSource() {
+        BexEngine engine = BexEngine.builder().build();
+        Node program = stepDo(list(
+                op("$appendEvent", obj("type", obj("name", "Local Event"), "amount", 7)),
+                op("$return", op("$events", true))));
+        BexExecutionResult result = engine.compileAndExecute(
+                BexProgramSource.inline(frozen(program)),
+                BexExecutionContext.builder().document(defaultDocumentView()).build());
+        assertEquals(1, result.events().events().size());
+        assertEquals(result.events().events().get(0).exactBlueId(),
+                result.value().at(Collections.singletonList("0")).exactBlueId());
+        assertEquals("Local Event", result.value().at(Collections.singletonList("0")).get("type").get("name").asText());
+    }
+
+    @Test
+    void canonicalPayloadRejectsConflictingTypeSourceEvidence() {
+        try (blue.language.runtime.BlueLanguage language =
+                blue.language.runtime.BlueLanguage.builder().build()) {
+            blue.language.merge.ResolvedSnapshot first = language.snapshots().resolve(
+                    new Node().type(new Node().name("First Type"))
+                            .properties("amount", new Node().value(7)));
+            blue.language.merge.ResolvedSnapshot second = language.snapshots().resolve(
+                    new Node().type(new Node().name("Second Type"))
+                            .properties("amount", new Node().value(7)));
+            BexValue conflicting = BexValues.exact(first.frozenCanonicalRoot(),
+                    second.frozenResolvedRoot(), first.blueId(), second.canonicalTypeIdentities());
+            BexException failure = assertThrows(BexException.class, () -> admission(
+                    BexSemanticIdentityBoundary.STANDALONE).admit(
+                    BexValues.fromSimple(map("child", conflicting)), BexOutputKind.ROOT_RESULT));
+            assertTrue(failure.getMessage().contains("type Source conflicts"));
+        }
+    }
+
+    @Test
     void ordinaryNonCyclicExactRootBypassesHostSemanticBoundary() {
         Node content = obj(
                 "kind", "ordinary-exact",

@@ -13,26 +13,26 @@
   "manifests": {
     "beforeSha256": "830caa187023079ba53fa76d2932e6e12cb8c93be3f90ac887ad374d6642b315",
     "workingCheckpointSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
-    "afterSha256": "1b8d5c894c0de95df0b29e979cd4ebde5c564e900090584d0da38501ef55717f",
+    "afterSha256": "29c96b2b5eb6c17977b61a7ce9f453e59c76573107109160cf2c276ce3728415",
     "workingCheckpointPath": "gradle/verification/api/working-checkpoint-public-api.txt",
     "requiredPath": "src/test/resources/hosted-release/required-public-api.txt",
     "generatedPath": "blue-bex-conformance/build/reports/bex-release/public-api.txt",
     "workingCheckpointClassificationPath": "gradle/verification/api/working-checkpoint-public-api-classification.json",
     "workingCheckpointClassificationSha256": "b27f400c6bac238e916f75f5ef66337371bea44783fb01f8931eab2835005001",
     "afterClassificationPath": "docs/public-api-classification.json",
-    "afterClassificationSha256": "0168e47fe3da2662d8021c7effd828c162c38713bf959e3a833bfe19280b5c9d",
+    "afterClassificationSha256": "9a9003806b87add05099ddfd5cf5706a5b60f07bc8de61220629642f42742739",
     "publicTypeCount": 103,
-    "publicDescriptorCount": 1037
+    "publicDescriptorCount": 1046
   },
   "modernizationDelta": {
     "baselineCommit": "169e589",
     "baselineManifestSha256": "43aea6ae9de6f39729f93c146ff5453887da9a2303f6f4f33573ba47f37d5be0",
     "removedDescriptorLines": 254,
-    "addedDescriptorLines": 493,
+    "addedDescriptorLines": 502,
     "removedDescriptorsPath": "gradle/verification/api/modernization-removed-descriptors.txt",
     "removedDescriptorsSha256": "7d3ba5a5e69ddf8e2fee0d92c924cae3c4dd36d42e465dc9931c550a99db2d99",
     "addedDescriptorsPath": "gradle/verification/api/modernization-added-descriptors.txt",
-    "addedDescriptorsSha256": "c73d2fc227bc51ae6719d1ecb1fee7b279497a14b3ff4f7ede23267932dbc928",
+    "addedDescriptorsSha256": "a61328959ceee5c0d91822fb33135e105eee310b2f32e5e9c308d8d7a55df5be",
     "comparison": "complete bytewise set difference after qualifying every member descriptor with its owning class; :blue-bex-conformance:binaryApiCheck recomputes and compares every line",
     "completeMachineAuditableDelta": true,
     "packageMoves": [
@@ -568,6 +568,87 @@
       "rationale": "Existing candidate factory binds output admission to the selected Language runtime, retaining resolver-issued identity evidence. The static factory belongs to the interface.",
       "binaryCompatibility": "additive",
       "sourceCompatibility": "additive"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-1",
+      "kind": "added",
+      "signature": "class public abstract interface blue.bex.value.BexValue :: method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup",
+      "classification": "stable API",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-2",
+      "kind": "added",
+      "signature": "class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)",
+      "classification": "host SPI",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-3",
+      "kind": "added",
+      "signature": "class public final blue.bex.output.BexEstablishedIdentity :: constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability,blue.language.identity.CanonicalTypeIdentityLookup)",
+      "classification": "host SPI",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-4",
+      "kind": "added",
+      "signature": "class public final blue.bex.output.BexEstablishedIdentity :: method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup",
+      "classification": "host SPI",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-5",
+      "kind": "added",
+      "signature": "class public final blue.bex.output.BexEstablishedIdentity :: method public resolvedValue():blue.language.snapshot.FrozenNode",
+      "classification": "host SPI",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-6",
+      "kind": "added",
+      "signature": "class public final blue.bex.value.BexBlueNodeWriter :: method public static toSourceNode(blue.bex.value.BexValue):blue.language.model.Node",
+      "classification": "internal implementation",
+      "rationale": "Retain available canonical exact children during transient output admission; never substitute their resolved view.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-7",
+      "kind": "added",
+      "signature": "class public final blue.bex.value.BexValues :: method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue):blue.bex.value.BexValue",
+      "classification": "stable API",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-8",
+      "kind": "added",
+      "signature": "class public final blue.bex.value.BexValues :: method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue",
+      "classification": "stable API",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
+    },
+    {
+      "id": "rc-closeout-exact-evidence-add-9",
+      "kind": "added",
+      "signature": "class public final blue.bex.value.BexValues :: method public static exact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue",
+      "classification": "stable API",
+      "rationale": "Carry canonical and resolved views together with optional resolver-issued type evidence across the existing exact-value boundary. Existing overloads delegate without changing their signature; the new interface method has a default implementation.",
+      "binaryCompatibility": "compatible additive member",
+      "sourceCompatibility": "compatible additive member"
     }
   ]
 }

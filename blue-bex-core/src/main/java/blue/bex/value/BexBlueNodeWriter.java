@@ -85,7 +85,7 @@ public final class BexBlueNodeWriter {
                 return value.toNode();
             }
             if (exactMode == ExactMode.CANONICAL) {
-                return BexFrozenWriter.toFrozen(value).toNode();
+                return BexExactSourceWriter.toSource(value);
             }
             String blueId = BlueIds.requireBlueIdOrCyclicMember(
                     value.exactBlueId(), "BEX exact output blueId");
