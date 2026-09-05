@@ -29,6 +29,7 @@ public final class RootOrchestrationPlugin implements Plugin<Project> {
         project.getPluginManager().apply("base");
         project.getPluginManager().apply(ArchitectureVerificationPlugin.class);
         project.getPluginManager().apply(ReleaseEvidencePlugin.class);
+        DevelopmentRepositoryExport.register(project);
 
         TaskProvider<Task> check = lifecycle(project, "bexCheck",
                 "Runs module tests and architecture/API checks.");
