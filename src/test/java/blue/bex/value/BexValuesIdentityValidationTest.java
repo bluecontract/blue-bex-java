@@ -1,12 +1,15 @@
 package blue.bex.value;
 
 import blue.bex.BexException;
+import blue.bex.api.BexFailureBoundary;
+import blue.bex.contracts.BexContractsFailureBoundary;
 import blue.language.identity.DirectBlueIdCalculator;
 import blue.language.model.Node;
 import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,10 +27,14 @@ class BexValuesIdentityValidationTest {
                 "this#0",
                 ordinaryBlueId("master") + "#01"
         }) {
-            assertThrows(
+            IllegalArgumentException failure = assertThrows(
                     IllegalArgumentException.class,
                     () -> BexValues.exact(value, value, malformed),
                     malformed);
+            assertEquals(BexFailureBoundary.Classification.UNCLASSIFIED,
+                    BexFailureBoundary.STANDALONE.classify(failure));
+            assertEquals(BexFailureBoundary.Classification.UNCLASSIFIED,
+                    BexContractsFailureBoundary.INSTANCE.classify(failure));
         }
     }
 

@@ -24,10 +24,13 @@ final class ListGetExpr extends Expr {
     protected BexValue doEval(CompiledFrame frame) {
         BexValue l = list.eval(frame);
         if (!l.isList()) throw new BexException("$listGet list must be list");
-        int i = index.eval(frame).asInteger().intValueExact();
-        if (i < 0) throw new BexException("$listGet index must be non-negative");
+        BigInteger i = index.eval(frame).asInteger();
+        if (i.signum() < 0) throw new BexException("$listGet index must be non-negative");
         BexGasWork.charge(frame, BexGasCounter.LIST_ITEM_READ);
-        BexValue value = l.get(String.valueOf(i));
+        // Establish absence from the list, not from a Java integer overflow.
+        BexValue value = i.compareTo(BigInteger.valueOf(l.size())) >= 0
+                ? BexValues.undefined()
+                : l.get(String.valueOf(i.intValueExact()));
         return value.isUndefined() && defaultValue != null ? defaultValue.eval(frame) : value;
     }
 }

@@ -334,13 +334,21 @@ final class SplitExpr extends Expr {
         String sep = BexGasWork.fullText(
                 frame, separator.eval(frame)).text();
         if (sep.isEmpty()) throw new BexException("$split separator must not be empty");
-        int max = limit != null ? limit.eval(frame).asInteger().intValueExact() : -1;
-        if (max == 0 || max < -1) throw new BexException("$split limit must be positive");
+        BigInteger max = limit != null
+                ? limit.eval(frame).asInteger() : BigInteger.valueOf(-1L);
+        if (max.signum() == 0 || max.compareTo(BigInteger.valueOf(-1L)) < 0) {
+            throw new BexException("$split limit must be -1 or positive");
+        }
+        // A non-empty separator cannot occur more often than there are input
+        // code units. Bound the split count before narrowing a legal Integer.
+        int maxSeparators = max.signum() < 0 ? input.length()
+                : max.subtract(BigInteger.ONE)
+                        .min(BigInteger.valueOf(input.length())).intValueExact();
 
         List<BexValue> out = new ArrayList<>();
         int start = 0;
         int produced = 0;
-        while (max == -1 || produced < max - 1) {
+        while (produced < maxSeparators) {
             int match = input.indexOf(sep, start);
             if (match < 0) {
                 break;

@@ -133,9 +133,8 @@ public final class BexBlueNodeWriter {
                 }
                 node.items(toNodeList(child, inlineExact));
             } else if ("blueId".equals(key)) {
-                String blueId = BlueIds.requireBlueIdOrCyclicMember(
-                        requiredText(child, "blueId"),
-                        "BEX output blueId");
+                String blueId = requireTransientBlueId(
+                        requiredText(child, "blueId"), "BEX output blueId");
                 if (blueId.indexOf('#') >= 0) {
                     throw new BexException(
                             "Transient BEX output cannot counterfeit an exact "
@@ -167,6 +166,17 @@ public final class BexBlueNodeWriter {
         return position == Position.LIST_ITEM && Nodes.isEmptyNode(node)
                 ? Nodes.emptyPlaceholder()
                 : node;
+    }
+
+    private static String requireTransientBlueId(String blueId, String path) {
+        try {
+            return BlueIds.requireBlueIdOrCyclicMember(blueId, path);
+        } catch (IllegalArgumentException invalidAuthoredIdentity) {
+            // Only this pure validation of an authored transient string is a
+            // semantic rejection. Do not relabel host/value-access failures or
+            // malformed exact handles, and do not retain an unclassified cause.
+            throw new BexException(invalidAuthoredIdentity.getMessage());
+        }
     }
 
     public static boolean hasLanguageField(BexValue value) {
@@ -341,7 +351,7 @@ public final class BexBlueNodeWriter {
                 throw new BexException("Blue schema blueId reference must be pure");
             }
             Schema schema = new Schema();
-            schema.blueId(BlueIds.requireBlueIdOrCyclicMember(
+            schema.blueId(requireTransientBlueId(
                     requiredText(value.get("blueId"), "schema.blueId"),
                     "BEX output schema.blueId"));
             return schema;
