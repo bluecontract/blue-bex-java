@@ -9,6 +9,7 @@ import blue.bex.gas.BexGasSchedule;
 import blue.bex.gas.BexHostGasExhaustion;
 import blue.bex.gas.BexSharedGasBudget;
 import blue.bex.output.BexFailurePolicy;
+import blue.bex.api.BexFailureBoundary;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,6 +60,12 @@ final class BexRuntimeGasSession {
 
     void completeAfterFailure(Throwable primaryFailure) {
         if (host == null || meter.hostLedgerFinalized()) {
+            return;
+        }
+        BexFailureBoundary.Classification classification = classify(primaryFailure, context.failureBoundary());
+        if (classification == BexFailureBoundary.Classification.UNCLASSIFIED) {
+            notifyFailureLifecycle(primaryFailure,
+                    () -> meter.unavailableHostLedger(host::abandoned));
             return;
         }
         if (evidenceUnavailableWins(
@@ -216,14 +223,15 @@ final class BexRuntimeGasSession {
             Map<String, BexGasLedgerCapability> opened,
             Throwable openingFailure,
             BexFailurePolicy failureBoundary) {
-        boolean unavailable = evidenceUnavailableWins(
-                openingFailure, failureBoundary);
+        BexFailureBoundary.Classification classification = classify(openingFailure, failureBoundary);
         for (BexGasLedgerCapability ledger : opened.values()) {
             try {
-                if (unavailable) {
+                if (classification == BexFailureBoundary.Classification.EVIDENCE_UNAVAILABLE) {
                     host.evidenceUnavailable(ledger);
-                } else {
+                } else if (classification == BexFailureBoundary.Classification.DETERMINISTIC) {
                     host.failedDeterministically(ledger);
+                } else {
+                    host.abandoned(ledger);
                 }
             } catch (RuntimeException | Error lifecycleFailure) {
                 addSuppressed(openingFailure, lifecycleFailure);
@@ -249,6 +257,14 @@ final class BexRuntimeGasSession {
         }
     }
 
+    private static BexFailureBoundary.Classification classify(Throwable failure, BexFailurePolicy policy) {
+        return policy instanceof BexFailureBoundary
+                ? ((BexFailureBoundary) policy).classify(failure)
+                : policy.evidenceUnavailable(failure)
+                ? BexFailureBoundary.Classification.EVIDENCE_UNAVAILABLE
+                : BexFailureBoundary.STANDALONE.classify(failure);
+    }
+
     private static boolean evidenceUnavailableWins(
             Throwable failure,
             BexFailurePolicy failureBoundary) {
@@ -261,7 +277,8 @@ final class BexRuntimeGasSession {
             Throwable failure,
             Class<T> type) {
         Throwable current = failure;
-        while (current != null) {
+        Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while (current != null && seen.add(current)) {
             if (type.isInstance(current)) {
                 return type.cast(current);
             }

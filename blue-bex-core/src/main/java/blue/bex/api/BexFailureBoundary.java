@@ -5,6 +5,9 @@ import blue.bex.BexExecutionEvidenceUnavailableException;
 import blue.bex.output.BexFailurePolicy;
 
 import java.util.Objects;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 /**
  * Host-neutral classification and translation boundary for execution
@@ -28,23 +31,19 @@ public interface BexFailureBoundary extends BexFailurePolicy {
         @Override
         public Classification classify(Throwable failure) {
             Throwable current = failure;
-            boolean genericBexFailure = false;
-            while (current != null) {
+            Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>());
+            while (current != null && seen.add(current)) {
                 if (current instanceof BexExecutionEvidenceUnavailableException) {
                     return Classification.EVIDENCE_UNAVAILABLE;
                 }
-                if (current instanceof BexException) {
-                    genericBexFailure = true;
-                }
                 Throwable cause = current.getCause();
-                if (cause == current) {
-                    break;
+                if (cause == null) {
+                    return current instanceof BexException
+                            ? Classification.DETERMINISTIC : Classification.UNCLASSIFIED;
                 }
                 current = cause;
             }
-            return genericBexFailure
-                    ? Classification.DETERMINISTIC
-                    : Classification.UNCLASSIFIED;
+            return Classification.UNCLASSIFIED;
         }
     };
 
@@ -65,19 +64,14 @@ public interface BexFailureBoundary extends BexFailurePolicy {
     }
 
     /**
-     * Preserves a classified host failure and wraps only an unexpected
-     * implementation failure.
+     * Preserves the failure without converting unknown implementation faults into a semantic
+     * BexException. Diagnostic decoration cannot change ledger classification.
      */
     default RuntimeException preserveOrWrap(
             String operation,
             RuntimeException failure) {
         RuntimeException exact = Objects.requireNonNull(failure, "failure");
-        if (classify(exact) != Classification.UNCLASSIFIED) {
-            return exact;
-        }
-        return new BexException(
-                Objects.requireNonNull(operation, "operation")
-                        + ": " + exact.getMessage(),
-                exact);
+        Objects.requireNonNull(operation, "operation");
+        return exact;
     }
 }

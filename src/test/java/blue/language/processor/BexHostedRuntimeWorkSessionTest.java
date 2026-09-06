@@ -989,7 +989,7 @@ class BexHostedRuntimeWorkSessionTest {
     }
 
     @Test
-    void laterNamespaceOpenFailureFinalizesEveryLedgerAlreadyOpened() {
+    void laterNamespaceOpenFaultAbandonsEveryLedgerAlreadyOpened() {
         FailingSecondOpenHost host =
                 new FailingSecondOpenHost();
         BexIntrinsicRegistry intrinsics = BexIntrinsicRegistry.builder()
@@ -1023,8 +1023,8 @@ class BexHostedRuntimeWorkSessionTest {
 
         assertEquals("second open rejected", failure.getMessage());
         assertEquals(2, host.openCount);
-        assertEquals(1, host.deterministicFinalizations);
-        assertEquals(0, host.unavailableFinalizations);
+        assertEquals(0, host.deterministicFinalizations);
+        assertEquals(1, host.unavailableFinalizations);
         assertEquals(0, host.successfulSubmissions);
     }
 
@@ -1372,7 +1372,7 @@ class BexHostedRuntimeWorkSessionTest {
     }
 
     @Test
-    void arbitraryIntrinsicFailureIsNotReclassifiedAsUnavailable() {
+    void arbitraryIntrinsicFailureAbandonsProvisionalLedgersWithoutSemanticSettlement() {
         IllegalStateException expected =
                 new IllegalStateException(
                         "intrinsic implementation defect");
@@ -1381,13 +1381,11 @@ class BexHostedRuntimeWorkSessionTest {
 
         assertSame(expected, scenario.observed);
         assertEquals(0, scenario.host.submitCount);
-        assertEquals(2,
-                scenario.host.deterministicFailureCount);
-        assertEquals(0, scenario.host.unavailableCount);
-        assertFalse(scenario.session.stagedTrace().isEmpty());
-
-        scenario.session.failDeterministically();
-        assertTrue(scenario.parent.totalGas() > 0L);
+        assertEquals(0, scenario.host.deterministicFailureCount);
+        assertEquals(2, scenario.host.unavailableCount);
+        scenario.session.suspend();
+        assertEquals(0L, scenario.parent.totalGas());
+        assertEquals(1_000L, scenario.parent.remainingGas());
     }
 
     private static IntrinsicFailureScenario intrinsicFailureScenario(

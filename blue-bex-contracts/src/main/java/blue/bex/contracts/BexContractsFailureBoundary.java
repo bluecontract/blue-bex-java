@@ -11,6 +11,9 @@ import blue.language.processor.GasLimitExceededException;
 import blue.language.processor.InvalidExecutionEvidenceException;
 import blue.language.processor.PortableLimitExceededException;
 import blue.language.processor.ProcessorFailureException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 /** Contracts exception classification and translation at the adapter edge. */
 public final class BexContractsFailureBoundary
@@ -24,8 +27,8 @@ public final class BexContractsFailureBoundary
     @Override
     public Classification classify(Throwable failure) {
         Throwable current = failure;
-        boolean genericBexFailure = false;
-        while (current != null) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>());
+        while (current != null && seen.add(current)) {
             if (current instanceof ExecutionEvidenceUnavailableException
                     || current
                     instanceof BexExecutionEvidenceUnavailableException) {
@@ -40,24 +43,21 @@ public final class BexContractsFailureBoundary
                     || current instanceof BexInvalidExecutionEvidenceException) {
                 return Classification.DETERMINISTIC;
             }
-            if (current instanceof BexException) {
-                genericBexFailure = true;
-            }
             Throwable cause = current.getCause();
-            if (cause == current) {
-                break;
+            if (cause == null) {
+                return current instanceof BexException
+                        ? Classification.DETERMINISTIC : Classification.UNCLASSIFIED;
             }
             current = cause;
         }
-        return genericBexFailure
-                ? Classification.DETERMINISTIC
-                : Classification.UNCLASSIFIED;
+        return Classification.UNCLASSIFIED;
     }
 
     @Override
     public RuntimeException translate(RuntimeException failure) {
         Throwable current = failure;
-        while (current != null) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>());
+        while (current != null && seen.add(current)) {
             if (current instanceof BexExecutionEvidenceUnavailableException) {
                 BexExecutionEvidenceUnavailableException unavailable =
                         (BexExecutionEvidenceUnavailableException) current;
@@ -70,9 +70,6 @@ public final class BexContractsFailureBoundary
                         current.getMessage());
             }
             Throwable cause = current.getCause();
-            if (cause == current) {
-                break;
-            }
             current = cause;
         }
         return failure;

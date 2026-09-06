@@ -1,6 +1,5 @@
 package blue.bex.output;
 
-import blue.bex.BexException;
 import blue.bex.BexExecutionEvidenceUnavailableException;
 
 import java.util.Objects;
@@ -10,14 +9,12 @@ public interface BexFailurePolicy {
     /** Pure-runtime policy with no host-specific exception dependency. */
     BexFailurePolicy STANDALONE = failure -> {
         Throwable current = failure;
-        while (current != null) {
+        java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while (current != null && seen.add(current)) {
             if (current instanceof BexExecutionEvidenceUnavailableException) {
                 return true;
             }
             Throwable cause = current.getCause();
-            if (cause == current) {
-                break;
-            }
             current = cause;
         }
         return false;
@@ -31,17 +28,12 @@ public interface BexFailurePolicy {
         return Objects.requireNonNull(failure, "failure");
     }
 
-    /** Preserves classified host failures and wraps implementation failures. */
+    /** Preserves failure identity; unknown implementation faults are not semantic BEX failures. */
     default RuntimeException preserveOrWrap(
             String operation,
             RuntimeException failure) {
         RuntimeException exact = Objects.requireNonNull(failure, "failure");
-        if (evidenceUnavailable(exact) || exact instanceof BexException) {
-            return exact;
-        }
-        return new BexException(
-                Objects.requireNonNull(operation, "operation")
-                        + ": " + exact.getMessage(),
-                exact);
+        Objects.requireNonNull(operation, "operation");
+        return exact;
     }
 }

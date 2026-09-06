@@ -38,6 +38,12 @@ public interface BexGasLedgerLifecycle {
 
     void evidenceUnavailable(BexGasLedgerCapability ledger);
 
+    /** Abandons provisional work after an unclassified host/runtime fault, without settlement. */
+    default void abandoned(BexGasLedgerCapability ledger) {
+        // Existing hosts already implement the nonsettling discard lifecycle here.
+        evidenceUnavailable(ledger);
+    }
+
     default RuntimeException localGasLimitExceeded(
             BexGasLimitExceededException exhaustion,
             RuntimeException originalFailure) {

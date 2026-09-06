@@ -492,14 +492,14 @@ class BexSemanticIdentityIntegrationTest {
 
         IllegalStateException unexpected =
                 new IllegalStateException("adapter defect");
-        BexException wrapped = assertThrows(
-                BexException.class,
+        IllegalStateException observed = assertThrows(
+                IllegalStateException.class,
                 () -> admission(node -> {
                     throw unexpected;
                 }).admit(
                         BexValues.scalar("value"),
                         BexOutputKind.ROOT_RESULT));
-        assertSame(unexpected, wrapped.getCause());
+        assertSame(unexpected, observed);
     }
 
     @Test
