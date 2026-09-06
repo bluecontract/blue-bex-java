@@ -1,9 +1,9 @@
 {
   "schema": "blue-rc-closeout-language-binding/1",
   "releaseReadinessClaimed": false,
-  "sourceCommit": "c7140eb24e3b60b8b6092a516fc20d05de1c6b29",
-  "sourceTree": "5cc30b01f4345ad11bebe3a3da3a935779824b7c",
-  "version": "3.1.0-dev.c7140eb24e3b60b8b6092a516fc20d05de1c6b29",
-  "directory": "language-c7140eb24e3b60b8b6092a516fc20d05de1c6b29",
-  "manifestSha256": "sha256:e06a53a3fc07636a4d96ac701ce52aaea27800705c9faf428464fab543aecc14"
+  "sourceCommit": "4719bea7d18b7ecb172bf02b0e91cef66e320ac7",
+  "sourceTree": "5c9eb12ee5e69e77b11ca493670434c5334f2e0b",
+  "version": "3.1.0-dev.4719bea7d18b7ecb172bf02b0e91cef66e320ac7",
+  "directory": "language-4719bea7d18b7ecb172bf02b0e91cef66e320ac7",
+  "manifestSha256": "sha256:be2546ed0d18bea747788dfb448097d0e9e827452d119c9ca0d5efc3427e75b4"
 }
