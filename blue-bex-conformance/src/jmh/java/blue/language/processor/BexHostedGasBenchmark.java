@@ -11,7 +11,7 @@ import blue.bex.contracts.ProcessorExecutionContextBexGasLedgerHost;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.output.BexSemanticIdentityBoundary;
 import blue.bex.result.BexExecutionResult;
-import blue.language.model.Node;
+import blue.language.model.Nodes;
 import blue.language.snapshot.FrozenNode;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -63,7 +63,7 @@ public class BexHostedGasBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             engine = BexEngine.builder().build();
-            document = FrozenNode.fromResolvedNode(new Node());
+            document = FrozenNode.fromResolvedNode(Nodes.emptyObject());
             BexProgramSource source = BexProgramSource.expression(
                     frozen(op("$map", obj(
                             "in", integerList(128),

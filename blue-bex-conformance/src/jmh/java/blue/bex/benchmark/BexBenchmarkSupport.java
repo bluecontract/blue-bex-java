@@ -7,6 +7,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
+import blue.language.model.Nodes;
 import blue.language.snapshot.FrozenNode;
 
 import java.math.BigDecimal;
@@ -20,7 +21,7 @@ import java.util.Objects;
 /** Shared correctness and exact-gas checks used by the JMH corpus. */
 public final class BexBenchmarkSupport {
     private static final FrozenNode EMPTY_DOCUMENT =
-            FrozenNode.fromResolvedNode(new Node());
+            FrozenNode.fromResolvedNode(Nodes.emptyObject());
 
     private BexBenchmarkSupport() {
     }
