@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -334,14 +335,127 @@ class BexConformanceReportTruthfulnessTest {
     }
 
     @Test
-    void historicalReleaseStillRequiresItsRecordedSpecification() {
+    void publishedCandidateAcceptsItsPinnedCurrentSpecification(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Map<String, Object> specification =
+                publishedSpecificationEvidence(temporaryDirectory);
+
+        assertFalse(Boolean.TRUE.equals(specification.get("matchesBaseline")));
+        assertEquals(null, BexConformanceReportMain.specificationIdentityFailure(
+                publishedSpecificationDependency(), specification));
+    }
+
+    @Test
+    void publishedCandidateRejectsChangedSpecificationBytes(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Path specification = temporaryDirectory.resolve(
+                "specifications/blue-bex-specification-2.0.md");
+        Files.write(specification, "unapproved specification\n".getBytes(
+                StandardCharsets.UTF_8));
+        Map<String, Object> evidence = BexConformanceReportMain.specificationEvidence(
+                temporaryDirectory, Collections.singletonMap("specificationSha256",
+                        ConformancePackage.sha256(Files.readAllBytes(specification))));
+
+        assertTrue(Boolean.TRUE.equals(evidence.get("matchesBaseline")));
+        assertEquals("specification-identity-differs-from-published-pin",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        publishedSpecificationDependency(), evidence));
+    }
+
+    @Test
+    void publishedCandidateRejectsMissingSpecificationPin(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Files.delete(temporaryDirectory.resolve(
+                "src/test/resources/hosted-release/published-specification.properties"));
+
+        assertEquals("published-specification-pin-invalid",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        publishedSpecificationDependency(),
+                        publishedSpecificationEvidence(temporaryDirectory)));
+    }
+
+    @Test
+    void publishedCandidateRejectsInvalidSpecificationPins(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Path pin = temporaryDirectory.resolve(
+                "src/test/resources/hosted-release/published-specification.properties");
+        String valid = new String(Files.readAllBytes(pin), StandardCharsets.UTF_8);
+        for (String invalid : Arrays.asList(
+                valid.replace("blue-bex-published-specification/1.0", "unknown/1.0"),
+                valid.replace("specifications/blue-bex-specification-2.0.md", "other.md"),
+                valid.replace("specification.sha256=", "specification.sha256=invalid-"))) {
+            Files.write(pin, invalid.getBytes(StandardCharsets.UTF_8));
+            assertEquals("published-specification-pin-invalid",
+                    BexConformanceReportMain.specificationIdentityFailure(
+                            publishedSpecificationDependency(),
+                            publishedSpecificationEvidence(temporaryDirectory)));
+        }
+    }
+
+    @Test
+    void publishedCandidateRejectsDifferentLanguageCoordinate(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Map<String, Object> dependency = publishedSpecificationDependency();
+        dependency.put("declaredCoordinate",
+                "blue.language:blue-language-java:3.1.0-rc.23");
+
+        assertEquals("published-specification-language-coordinate-differs",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        dependency, publishedSpecificationEvidence(temporaryDirectory)));
+    }
+
+    @Test
+    void publishedCandidateRejectsMissingSpecification(
+            @TempDir Path temporaryDirectory) throws Exception {
+        copyPublishedSpecification(temporaryDirectory);
+        Files.delete(temporaryDirectory.resolve(
+                "specifications/blue-bex-specification-2.0.md"));
+
+        assertEquals("specification-identity-differs-from-published-pin",
+                BexConformanceReportMain.specificationIdentityFailure(
+                        publishedSpecificationDependency(),
+                        publishedSpecificationEvidence(temporaryDirectory)));
+    }
+
+    private static Map<String, Object> publishedSpecificationEvidence(Path project)
+            throws Exception {
+        return BexConformanceReportMain.specificationEvidence(project,
+                Collections.singletonMap("specificationSha256",
+                        "0000000000000000000000000000000000000000000000000000000000000000"));
+    }
+
+    private static Map<String, Object> publishedSpecificationDependency() {
+        Map<String, Object> dependency = new LinkedHashMap<String, Object>();
+        dependency.put("mode", "standalone-published");
+        dependency.put("declaredCoordinate",
+                "blue.language:blue-language-java:3.1.0-rc.24");
+        return dependency;
+    }
+
+    private static void copyPublishedSpecification(Path target) throws Exception {
+        for (String relative : Arrays.asList(
+                "specifications/blue-bex-specification-2.0.md",
+                "src/test/resources/hosted-release/published-specification.properties")) {
+            Path destination = target.resolve(relative);
+            Files.createDirectories(destination.getParent());
+            Files.copy(Paths.get(relative), destination);
+        }
+    }
+
+    @Test
+    void publishedReleaseRejectsAvailabilityWithoutItsSpecificationPin() {
         Map<String, Object> specification =
                 new LinkedHashMap<String, Object>();
         specification.put("matchesBaseline", Boolean.FALSE);
         specification.put("currentSpecificationAvailable", Boolean.TRUE);
 
         assertEquals(
-                "specification-identity-differs-from-baseline",
+                "published-specification-pin-invalid",
                 BexConformanceReportMain.specificationIdentityFailure(
                         Collections.<String, Object>singletonMap(
                                 "mode", "standalone-published"),

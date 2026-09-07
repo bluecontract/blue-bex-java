@@ -38,8 +38,15 @@ They are not aliases for the current content.
 ## Historical and current specification gates
 
 The hosted-release baseline still authenticates its historical specification
-bytes. A standalone published-release report must match that baseline. An SDK
-candidate instead reports the current specification and is accepted only when
+bytes. A standalone published-release report instead requires the exact current
+specification path and SHA-256 declared in
+`src/test/resources/hosted-release/published-specification.properties`, bound to
+the selected Language coordinate. The declaration carries no test or artifact
+readiness claim and does not select a BEX version; the existing release gates
+verify the final BEX version and tag. Missing or different specification bytes,
+an unknown declaration schema, a different path, or a different Language
+coordinate fail closed. The report retains the historical baseline comparison.
+An SDK candidate reports the current specification and is accepted only when
 the current file exists; `verifyBexSdkStageReport` independently hashes that
 file and compares it with both the report and
 `bex.currentSpecificationSha256` in the candidate lock.

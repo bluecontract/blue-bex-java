@@ -711,21 +711,40 @@ public final class BexConformanceReportMain {
     static Map<String, Object> specificationEvidence(
             Path projectDir,
             Map<String, String> baseline) throws IOException {
+        String specificationPath = "specifications/blue-bex-specification-2.0.md";
         Path specification = projectDir.resolve("specifications")
                 .resolve("blue-bex-specification-2.0.md");
         String actual = Files.isRegularFile(specification)
                 ? sha256(specification)
                 : "unavailable";
         String expected = baseline.get("specificationSha256");
+        String pinPath = "src/test/resources/hosted-release/"
+                + "published-specification.properties";
+        Path pinFile = projectDir.resolve(pinPath);
+        Map<String, String> pin = Files.isRegularFile(
+                pinFile, LinkOption.NOFOLLOW_LINKS)
+                ? readEvidence(pinFile)
+                : Collections.<String, String>emptyMap();
+        String pinnedIdentity = pin.get("specification.sha256");
+        boolean validPin = "blue-bex-published-specification/1.0"
+                .equals(pin.get("schema"))
+                && specificationPath.equals(pin.get("specification.path"))
+                && pinnedIdentity != null
+                && ConformancePackage.SHA_256.matcher(pinnedIdentity).matches();
         return map(
                 "path",
-                "specifications/blue-bex-specification-2.0.md",
+                specificationPath,
                 "sha256", actual,
                 "baselineSha256", expected,
                 "matchesBaseline",
                 actual.equals(expected),
                 "currentSpecificationAvailable",
-                ConformancePackage.SHA_256.matcher(actual).matches());
+                ConformancePackage.SHA_256.matcher(actual).matches(),
+                "publishedPinPath", pinPath,
+                "publishedPinValid", validPin,
+                "publishedSpecificationSha256", pinnedIdentity,
+                "publishedLanguageCoordinate", pin.get("language.coordinate"),
+                "matchesPublishedSpecification", actual.equals(pinnedIdentity));
     }
 
     static String specificationIdentityFailure(
@@ -736,6 +755,22 @@ public final class BexConformanceReportMain {
                     specification.get("currentSpecificationAvailable"))
                     ? null
                     : "current-specification-unavailable";
+        }
+        if ("standalone-published".equals(dependencyResolution.get("mode"))) {
+            if (!Boolean.TRUE.equals(specification.get("publishedPinValid"))) {
+                return "published-specification-pin-invalid";
+            }
+            Object pinnedCoordinate = specification.get("publishedLanguageCoordinate");
+            if (!(pinnedCoordinate instanceof String)
+                    || ((String) pinnedCoordinate).isEmpty()
+                    || !pinnedCoordinate.equals(
+                            dependencyResolution.get("declaredCoordinate"))) {
+                return "published-specification-language-coordinate-differs";
+            }
+            return Boolean.TRUE.equals(
+                    specification.get("matchesPublishedSpecification"))
+                    ? null
+                    : "specification-identity-differs-from-published-pin";
         }
         return Boolean.TRUE.equals(specification.get("matchesBaseline"))
                 ? null
