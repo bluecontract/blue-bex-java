@@ -10,6 +10,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.test.TestBlue;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
+import blue.bex.value.BexBlueNodeWriter;
 import blue.language.identity.DirectBlueIdCalculator;
 import blue.language.model.Node;
 import blue.language.provider.NodeProvider;
@@ -18,6 +19,7 @@ import blue.language.snapshot.FrozenNode;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +31,81 @@ import static org.junit.jupiter.api.Assertions.*;
 class BexAuthoredInputBoundaryTest {
     private static final BigInteger HUGE = BigInteger.TEN.pow(60);
     private static final BigInteger INT_MAX = BigInteger.valueOf(Integer.MAX_VALUE);
+
+    @Test
+    void malformedSchemaKeywordValuesAreDeterministicAtEveryRealOutputBoundary() {
+        for (String keyword : Arrays.asList("required", "uniqueItems", "minLength", "maxLength",
+                "minItems", "maxItems", "minFields", "maxFields", "minimum", "maximum",
+                "exclusiveMinimum", "exclusiveMaximum", "multipleOf")) {
+            for (Node invalid : Arrays.asList(v("bogus"), list(true), obj("unexpected", true))) {
+                assertInvalidSchemaOutput(dynamicSchema(keyword, invalid));
+            }
+        }
+        for (String keyword : Arrays.asList("minLength", "maxLength", "minItems", "maxItems", "minFields", "maxFields")) {
+            assertInvalidSchemaOutput(dynamicSchema(keyword, new Node().value(new BigDecimal("0.5"))));
+        }
+        assertInvalidSchemaOutput(obj("child", dynamicSchema("required", "bogus")));
+    }
+
+    @Test
+    void legalSchemaValuesAndExactReferencesRetainTheirOutputIdentity() {
+        for (Node legal : Arrays.asList(dynamicSchema("required", false), dynamicSchema("uniqueItems", true),
+                dynamicSchema("minItems", new Node().value(new BigDecimal("2.00"))),
+                dynamicSchema("minimum", new Node().value(new BigDecimal("0.5"))))) {
+            BexExecutionResult identity = runExpr(op("$nodeBlueId", legal));
+            assertNotNull(identity.value().asText());
+            assertEquals(1, runStep(stepDo(list(op("$appendEvent", legal))), defaultContext()).events().events().size());
+        }
+        BexValue exactSchema = BexValues.frozen(frozen(obj("minimum", new Node().value(new BigDecimal("0.5")))));
+        BexExecutionContext context = BexExecutionContext.builder().document(defaultDocumentView())
+                .binding("schema", exactSchema).build();
+        Node fromExact = obj("schema", op("$binding", "schema"));
+        Node fromReference = obj("schema", dynamicReference(exactSchema.exactBlueId()));
+        assertEquals(runExpr(op("$nodeBlueId", fromReference)).value().asText(),
+                runStep(stepExpr(op("$nodeBlueId", fromExact)), context).value().asText());
+    }
+
+    @Test
+    void numericSchemaKeywordRetainsItsLegalExactReference() {
+        BexValue minimum = BexValues.frozen(frozen(new Node().value(new BigDecimal("0.5"))));
+        BexExecutionContext context = BexExecutionContext.builder().document(defaultDocumentView())
+                .binding("minimum", minimum).build();
+        Node exact = dynamicSchema("minimum", op("$binding", "minimum"));
+        Node reference = dynamicSchema("minimum", dynamicReference(minimum.exactBlueId()));
+        assertEquals(runExpr(op("$nodeBlueId", reference)).value().asText(),
+                runStep(stepExpr(op("$nodeBlueId", exact)), context).value().asText());
+    }
+
+    @Test
+    void schemaNumericRepresentationFailureRemainsUnclassified() {
+        BigDecimal oversized = new BigDecimal(BigInteger.ONE, Integer.MIN_VALUE);
+        // BEX emits an explicit Double node: its ordinary representation check
+        // rejects this value before the schema's exact-integer getter is reached.
+        RuntimeException representationFailure = assertThrows(RuntimeException.class,
+                () -> blue.language.model.Nodes.doubleNode(oversized).getValue());
+        BexValue output = BexValues.fromSimple(Collections.singletonMap("schema",
+                Collections.singletonMap("minItems", oversized)));
+        BexException failure = assertThrows(BexException.class, () -> BexBlueNodeWriter.toNode(output));
+        assertEquals(representationFailure.getClass(), failure.getCause().getClass());
+        assertEquals(representationFailure.getMessage(), failure.getCause().getMessage());
+        assertEquals(BexFailureBoundary.Classification.UNCLASSIFIED, BexFailureBoundary.STANDALONE.classify(failure));
+        assertEquals(BexFailureBoundary.Classification.UNCLASSIFIED, BexContractsFailureBoundary.INSTANCE.classify(failure));
+    }
+
+    private static Node dynamicSchema(String keyword, Object value) {
+        Node schema = op("$objectSet", obj("object", op("$emptyObject", true), "key", keyword, "val", value));
+        return op("$objectSet", obj("object", op("$emptyObject", true), "key", "schema", "val", schema));
+    }
+
+    private static void assertInvalidSchemaOutput(Node expression) {
+        assertDeterministic(assertThrows(BexException.class,
+                () -> runExpr(op("$nodeBlueId", expression))));
+        assertDeterministic(assertThrows(BexException.class, () -> runStep(
+                stepDo(list(op("$appendEvent", expression))), defaultContext())));
+        assertDeterministic(assertThrows(BexException.class, () -> runStep(
+                stepDo(list(op("$appendChange", obj("op", "replace", "path", "/status", "val", expression)))),
+                defaultContext())));
+    }
 
     @Test
     void dynamicallyConstructedInvalidReferencesAreDeterministicAtRealOutputBoundaries() {

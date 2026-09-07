@@ -1,6 +1,7 @@
 package blue.bex.value;
 
 import blue.bex.BexException;
+import blue.language.model.InvalidNodeStructureException;
 import blue.language.model.Node;
 import blue.language.model.Schema;
 import blue.language.identity.BlueIds;
@@ -135,12 +136,6 @@ public final class BexBlueNodeWriter {
             } else if ("blueId".equals(key)) {
                 String blueId = requireTransientBlueId(
                         requiredText(child, "blueId"), "BEX output blueId");
-                if (blueId.indexOf('#') >= 0) {
-                    throw new BexException(
-                            "Transient BEX output cannot counterfeit an exact "
-                                    + "cyclic-set member reference: "
-                                    + blueId);
-                }
                 node.blueId(blueId);
             } else if ("contracts".equals(key)) {
                 node.contracts(toObjectNode(
@@ -170,13 +165,23 @@ public final class BexBlueNodeWriter {
 
     private static String requireTransientBlueId(String blueId, String path) {
         try {
-            return BlueIds.requireBlueIdOrCyclicMember(blueId, path);
+            BlueIds.requireBlueIdOrCyclicMember(blueId, path);
         } catch (IllegalArgumentException invalidAuthoredIdentity) {
             // Only this pure validation of an authored transient string is a
             // semantic rejection. Do not relabel host/value-access failures or
             // malformed exact handles, and do not retain an unclassified cause.
             throw new BexException(invalidAuthoredIdentity.getMessage());
         }
+        // Both ordinary references and schema.blueId pass here only after the
+        // exact-carried branches have returned. Syntax cannot establish an
+        // exact cyclic-member capability for an authored transient string.
+        if (blueId.indexOf('#') >= 0) {
+            throw new BexException(
+                    "Transient BEX output cannot counterfeit an exact "
+                            + "cyclic-set member reference: "
+                            + blueId);
+        }
+        return blueId;
     }
 
     public static boolean hasLanguageField(BexValue value) {
@@ -396,6 +401,33 @@ public final class BexBlueNodeWriter {
         else if ("uniqueItems".equals(key)) schema.uniqueItems(node);
         else if ("minFields".equals(key)) schema.minFields(node);
         else if ("maxFields".equals(key)) schema.maxFields(node);
+        // Exact references and type-supplied values remain for the Language
+        // resolver. Only locally available authored keyword values are checked.
+        if (!value.isExact() && node.getBlueId() == null
+                && (node.getValue() != null || node.getType() == null)) {
+            validateSchemaKeyword(schema, key);
+        }
+    }
+
+    private static void validateSchemaKeyword(Schema schema, String key) {
+        try {
+            if ("required".equals(key)) schema.getRequiredValue();
+            else if ("minLength".equals(key)) schema.getMinLengthExact();
+            else if ("maxLength".equals(key)) schema.getMaxLengthExact();
+            else if ("minimum".equals(key)) schema.getMinimumValue();
+            else if ("maximum".equals(key)) schema.getMaximumValue();
+            else if ("exclusiveMinimum".equals(key)) schema.getExclusiveMinimumValue();
+            else if ("exclusiveMaximum".equals(key)) schema.getExclusiveMaximumValue();
+            else if ("multipleOf".equals(key)) schema.getMultipleOfValue();
+            else if ("minItems".equals(key)) schema.getMinItemsExact();
+            else if ("maxItems".equals(key)) schema.getMaxItemsExact();
+            else if ("uniqueItems".equals(key)) schema.getUniqueItemsValue();
+            else if ("minFields".equals(key)) schema.getMinFieldsExact();
+            else if ("maxFields".equals(key)) schema.getMaxFieldsExact();
+        } catch (InvalidNodeStructureException invalid) {
+            // This is a locally validated authored error, not a host failure.
+            throw new BexException(invalid.getMessage());
+        }
     }
 
     private static void setSchemaList(Schema schema,
