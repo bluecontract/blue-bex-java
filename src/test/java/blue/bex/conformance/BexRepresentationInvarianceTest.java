@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BexRepresentationInvarianceTest {
     private static final String SORT_INTRINSIC =
-            "2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG";
+            "3x6byASNDdnEf9o2EgzAVqewP1zuqyNmzccAmyiYfQsw";
     private static final String REPRESENTATION_REGISTRY =
             "sha256:858952520d947dcffa773f7479434d86367b22f1a4ddabde90b8c19826710a62";
 
@@ -218,7 +218,8 @@ class BexRepresentationInvarianceTest {
                     .intrinsics(representationIntrinsics())
                     .build();
             BexCompiledProgram compiled = engine.compile(
-                    BexProgramSource.inline(program.resolved));
+                    BexProgramSource.inline(FrozenNode.fromResolvedNode(
+                            prepareProgramTypes(blue, program.resolved.toNode()))));
             FrozenBexDocumentView documentView =
                     new FrozenBexDocumentView(
                             document.canonical, document.resolved, "/");
@@ -304,12 +305,27 @@ class BexRepresentationInvarianceTest {
             TestBlue blue,
             Node presented,
             ExactForm exactForm) {
-        Node expanded = blue.expand(presented);
-        FrozenNode resolved = FrozenNode.fromResolvedNode(expanded);
-        FrozenNode canonical = exactForm == ExactForm.MATERIALIZED
-                ? FrozenNode.fromNode(expanded)
-                : FrozenNode.fromNode(presented);
-        return new ExactPair(canonical, resolved);
+        blue.language.merge.ResolvedSnapshot snapshot = blue.resolveToSnapshot(presented);
+        return new ExactPair(snapshot.frozenCanonicalRoot(),
+                FrozenNode.fromResolvedNode(blue.expand(presented)));
+    }
+
+    /** Host preparation preserves exact type references while opening program bodies. */
+    private static Node prepareProgramTypes(TestBlue blue, Node expanded) {
+        Node prepared = expanded.clone();
+        if (prepared.getType() != null)
+            prepared.type(blue.runtime().graph().collapse(prepared.getType()));
+        if (prepared.getItemType() != null)
+            prepared.itemType(blue.runtime().graph().collapse(prepared.getItemType()));
+        if (prepared.getKeyType() != null)
+            prepared.keyType(blue.runtime().graph().collapse(prepared.getKeyType()));
+        if (prepared.getValueType() != null)
+            prepared.valueType(blue.runtime().graph().collapse(prepared.getValueType()));
+        if (prepared.getProperties() != null)
+            prepared.getProperties().replaceAll((key, value) -> prepareProgramTypes(blue, value));
+        if (prepared.getItems() != null)
+            prepared.getItems().replaceAll(value -> prepareProgramTypes(blue, value));
+        return prepared;
     }
 
     private static Node present(
@@ -628,7 +644,7 @@ class BexRepresentationInvarianceTest {
                                 + "values:\n"
                                 + "  type:\n"
                                 + "    blueId: "
-                                + "8DSFoWG9MqRSUhStqoPLrwVQiYByRh18NWbDEarN8MKF");
+                                + "85ip88snCGrgUNdi1rUFqqAxcxwVGKV2g4LjsKoyKmXK");
                 return new LogicalInputs(
                         program, document, event, intrinsicType);
             }

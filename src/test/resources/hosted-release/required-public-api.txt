@@ -578,9 +578,13 @@ class public final blue.bex.output.BexAdmittedValue
 class public final blue.bex.output.BexEstablishedIdentity
   constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode)
   constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
+  constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability)
+  constructor public <init>(java.lang.String,blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,blue.bex.output.BexExactValueCapability,blue.language.identity.CanonicalTypeIdentityLookup)
   method public blueId():java.lang.String
+  method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup
   method public exactCapability():blue.bex.output.BexExactValueCapability
   method public frozenValue():blue.language.snapshot.FrozenNode
+  method public resolvedValue():blue.language.snapshot.FrozenNode
 class public abstract interface blue.bex.output.BexExactValueCapability
 class public abstract interface blue.bex.output.BexFailurePolicy
   field public static final STANDALONE:blue.bex.output.BexFailurePolicy
@@ -605,6 +609,7 @@ class public abstract interface blue.bex.output.BexSemanticIdentityBoundary
   field public static final STANDALONE:blue.bex.output.BexSemanticIdentityBoundary
   method public abstract establishIdentity(blue.language.model.Node):blue.bex.output.BexEstablishedIdentity
   method public carryExactIdentity(java.lang.String,blue.language.snapshot.FrozenNode):blue.bex.output.BexEstablishedIdentity
+  method public static standalone(blue.language.runtime.LanguageRuntimeAccess):blue.bex.output.BexSemanticIdentityBoundary
 class public final blue.bex.pointer.BexPointer
   method public descendant(java.util.List):blue.bex.pointer.BexPointer
   method public equals(java.lang.Object):boolean
@@ -879,6 +884,7 @@ class public final blue.bex.value.BexBlueNodeWriter
   method public static isLanguageField(java.lang.String):boolean
   method public static toNode(blue.bex.value.BexValue):blue.language.model.Node
   method public static toSemanticNode(blue.bex.value.BexValue):blue.language.model.Node
+  method public static toSourceNode(blue.bex.value.BexValue):blue.language.model.Node
 class public abstract interface blue.bex.value.BexChangesetValueView
   method public abstract entries():java.util.List
 class public abstract interface blue.bex.value.BexEventsValueView
@@ -919,6 +925,7 @@ class public abstract interface blue.bex.value.BexValue
   method public abstract size():int
   method public abstract toNode():blue.language.model.Node
   method public abstract toSimple():java.lang.Object
+  method public canonicalTypeIdentities():blue.language.identity.CanonicalTypeIdentityLookup
   method public exactBlueId():java.lang.String
   method public isExact():boolean
   method public semanticKind():blue.bex.value.BexValueKind
@@ -940,11 +947,14 @@ class public abstract interface blue.bex.value.BexValueMetrics
 class public final blue.bex.value.BexValues
   field public static final NULL:blue.bex.value.BexValue
   field public static final UNDEFINED:blue.bex.value.BexValue
+  method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue):blue.bex.value.BexValue
+  method public static admittedExact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue
   method public static admittedExact(blue.language.snapshot.FrozenNode,java.lang.String,blue.bex.value.BexValue):blue.bex.value.BexValue
   method public static empty(blue.bex.value.BexValue):boolean
   method public static equal(blue.bex.value.BexValue,blue.bex.value.BexValue):boolean
   method public static exact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode):blue.bex.value.BexValue
   method public static exact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String):blue.bex.value.BexValue
+  method public static exact(blue.language.snapshot.FrozenNode,blue.language.snapshot.FrozenNode,java.lang.String,blue.language.identity.CanonicalTypeIdentityLookup):blue.bex.value.BexValue
   method public static fromSimple(java.lang.Object):blue.bex.value.BexValue
   method public static frozen(blue.language.snapshot.FrozenNode):blue.bex.value.BexValue
   method public static frozenBlueId(blue.bex.value.BexValue):java.lang.String

@@ -6,6 +6,7 @@ import blue.bex.api.BexProgramSource;
 import blue.bex.api.FrozenBexDocumentView;
 import blue.bex.result.BexExecutionResult;
 import blue.language.model.Node;
+import blue.language.model.Nodes;
 import blue.language.snapshot.FrozenNode;
 
 import java.math.BigInteger;
@@ -22,7 +23,7 @@ public final class StandaloneBexExample {
                         new Node().items(
                                 new Node().value(40L),
                                 new Node().value(2L))));
-        FrozenNode document = FrozenNode.fromResolvedNode(new Node());
+        FrozenNode document = FrozenNode.fromResolvedNode(Nodes.emptyObject());
 
         BexExecutionResult result;
         try (BexEngine engine = BexEngine.builder().build()) {

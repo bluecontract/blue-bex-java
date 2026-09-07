@@ -1,0 +1,28 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-02
+vectors:
+- BEX-EMPTY-02
+category: e
+description: A BEX null member remains observable before admission and is omitted only at the Blue boundary.
+program:
+  expr:
+    x:
+      $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    x: null
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected: {}
+  - actual: output.nodeBlueId
+    op: equals
+    expected: 5ajuwjHoLj33yG5t5UFsJtUb3vnRaJQEMPqSLz6VyoHK

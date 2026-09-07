@@ -1,15 +1,15 @@
 fixturePackage: blue-bex-conformance
 specificationVersion: '2.0'
 schemaVersion: blue-bex-fixture/2.0
-registryPackageIdentity: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
-vectorCount: 60
-behaviorFixtureCount: 105
+registryPackageIdentity: sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b
+vectorCount: 75
+behaviorFixtureCount: 120
 gasFixtureCount: 30
 files:
 - path: HARNESS.md
   role: support
-  sha256: 13d8124d59aa495f41cdc40f68d38be0299dc61765b4b7271978d728e8376b03
-  bytes: 6357
+  sha256: 46f7cb9b23e5a1ba5793174f7eae49a11690aba9856018f3934453958fd2991b
+  bytes: 6585
 - path: README.md
   role: support
   sha256: a0776a0e1f3c21b388369a7ac92506d2ceca34d3d813cced09f627d253cb42f9
@@ -106,10 +106,70 @@ files:
   role: behavior-fixture
   sha256: 92f074b34268640dba1c9e1572b8f14acab6c3199afa2ad3da43f8072f60cd04
   bytes: 577
+- path: empty/bex-empty-01.yaml
+  role: behavior-fixture
+  sha256: 1be11b63b88970f27ee6974245d33ae0f5e4bd083b37d0e3f062c96233b79740
+  bytes: 565
+- path: empty/bex-empty-02.yaml
+  role: behavior-fixture
+  sha256: 33ad29bdd70d0707030531686fc105061eea00b04c0731fa9fd2d50f268f6aa0
+  bytes: 578
+- path: empty/bex-empty-03.yaml
+  role: behavior-fixture
+  sha256: cbd2fcd7bf419e897675328143a0c8f456faf453b25a57733a7bc87e19aa6cab
+  bytes: 433
+- path: empty/bex-empty-04.yaml
+  role: behavior-fixture
+  sha256: f8f0f9cffc526dfb517037407444725957830d191ce4fe8d1ef45792d6394241
+  bytes: 485
+- path: empty/bex-empty-05.yaml
+  role: behavior-fixture
+  sha256: 04f282c180242aac51bae5ac7ce60c0c7bd49744a2f089ffedfcfbe316553dd0
+  bytes: 879
+- path: empty/bex-empty-06.yaml
+  role: behavior-fixture
+  sha256: 0f6ea1d791c452ad2fd5aeea6d0fc0a1783aa882e58ef0449336525eefb9be23
+  bytes: 7654
+- path: empty/bex-empty-07.yaml
+  role: behavior-fixture
+  sha256: ece99b4173d785a23dac7224e586aee1280b2cbae3010497aa33b959e8860657
+  bytes: 460
+- path: empty/bex-empty-08.yaml
+  role: behavior-fixture
+  sha256: c7ecbb4a5f499bce331c16084021b7ddc713fb310d8fec3f1553d9b1396cdf61
+  bytes: 584
+- path: empty/bex-empty-09.yaml
+  role: behavior-fixture
+  sha256: f7cb457dc3e09da3b9f2a6314ae9628d6a1f86d0015dc5149b24e4f907f61975
+  bytes: 819
+- path: empty/bex-empty-10.yaml
+  role: behavior-fixture
+  sha256: 6c74473f15a26ca19152bb808c4348d5f7e57ad4ac44ab5e43a5ebbb691ba819
+  bytes: 824
+- path: empty/bex-empty-11.yaml
+  role: behavior-fixture
+  sha256: 651a706a40d2e1c6f7a3951d255b991cf59ba293dd04a04bda0a030d3046baa3
+  bytes: 7606
+- path: empty/bex-empty-12.yaml
+  role: behavior-fixture
+  sha256: 243ca7548da6ce8613ee7de3f244f284754b3e8d6b3f26f3b7d6fdf0ebe73914
+  bytes: 634
+- path: empty/bex-empty-13.yaml
+  role: behavior-fixture
+  sha256: 10f88acd4f6661c0cfaf3b66bcad5740218d25c1b97b42693d61f8b276504be0
+  bytes: 759
+- path: empty/bex-empty-14.yaml
+  role: behavior-fixture
+  sha256: 399ef3e9acd351167fff0a8135b887e972fd329dbbb4c292c8eb04a8e52b0547
+  bytes: 2286
+- path: empty/bex-empty-15.yaml
+  role: behavior-fixture
+  sha256: cb8b0bf930f637d1dcdf7a4448798d97ddbff0e80fd544d4bdd6c50499229878
+  bytes: 843
 - path: fixture-schema.yaml
   role: support
-  sha256: a808d5fb6fe7f7596fd12b17b8c10873f01c0b8d731c845c3bfda2c0e570b6dc
-  bytes: 3062
+  sha256: 787874fc0a67a3f6e43b1777fc500177c0816451ff28684a43df9185474609ee
+  bytes: 3387
 - path: g/bex-g-01.yaml
   role: behavior-fixture
   sha256: fecea8ce022312ad088d896a2a74ecebe65eb98812bb65c94e9178e76b73a8fe
@@ -144,7 +204,7 @@ files:
   bytes: 630
 - path: g/bex-g-09.yaml
   role: behavior-fixture
-  sha256: 6714c4d282e84f519c79184d5fd107c079b2292350a4ad0c7503dd9a0e5269fc
+  sha256: 05ac53a23c95ce055c321ce7c983c24b7abf18d7020cc0394126e37cd4a0862e
   bytes: 529
 - path: g/bex-g-10.yaml
   role: behavior-fixture
@@ -500,8 +560,8 @@ files:
   bytes: 370
 - path: projection-catalog.yaml
   role: support
-  sha256: d562daf891e62840596cd5d51fe41fda05ed428d67315cce0ddd9d49d883c8ea
-  bytes: 3789
+  sha256: 9edcecfa37f6731f2fb6191808c7a386d8792e0772ae15b4bae7ceb0f083f89b
+  bytes: 5152
 - path: r/bex-r-01.yaml
   role: behavior-fixture
   sha256: 5f5466a3d0cbefb69d1c5820cf98066ff84edc780fdac1828f62a979b6c88a1a
@@ -568,14 +628,14 @@ files:
   bytes: 579
 - path: vector-coverage.yaml
   role: support
-  sha256: ded406cbf28e659ff2b0b7ab37bb839b1b64a2595555a3682cdbb978d922f8d0
-  bytes: 4570
+  sha256: d71642193015fe071a69ff4ece5898563b205356e7ec732dfaf4cf9a8da0ed4c
+  bytes: 5230
 packageIdentityAlgorithm:
   digest: sha256
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity is null before hashing
   lineEndings: LF
-packageIdentity: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+packageIdentity: sha256:fdb896bf467c0ab8f3b2c9af3b609c9e7d0dc368dd3061f4b2909d0ee1fa89c3
 gasSchedule: blue-bex/gas/2.0
 gasManifestPackageIdentity: sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 gasManifestSha256: 1f689e0cf51b0f9afa6b18a640e0c755470921a7b0d66f62bfc2206679de640d

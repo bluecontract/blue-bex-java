@@ -10,6 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HostedConsumerSmokeTest {
     @Test
+    void executesTheShippedStandaloneGettingStartedExample() {
+        StandaloneBexExample.main(new String[0]);
+    }
+
+    @Test
     void executesInsideARealContractsLifecycleInvocation() {
         HostedConsumerSmoke.SmokeResult result =
                 HostedConsumerSmoke.runSmoke();

@@ -73,12 +73,27 @@ $defs:
   case:
     type: object
     additionalProperties: false
-    required: [name, program, errorClass]
+    required: [name, program]
     properties:
       name: {type: string}
       program: {}
       context: {$ref: '#/$defs/context'}
+      compileStatus: {type: string}
+      result: {}
+      changes:
+        type: array
+        items: {}
+      events:
+        type: array
+        items: {}
       errorClass: {type: string}
+      gasTrace:
+        type: array
+        items: {}
+      totalGas: {type: integer, minimum: 0}
+      assertions:
+        type: array
+        items: {$ref: '#/$defs/assertion'}
       reason: {type: string}
   expected:
     type: object

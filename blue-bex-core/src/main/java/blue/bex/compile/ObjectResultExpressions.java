@@ -130,7 +130,7 @@ final class PointerSetExpr extends Expr {
         BexValue current = base;
         for (int index = 0; index < segments.size(); index++) {
             BexGasWork.charge(frame, BexGasCounter.POINTER_SEGMENT_WRITTEN);
-            if (current.isUndefined() || current.isNull()) {
+            if (current.isUndefined()) {
                 current = BexValues.map(
                         Collections.<String, BexValue>emptyMap());
             }

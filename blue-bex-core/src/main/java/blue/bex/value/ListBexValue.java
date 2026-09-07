@@ -48,11 +48,7 @@ final class ListBexValue extends AbstractBexValue {
 
     @Override
     public Node toNode() {
-        ArrayList<Node> items = new ArrayList<>();
-        for (BexValue value : values) {
-            items.add(value.toNode());
-        }
-        return new Node().items(items);
+        return BexNodeWriter.toNode(this);
     }
 
     @Override

@@ -34,9 +34,8 @@ public final class ProcessorExecutionContextBexSemanticIdentityBoundary
             String blueId,
             FrozenNode frozenValue) {
         ExactBlueValue exact = context.semanticOutputBoundary()
-                .carryExactValue(
-                        Objects.requireNonNull(blueId, "blueId"),
-                        Objects.requireNonNull(frozenValue, "frozenValue"));
+                .admit(Objects.requireNonNull(
+                        frozenValue, "frozenValue"));
         if (!Objects.requireNonNull(blueId, "blueId").equals(
                 exact.blueId())) {
             throw new IllegalArgumentException(

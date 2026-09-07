@@ -19,7 +19,7 @@ class BexCompiler20Test {
     @Test
     void explicitEmptyExprWinsOverDoByFieldPresence() {
         BexExecutionResult result = runStep(obj(
-                "expr", null,
+                "expr", obj(),
                 "do", list(op("$appendEvent", "wrong"))
         ), defaultContext());
 
@@ -41,7 +41,7 @@ class BexCompiler20Test {
     @Test
     void rejectsNullEmptyAndBluePlaceholderStatements() {
         assertThrows(BexException.class,
-                () -> compile(stepDo(list((Object) null))));
+                () -> compile(new blue.bex.test.TestBlue().yamlToNode("do: [null]")));
         assertThrows(BexException.class,
                 () -> compile(stepDo(list(obj()))));
         BexException placeholder = assertThrows(BexException.class,

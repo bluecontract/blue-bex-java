@@ -15,6 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BexSchemaValueTest {
+    private static final String ACTIVE_OPTION_BLUE_ID =
+            blue.language.identity.DirectBlueIdCalculator.calculateBlueId(
+                    new Node().name("Active option").type(new Node().blueId(
+                            blue.language.model.wire.BlueLanguageConstants.TEXT_TYPE_BLUE_ID)));
+
     @Test
     void frozenSchemaIsExposedAsFiniteObject() {
         assertFiniteSchemaValue(BexValues.nodeSnapshot(schemaBearingObject()));
@@ -51,8 +56,8 @@ class BexSchemaValueTest {
         assertTrue(schema.get("required").asBoolean());
         assertEquals(BigInteger.valueOf(2), schema.get("multipleOf").asInteger());
         assertEquals("draft", schema.get("enum").get("0").asText());
-        assertEquals("Active option",
-                schema.get("enum").get("1").get("type").get("name").asText());
+        assertEquals(ACTIVE_OPTION_BLUE_ID,
+                schema.get("enum").get("1").get("type").get("blueId").asText());
         assertEquals("active", schema.get("enum").get("1").get("value").asText());
 
         Node roundTripped = BexNodeWriter.toNode(BexValues.fromSimple(sourceValue.toSimple()));
@@ -94,7 +99,7 @@ class BexSchemaValueTest {
                 .enumValues(Arrays.asList(
                         new Node().value("draft"),
                         new Node()
-                                .type(new Node().name("Active option"))
+                                .type(new Node().blueId(ACTIVE_OPTION_BLUE_ID))
                                 .value("active")));
     }
 

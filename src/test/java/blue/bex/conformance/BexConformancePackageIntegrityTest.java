@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BexConformancePackageIntegrityTest {
 
     @Test
-    void exact147FilePackageAndManifestInventoryAreIntact() {
+    void exact162FilePackageAndManifestInventoryAreIntact() {
         Map<String, Object> manifest = ConformancePackage.fixtureManifest();
         assertEquals("blue-bex-conformance", manifest.get("fixturePackage"));
         assertEquals("2.0", manifest.get("specificationVersion"));
@@ -42,7 +42,7 @@ class BexConformancePackageIntegrityTest {
 
         List<ConformancePackage.ManifestFile> entries =
                 ConformancePackage.manifestFiles();
-        assertEquals(141, entries.size(),
+        assertEquals(156, entries.size(),
                 "The fixture manifest inventories every fixture/support file except itself");
         assertEquals(ConformancePackage.BEHAVIOR_FIXTURE_COUNT,
                 countRole(entries, "behavior-fixture"));
@@ -87,7 +87,7 @@ class BexConformancePackageIntegrityTest {
         assertEquals(ConformancePackage.FILE_COUNT,
                 ConformancePackage.regularResourcePaths(
                         ConformancePackage.ROOT).size(),
-                "The imported BEX package must remain exactly 147 files");
+                "The imported BEX package must remain exactly 162 files");
     }
 
     @Test
@@ -172,7 +172,7 @@ class BexConformancePackageIntegrityTest {
         Map<String, Object> declaredVectors = ConformancePackage.map(
                 vectorCoverage.get("vectors"), "vector-coverage.vectors");
         assertEquals(ConformancePackage.VECTOR_COUNT, declaredVectors.size(),
-                "The authoritative manifest's 60-vector count wins");
+                "The authoritative manifest's 75-vector count wins");
         assertEquals(expectedVectors.keySet(), declaredVectors.keySet());
         for (Map.Entry<String, Object> entry : declaredVectors.entrySet()) {
             assertEquals(expectedVectors.get(entry.getKey()),
@@ -231,18 +231,41 @@ class BexConformancePackageIntegrityTest {
                     "Duplicate projection: " + projection);
         }
         for (ConformancePackage.Fixture fixture : behavior) {
-            Object assertionsValue = fixture.expected().get("assertions");
-            if (assertionsValue == null) {
-                continue;
+            assertDeclaredProjections(
+                    projections,
+                    fixture.expected(),
+                    fixture.path + ".expected");
+            Object cases = fixture.expected().get("cases");
+            if (cases != null) {
+                for (Object caseValue : ConformancePackage.list(
+                        cases, fixture.path + ".expected.cases")) {
+                    Map<String, Object> fixtureCase = ConformancePackage.map(
+                            caseValue, fixture.path + " case");
+                    assertDeclaredProjections(
+                            projections,
+                            fixtureCase,
+                            fixture.path + ".expected.cases["
+                                    + fixtureCase.get("name") + "]");
+                }
             }
-            for (Object assertionValue : ConformancePackage.list(
-                    assertionsValue, fixture.path + ".expected.assertions")) {
-                Map<String, Object> assertion = ConformancePackage.map(
-                        assertionValue, fixture.path + " assertion");
-                String actual = text(assertion.get("actual"));
-                assertTrue(projections.contains(actual),
-                        fixture.path + " uses undeclared projection " + actual);
-            }
+        }
+    }
+
+    private static void assertDeclaredProjections(
+            Set<String> projections,
+            Map<String, Object> expected,
+            String path) {
+        Object assertionsValue = expected.get("assertions");
+        if (assertionsValue == null) {
+            return;
+        }
+        for (Object assertionValue : ConformancePackage.list(
+                assertionsValue, path + ".assertions")) {
+            Map<String, Object> assertion = ConformancePackage.map(
+                    assertionValue, path + " assertion");
+            String actual = text(assertion.get("actual"));
+            assertTrue(projections.contains(actual),
+                    path + " uses undeclared projection " + actual);
         }
     }
 
@@ -345,8 +368,8 @@ class BexConformancePackageIntegrityTest {
                 fixturesByPath(ConformancePackage.behaviorFixtures());
 
         Map<String, Object> manifest = ConformancePackage.fixtureManifest();
-        assertEquals(60, intValue(manifest.get("vectorCount")));
-        assertEquals(105, intValue(manifest.get("behaviorFixtureCount")));
+        assertEquals(75, intValue(manifest.get("vectorCount")));
+        assertEquals(120, intValue(manifest.get("behaviorFixtureCount")));
 
         ConformancePackage.Fixture s07 = fixtures.get("s/bex-s-07.yaml");
         assertEquals("runtime-error", s07.expected().get("errorClass"),

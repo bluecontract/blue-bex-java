@@ -2,6 +2,7 @@ package blue.bex.buildlogic;
 
 import blue.bex.buildlogic.tasks.GenerateDependencyEvidenceTask;
 import java.io.File;
+import java.util.regex.Pattern;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -10,6 +11,8 @@ import org.gradle.api.artifacts.Configuration;
 /** Establishes explicit local-composite versus published Language policy. */
 public final class LanguageDependencyModePlugin implements Plugin<Project> {
     public static final String EXTENSION = "bexLanguage";
+    private static final Pattern EXACT_VERSION = Pattern.compile(
+            "[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+|-dev\\.[0-9a-f]{40})?");
 
     @Override
     public void apply(Project project) {
@@ -17,12 +20,29 @@ public final class LanguageDependencyModePlugin implements Plugin<Project> {
                 project.getExtensions().create(
                         EXTENSION,
                         LanguageDependencyModeExtension.class);
+        String versionProperty = extension.getVersionPropertyName().get();
+        Object configuredVersion = project.findProperty(versionProperty);
+        if (configuredVersion != null) {
+            String selected = configuredVersion.toString().trim();
+            if (!EXACT_VERSION.matcher(selected).matches()) {
+                throw new GradleException(
+                        versionProperty + " must be an exact release, RC, or "
+                                + "commit-bound development version");
+            }
+            extension.getVersion().set(selected);
+        }
         String repositoryProperty =
                 extension.getRepositoryPropertyName().get();
         Object configuredRepository = project.findProperty(
                 repositoryProperty);
         if (configuredRepository != null
                 && !configuredRepository.toString().trim().isEmpty()) {
+            if (configuredVersion == null
+                    || configuredVersion.toString().trim().isEmpty()) {
+                throw new GradleException(
+                        repositoryProperty + " requires explicit -P"
+                                + versionProperty + "=<exact-version>");
+            }
             String repositoryPath = configuredRepository.toString().trim();
             project.getRepositories().maven(repository -> {
                 repository.setName("stagedBlueLanguage");
@@ -31,7 +51,13 @@ public final class LanguageDependencyModePlugin implements Plugin<Project> {
                         content.includeGroup("blue.language"));
             });
         }
-        project.getRepositories().mavenCentral();
+        project.getRepositories().mavenCentral(repository -> {
+            if (configuredRepository != null
+                    && !configuredRepository.toString().trim().isEmpty()) {
+                repository.content(content ->
+                        content.excludeGroup("blue.language"));
+            }
+        });
 
         project.getPluginManager().withPlugin("java", ignored ->
                 project.getTasks().register(

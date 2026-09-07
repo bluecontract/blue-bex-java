@@ -85,7 +85,7 @@ class ExternalCustomerPayNoteBexFunctionTest {
 
         BexValue attachEvent = findEvent(result, "attachPayNote");
         assertNotNull(attachEvent, "Expected attachPayNote event in " + result.events().events().size() + " computed events");
-        assertEquals("MyOS/Call Operation Requested", attachEvent.get("type").asText());
+        assertEquals("MyOS/Call Operation Requested", attachEvent.get("type").get("name").asText());
         assertEquals("investorChannel", attachEvent.get("onBehalfOf").asText());
         assertEquals("package-order-a", attachEvent.get("targetSessionId").asText());
         assertEquals("customer-paynote-a", attachEvent.at("/request/payNoteSessionId").asText());

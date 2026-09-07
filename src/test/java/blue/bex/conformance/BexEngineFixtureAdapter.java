@@ -1,6 +1,7 @@
 package blue.bex.conformance;
 
 import blue.bex.BexException;
+import blue.bex.BexExecutionEvidenceUnavailableException;
 import blue.bex.BexSourcePath;
 import blue.bex.api.BexEngine;
 import blue.bex.api.BexExecutionContext;
@@ -14,21 +15,25 @@ import blue.bex.compile.BexCompiledProgram;
 import blue.bex.gas.BexGasCharge;
 import blue.bex.gas.BexGasLedgerCapability;
 import blue.bex.gas.BexGasLimitExceededException;
+import blue.bex.gas.BexGasSchedule;
 import blue.bex.output.BexEstablishedIdentity;
 import blue.bex.output.BexSemanticIdentityBoundary;
+import blue.bex.pointer.BexPointerCache;
 import blue.bex.result.BexExecutionResult;
+import blue.bex.result.BexMetricsRecorder;
+import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.bex.test.TestBlue;
 import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
 import blue.language.model.Node;
+import blue.language.model.NodeWireForm;
 import blue.language.processor.GasMeter;
 import blue.language.processor.GasSchedule;
 import blue.language.processor.GasTraceEntry;
 import blue.language.snapshot.FrozenNode;
 import blue.language.merge.ResolvedSnapshot;
-import blue.language.identity.DirectBlueIdCalculator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
@@ -57,9 +62,9 @@ final class BexEngineFixtureAdapter {
     static final String FIXTURE_INTRINSIC =
             "5Zbnaiu1hzRNEpuQmKNHuSmkiq5VqdZ5ros49gwGB674";
     static final String SORT_FIXTURE_INTRINSIC =
-            "2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG";
+            "3x6byASNDdnEf9o2EgzAVqewP1zuqyNmzccAmyiYfQsw";
     private static final String FIXTURE_REGISTRY_IDENTITY =
-            "sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1";
+            "sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b";
 
     private static final Pattern OPERATOR_IN_MESSAGE =
             Pattern.compile("(\\$[A-Za-z][A-Za-z0-9]*)");
@@ -69,6 +74,16 @@ final class BexEngineFixtureAdapter {
                           Map<String, Object> context,
                           Map<String, Object> variant,
                           String runName) {
+        return execute(
+                fixture, program, context, variant, runName, false);
+    }
+
+    BexFixtureRun execute(ConformancePackage.Fixture fixture,
+                          Map<String, Object> program,
+                          Map<String, Object> context,
+                          Map<String, Object> variant,
+                          String runName,
+                          boolean observeOverlay) {
         Map<String, Object> providerData = optionalMap(
                 context.get("provider"), fixture.path + ".context.provider");
         RecordingNodeProvider provider =
@@ -92,7 +107,7 @@ final class BexEngineFixtureAdapter {
                     : -1L;
             RecordingGasHost gasHost = new RecordingGasHost(parentBudget);
             RecordingIdentityBoundary identityBoundary =
-                    new RecordingIdentityBoundary();
+                    new RecordingIdentityBoundary(blue);
 
             BexExecutionContext executionContext = executionContext(
                     blue,
@@ -102,21 +117,33 @@ final class BexEngineFixtureAdapter {
                     identityBoundary,
                     parentBudget,
                     localLimit);
+            BexGasSchedule bexGasSchedule = BexGasSchedule.defaults();
+            BexIntrinsicRegistry intrinsicRegistry = fixtureIntrinsics();
             BexEngine engine = BexEngine.builder()
                     .language(blue.runtime())
-                    .intrinsics(fixtureIntrinsics())
+                    .gasSchedule(bexGasSchedule)
+                    .intrinsics(intrinsicRegistry)
                     .build();
 
             BexExecutionResult result = null;
+            BexRuntime runtime = null;
             Throwable failure = null;
             boolean runtimeStarted = false;
             try {
-                Node programNode = ConformancePackage.syntaxNode(program);
+                Node programNode = fixtureProgramNode(blue, program);
                 BexCompiledProgram compiled = engine.compile(
                         BexProgramSource.inline(
                                 FrozenNode.fromResolvedNode(programNode)));
                 runtimeStarted = true;
-                result = engine.execute(compiled, executionContext);
+                runtime = new BexRuntime(
+                        compiled,
+                        executionContext,
+                        blue.runtime(),
+                        bexGasSchedule,
+                        new BexMetricsRecorder(),
+                        new BexPointerCache(),
+                        intrinsicRegistry);
+                result = runtime.execute();
             } catch (RuntimeException ex) {
                 failure = ex;
             } catch (Error error) {
@@ -149,12 +176,14 @@ final class BexEngineFixtureAdapter {
             Object resultValue = result != null
                     ? result.value().toSimple()
                     : null;
-            Object changes = result != null
-                    ? result.changeset().asValue().toSimple()
+            Object changes = runtime != null
+                    ? runtime.accumulator().changeset().asValue().toSimple()
                     : Collections.emptyList();
-            Object events = result != null
-                    ? result.events().asValue().toSimple()
+            Object events = runtime != null
+                    ? runtime.accumulator().events().asValue().toSimple()
                     : Collections.emptyList();
+            Object overlayValue = observableOverlayValue(
+                    runtime, observeOverlay);
 
             return new BexFixtureRun(
                     runName,
@@ -182,10 +211,87 @@ final class BexEngineFixtureAdapter {
                     failedChargePresent,
                     identityBoundary.complexIdentityCalls,
                     result != null,
+                    overlayValue,
+                    identityBoundary.boundaryValue(),
                     resultValue,
                     changes,
                     events);
         }
+    }
+
+    private static Object observableOverlayValue(
+            BexRuntime runtime,
+            boolean requested) {
+        if (runtime == null || !requested) {
+            return null;
+        }
+        try {
+            return runtime.accumulator().overlay().rootValue().toSimple();
+        } catch (BexExecutionEvidenceUnavailableException unavailable) {
+            /*
+             * Overlay observation is optional fixture evidence. It must not
+             * introduce a new semantic provider demand after execution (for
+             * example for an intentionally opaque cyclic-set reference).
+             */
+            return null;
+        }
+    }
+
+    /**
+     * Builds executable BEX syntax while decoding function argument patterns
+     * through Blue's source mapper. Most program maps deliberately keep
+     * reserved Blue field names as ordinary BEX output syntax, but argument
+     * patterns are static Blue nodes and therefore need their modeled
+     * {@code type}, {@code description}, schema, and empty-object semantics.
+     */
+    private static Node fixtureProgramNode(
+            TestBlue blue,
+            Map<String, Object> program) {
+        Node syntax = ConformancePackage.syntaxNode(program);
+        Object declaredFunctions = program.get("functions");
+        if (!(declaredFunctions instanceof Map)
+                || syntax.getProperties() == null) {
+            return syntax;
+        }
+        Node functionsSyntax = syntax.getProperties().get("functions");
+        if (functionsSyntax == null
+                || functionsSyntax.getProperties() == null) {
+            return syntax;
+        }
+        for (Map.Entry<String, Object> functionEntry
+                : ConformancePackage.map(
+                        declaredFunctions,
+                        "program.functions").entrySet()) {
+            if (!(functionEntry.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> definition = ConformancePackage.map(
+                    functionEntry.getValue(),
+                    "program.functions." + functionEntry.getKey());
+            Object declaredArgs = definition.get("args");
+            if (!(declaredArgs instanceof Map)) {
+                continue;
+            }
+            Node functionSyntax = functionsSyntax.getProperties().get(
+                    functionEntry.getKey());
+            Node argsSyntax = functionSyntax != null
+                    && functionSyntax.getProperties() != null
+                    ? functionSyntax.getProperties().get("args")
+                    : null;
+            if (argsSyntax == null || argsSyntax.getProperties() == null) {
+                continue;
+            }
+            for (Map.Entry<String, Object> argEntry
+                    : ConformancePackage.map(
+                            declaredArgs,
+                            "program.functions." + functionEntry.getKey()
+                                    + ".args").entrySet()) {
+                argsSyntax.getProperties().put(
+                        argEntry.getKey(),
+                        ConformancePackage.node(blue, argEntry.getValue()));
+            }
+        }
+        return syntax;
     }
 
     private static BexExecutionContext executionContext(
@@ -376,6 +482,10 @@ final class BexEngineFixtureAdapter {
                         invocation -> {
                     invocation.charge(
                             "payloadReturned", 1L, "fixture-payload-returned");
+                    BexValue exact = invocation.field("exact");
+                    if (!exact.isUndefined() && exact.asBoolean()) {
+                        return invocation.exactField("x").value();
+                    }
                     return invocation.field("x");
                 })
                 .register(
@@ -720,16 +830,28 @@ final class BexEngineFixtureAdapter {
 
     private static final class RecordingIdentityBoundary
             implements BexSemanticIdentityBoundary {
+        private final BexSemanticIdentityBoundary delegate;
+        private Node boundaryInput;
         private long complexIdentityCalls;
+
+        private RecordingIdentityBoundary(TestBlue blue) {
+            this.delegate = BexSemanticIdentityBoundary.standalone(
+                    blue.runtime().processing().runtimeAccess());
+        }
 
         @Override
         public BexEstablishedIdentity establishIdentity(Node node) {
+            boundaryInput = node.clone();
             if (node.getProperties() != null || node.getItems() != null) {
                 complexIdentityCalls++;
             }
-            return new BexEstablishedIdentity(
-                    DirectBlueIdCalculator.calculateBlueId(node),
-                    FrozenNode.fromResolvedNode(node.clone()));
+            return delegate.establishIdentity(node);
+        }
+
+        private Object boundaryValue() {
+            return boundaryInput != null
+                    ? NodeWireForm.get(boundaryInput)
+                    : null;
         }
     }
 

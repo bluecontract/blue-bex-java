@@ -1,0 +1,35 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-13
+vectors:
+- BEX-EMPTY-13
+category: e
+description: An explicit empty object for a Text-typed field is real content and fails type validation.
+program:
+  expr:
+    type:
+      x:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    x: {}
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  errorClass: output-conversion-error
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      type:
+        x:
+          type:
+            blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+      x: {}
+  - actual: runtime.bufferedEffectsCommitted
+    op: equals
+    expected: false

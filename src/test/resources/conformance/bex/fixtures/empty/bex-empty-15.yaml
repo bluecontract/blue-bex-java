@@ -1,0 +1,39 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-15
+vectors:
+- BEX-EMPTY-15
+category: e
+description: An explicit positional placeholder and an explicit empty object remain distinct exact list elements.
+program:
+  expr:
+  - $objectFromEntries:
+    - key: $empty
+      val: true
+  - {}
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+  - {$empty: true}
+  - {}
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected:
+      items:
+      - {$empty: true}
+      - {}
+  - actual: output.itemBlueIds
+    op: equals
+    expected:
+    - 6V647wzsPU3zXvrc5AwKsqbFmkgHWV8WAeyBfNG1T8Rx
+    - 5ajuwjHoLj33yG5t5UFsJtUb3vnRaJQEMPqSLz6VyoHK
+  - actual: output.nodeBlueId
+    op: equals
+    expected: 7oLSDVaBCSUqBgvH9FNTuoKD9spAB9cW1EBuWTLb87YR

@@ -61,7 +61,7 @@ Each variant runs from an independent copy of the base context. `sameAcrossVaria
 
 ## 6. Cases
 
-`expected.cases` is an explicit list of complete subcases. Each case replaces `program`, optionally replaces `context`, and asserts the named `errorClass` and optional reason. A case name alone has no semantics.
+`expected.cases` is an explicit list of complete subcases. Each case replaces `program`, optionally replaces `context`, and carries its own result, diagnostic, gas, effect, and projection expectations. A case name alone has no semantics. Failure cases observe the live runtime accumulator after rollback, so empty `changes`/`events` and `runtime.overlayValue` are execution evidence rather than a synthetic consequence of a missing result.
 
 ## 7. Output admission
 

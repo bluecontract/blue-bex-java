@@ -3,7 +3,7 @@ registryKind: runtime-type
 specificationVersion: '2.0'
 languageVersion: '1.0'
 contractsVersion: '1.0'
-fixturePackageIdentity: sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+fixturePackageIdentity: sha256:fdb896bf467c0ab8f3b2c9af3b609c9e7d0dc368dd3061f4b2909d0ee1fa89c3
 entries:
 - key: Compute2
   path: Compute2.blue
@@ -19,12 +19,12 @@ entries:
   fixtureOnly: true
 - key: SortFixtureIntrinsic
   path: SortFixtureIntrinsic.blue
-  blueId: 2R1WaEk8LVwFRMEGnsZ8HTj15QTz3tQEj9LDYYjGFJJG
-  sha256: 243833c0ac8a34a11c976c20199c6a89e815361447b1578e86e526b2942ea18a
+  blueId: 3x6byASNDdnEf9o2EgzAVqewP1zuqyNmzccAmyiYfQsw
+  sha256: f44bc60f351d334d02345772176e79da40e353e6d3cca10c0d9ddf4f95e1a593
   semanticDescriptionIdentityBearing: true
   fixtureOnly: true
 packageIdentityAlgorithm:
   digest: sha256
   encoding: UTF-8 canonical JSON with sorted keys
   normalization: packageIdentity and fixturePackageIdentity are null before hashing
-packageIdentity: sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+packageIdentity: sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b

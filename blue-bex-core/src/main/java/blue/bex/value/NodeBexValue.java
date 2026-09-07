@@ -28,20 +28,7 @@ final class NodeBexValue extends AbstractBexValue {
 
     @Override
     public boolean isNull() {
-        return node.getName() == null
-                && node.getDescription() == null
-                && node.getType() == null
-                && node.getItemType() == null
-                && node.getKeyType() == null
-                && node.getValueType() == null
-                && node.getBlueId() == null
-                && node.getBlue() == null
-                && node.getSchema() == null
-                && node.getMergePolicy() == null
-                && node.getContracts() == null
-                && node.getValue() == null
-                && node.getItems() == null
-                && node.getProperties() == null;
+        return node.isInlineValue() && isFieldless();
     }
 
     @Override
@@ -51,7 +38,11 @@ final class NodeBexValue extends AbstractBexValue {
 
     @Override
     public boolean isObject() {
-        return node.getProperties() != null || hasObjectCompatibleLanguageFields();
+        return node.getValue() == null
+                && node.getItems() == null
+                && (node.getProperties() != null
+                || hasObjectCompatibleLanguageFields()
+                || (!node.isInlineValue() && isFieldless()));
     }
 
     @Override
@@ -196,7 +187,9 @@ final class NodeBexValue extends AbstractBexValue {
             }
             return out;
         }
-        if (node.getProperties() != null || hasObjectCompatibleLanguageFields()) {
+        if (node.getProperties() != null
+                || hasObjectCompatibleLanguageFields()
+                || (!node.isInlineValue() && isFieldless())) {
             LinkedHashMap<String, Object> out = new LinkedHashMap<>();
             for (String key : keys()) {
                 BexValue value = get(key);
@@ -207,6 +200,25 @@ final class NodeBexValue extends AbstractBexValue {
             return out;
         }
         return null;
+    }
+
+    private boolean isFieldless() {
+        return node.getName() == null
+                && node.getDescription() == null
+                && node.getType() == null
+                && node.getItemType() == null
+                && node.getKeyType() == null
+                && node.getValueType() == null
+                && node.getValue() == null
+                && node.getItems() == null
+                && node.getProperties() == null
+                && node.getContracts() == null
+                && node.getBlueId() == null
+                && node.getSchema() == null
+                && node.getMergePolicy() == null
+                && node.getPreviousBlueId() == null
+                && node.getPosition() == null
+                && node.getBlue() == null;
     }
 
     private boolean hasObjectCompatibleLanguageFields() {

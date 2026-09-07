@@ -52,9 +52,9 @@ public final class BexOutputAdmission {
          */
         gas.charge(BexGasCounter.BLUE_OUTPUT_BOUNDARY, 1L, kind.reason());
         if (value == null || value.isUndefined()) {
-            throw new BexException("Blue output conversion failed: root value is undefined");
+            throw new BexException(
+                    "Blue output conversion failed: root value is undefined");
         }
-
         if (value.isExact()) {
             String exactId = BlueIds.requireBlueIdOrCyclicMember(
                     value.exactBlueId(), "BEX exact output blueId");
@@ -75,13 +75,20 @@ public final class BexOutputAdmission {
                     false,
                     carried.exactCapability());
         }
+        if (value.isNull()) {
+            throw new BexException(
+                    "Blue output conversion failed: root value is null");
+        }
 
         BexAdmittedValue prior = admittedTransientValues.get(value);
         if (prior != null) {
             return prior;
         }
 
-        Node node = BexBlueNodeWriter.toNode(value);
+        // Host admission needs the available exact children before it can
+        // establish the rebuilt parent's identity. Collapsing them here would
+        // discard literal-template content that has no provider entry yet.
+        Node node = BexBlueNodeWriter.toSourceNode(value);
 
         final BexEstablishedIdentity established;
         try {
@@ -114,8 +121,9 @@ public final class BexOutputAdmission {
         EstablishedTransientIdentity identity =
                 new EstablishedTransientIdentity(
                         established.frozenValue(),
+                        established.resolvedValue(),
                         blueId,
-                        established.exactCapability());
+                        established.exactCapability(), established.canonicalTypeIdentities());
         BexAdmittedValue admitted =
                 identity.admit(value);
         admittedTransientValues.put(value, admitted);
@@ -124,26 +132,33 @@ public final class BexOutputAdmission {
 
     private static final class EstablishedTransientIdentity {
         private final FrozenNode frozenValue;
+        private final FrozenNode resolvedValue;
         private final String blueId;
         private final BexExactValueCapability exactCapability;
+        private final blue.language.identity.CanonicalTypeIdentityLookup typeIdentities;
 
         private EstablishedTransientIdentity(
                 FrozenNode frozenValue,
+                FrozenNode resolvedValue,
                 String blueId,
-                BexExactValueCapability exactCapability) {
+                BexExactValueCapability exactCapability,
+                blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
             this.frozenValue = Objects.requireNonNull(
                     frozenValue, "frozenValue");
+            this.resolvedValue = Objects.requireNonNull(resolvedValue, "resolvedValue");
             this.blueId = Objects.requireNonNull(
                     blueId, "blueId");
             this.exactCapability = exactCapability;
+            this.typeIdentities = typeIdentities;
         }
 
         private BexAdmittedValue admit(
                 BexValue suppliedValue) {
             BexValue exact = BexValues.admittedExact(
                     frozenValue,
+                    resolvedValue,
                     blueId,
-                    suppliedValue);
+                    suppliedValue, typeIdentities);
             return new BexAdmittedValue(
                     exact,
                     exact,

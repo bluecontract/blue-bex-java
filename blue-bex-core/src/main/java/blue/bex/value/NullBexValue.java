@@ -19,7 +19,7 @@ final class NullBexValue extends AbstractBexValue {
     public boolean isNull() { return true; }
 
     @Override
-    public Node toNode() { return new Node(); }
+    public Node toNode() { return BexNodeWriter.toNode(this); }
 
     @Override
     public Object toSimple() { return null; }

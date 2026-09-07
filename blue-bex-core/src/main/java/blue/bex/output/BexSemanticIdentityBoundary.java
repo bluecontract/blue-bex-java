@@ -1,8 +1,12 @@
 package blue.bex.output;
 
 import blue.language.model.Node;
+import blue.language.merge.ResolvedSnapshot;
 import blue.language.snapshot.FrozenNode;
 import blue.language.identity.DirectBlueIdCalculator;
+import blue.language.runtime.LanguageRuntimeAccess;
+
+import java.util.Objects;
 
 /**
  * Host-owned Blue semantic identity establishment.
@@ -21,6 +25,31 @@ public interface BexSemanticIdentityBoundary {
                         frozen.toNode()),
                 frozen);
     };
+
+    /**
+     * Creates the standalone boundary for one configured Language runtime.
+     *
+     * <p>Runtime-produced BEX output is authored Blue content, so Language
+     * must first resolve inline type declarations and validate payload kinds
+     * before direct identity calculation.  Keeping this factory here gives
+     * standalone execution the same semantic admission rule as the hosted
+     * Contracts boundary without giving BEX a second identity algorithm.</p>
+     *
+     * @param languageRuntime configured Language semantic runtime
+     * @return runtime-bound standalone identity boundary
+     */
+    static BexSemanticIdentityBoundary standalone(
+            LanguageRuntimeAccess languageRuntime) {
+        LanguageRuntimeAccess runtime = Objects.requireNonNull(
+                languageRuntime, "languageRuntime");
+        return node -> {
+            ResolvedSnapshot snapshot = runtime.canonicalizeWithEvidence(
+                    Objects.requireNonNull(node, "node").clone());
+            return new BexEstablishedIdentity(
+                    snapshot.blueId(), snapshot.frozenCanonicalRoot(),
+                    snapshot.frozenResolvedRoot(), null, snapshot.canonicalTypeIdentities());
+        };
+    }
 
     BexEstablishedIdentity establishIdentity(Node node);
 

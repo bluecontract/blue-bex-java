@@ -7,19 +7,19 @@ fixture manifest.
 ## Exact package baseline
 
 ```text
-normative vectors       60
-behavior fixtures      105
+normative vectors       75
+behavior fixtures      120
 gas microfixtures       30
 normative operators     86
 
 runtime registry
-sha256:23d282ec1c0bb016263922b1b49c369fdd537efdcf23e005eceeb888d7763fe1
+sha256:2ccbfc9d1a1c4425cdcaf37c924274cc4398f82ac72769a8c2cf1dd8ba2fd04b
 
 gas manifest
 sha256:41247c820d91a12fdfc17fd9e787a5d8d668d8acc5954fdcb131715bf9e6147d
 
 fixture package
-sha256:a1b7bb2b3687389409bc9d0aa450c734f7856d2bcb818c95f4d7ecb19095d20e
+sha256:fdb896bf467c0ab8f3b2c9af3b609c9e7d0dc368dd3061f4b2909d0ee1fa89c3
 ```
 
 Documentation-only corrections do not change these identities. If
@@ -48,14 +48,20 @@ No new BEX fixture is required merely because Contracts supports
 ## Run the working suite
 
 ```bash
-./gradlew --no-daemon clean bexWorkingVerification \
-  -PblueLanguageCompositePath=/absolute/path/to/blue-language-java
+./gradlew --no-daemon clean bexSdkStageVerify \
+  -PblueLanguageRepository=/absolute/path/to/immutable-language-repository \
+  -PblueLanguageVersion=3.1.0-dev.<language-source-commit> \
+  -PbexLocalStageVersion=1.1.0-dev.<bex-source-commit> \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-mutable-bex-stage
 ```
 
 The gate includes all ordinary tests, all fixture/vector/gas/operator coverage,
-local composite compile/runtime smoke, hosted adapters, Java 8 bytecode, public
-API descriptors, artifacts, BEX-owned archive determinism, and a clean
-machine-readable report.
+immutable-repository compile/runtime smoke, hosted adapters, Java 8 bytecode,
+public API descriptors, artifacts, BEX-owned archive determinism, and a clean
+machine-readable report. The repository must use the
+`blue-development-maven-repository/1.0` schema and contain the exact six-module
+Language runtime/POM closure; included-build substitution is not accepted by
+this lane.
 
 A green working result requires:
 

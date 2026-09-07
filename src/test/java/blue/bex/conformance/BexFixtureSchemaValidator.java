@@ -2,6 +2,7 @@ package blue.bex.conformance;
 
 import java.math.BigInteger;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +63,9 @@ final class BexFixtureSchemaValidator {
                     "document-update", "triggered", "lifecycle", "embedded");
     private static final Set<String> CASE_FIELDS =
             ConformancePackage.stringSet(
-                    "name", "program", "context", "errorClass", "reason");
+                    "name", "program", "context", "compileStatus", "result",
+                    "changes", "events", "errorClass", "gasTrace", "totalGas",
+                    "assertions", "reason");
 
     private BexFixtureSchemaValidator() {
     }
@@ -216,8 +219,7 @@ final class BexFixtureSchemaValidator {
                         requireMap(cases.get(index), casePath);
                 rejectUnknownFields(fixtureCase, CASE_FIELDS, casePath);
                 requireFields(fixtureCase,
-                        ConformancePackage.stringSet(
-                                "name", "program", "errorClass"),
+                        ConformancePackage.stringSet("name", "program"),
                         casePath);
                 String name = requireText(
                         fixtureCase.get("name"), casePath + ".name");
@@ -227,16 +229,21 @@ final class BexFixtureSchemaValidator {
                 if (fixtureCase.get("program") == null) {
                     fail(casePath + ".program must be present");
                 }
-                requireText(
-                        fixtureCase.get("errorClass"),
-                        casePath + ".errorClass");
-                requireTextWhenPresent(fixtureCase, "reason", casePath);
                 if (fixtureCase.containsKey("context")) {
                     validateContext(
                             requireMap(fixtureCase.get("context"),
                                     casePath + ".context"),
                             casePath + ".context");
                 }
+                Map<String, Object> caseExpected =
+                        new LinkedHashMap<String, Object>(fixtureCase);
+                caseExpected.remove("name");
+                caseExpected.remove("program");
+                caseExpected.remove("context");
+                if (caseExpected.isEmpty()) {
+                    fail(casePath + " must declare at least one expectation");
+                }
+                validateExpected(caseExpected, casePath);
             }
         }
     }

@@ -86,6 +86,36 @@ vectors:
   BEX-E-14:
   - e/bex-e-14.yaml
   - operators/bex-op-ne.yaml
+  BEX-EMPTY-01:
+  - empty/bex-empty-01.yaml
+  BEX-EMPTY-02:
+  - empty/bex-empty-02.yaml
+  BEX-EMPTY-03:
+  - empty/bex-empty-03.yaml
+  BEX-EMPTY-04:
+  - empty/bex-empty-04.yaml
+  BEX-EMPTY-05:
+  - empty/bex-empty-05.yaml
+  BEX-EMPTY-06:
+  - empty/bex-empty-06.yaml
+  BEX-EMPTY-07:
+  - empty/bex-empty-07.yaml
+  BEX-EMPTY-08:
+  - empty/bex-empty-08.yaml
+  BEX-EMPTY-09:
+  - empty/bex-empty-09.yaml
+  BEX-EMPTY-10:
+  - empty/bex-empty-10.yaml
+  BEX-EMPTY-11:
+  - empty/bex-empty-11.yaml
+  BEX-EMPTY-12:
+  - empty/bex-empty-12.yaml
+  BEX-EMPTY-13:
+  - empty/bex-empty-13.yaml
+  BEX-EMPTY-14:
+  - empty/bex-empty-14.yaml
+  BEX-EMPTY-15:
+  - empty/bex-empty-15.yaml
   BEX-G-01:
   - g/bex-g-01.yaml
   - gas-micro/bindingRead.yaml

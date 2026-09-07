@@ -6,6 +6,9 @@ import blue.bex.BexSourcePath;
 import blue.bex.gas.BexGasLimitExceededException;
 import blue.bex.gas.BexGasMeter;
 import blue.bex.value.BexBlueNodeWriter;
+import blue.bex.value.BexFrozenWriter;
+import blue.language.matching.NodeTypeMatcher;
+import blue.language.resolve.ResolutionLimits;
 import blue.bex.value.BexValue;
 import blue.bex.value.BexValues;
 import blue.language.model.Node;
@@ -34,11 +37,9 @@ public final class BexTypeMatcher {
         this.blue = blue != null
                 ? blue : BlueLanguage.builder().build();
         this.matcher = FrozenTypeMatcher.withVerifiedReferenceMaterializer(
-                reference -> FrozenNode.fromResolvedNode(
-                        BexValues.referenceBacked(
-                                BexValues.frozen(reference),
-                                this.blue)
-                                .toNode()));
+                reference -> this.blue.processing()
+                        .runtimeAccess()
+                        .materializeTypeReferenceForMatching(reference));
         this.frozenMatcher = new BexFrozenTypeMatcher(
                 matcher, patternValidator);
     }
@@ -116,7 +117,7 @@ public final class BexTypeMatcher {
             FrozenNode pattern,
             BexTypeMatchWorkRecorder gas,
             CandidatePosition position) {
-        if (pattern.isEmptyNode()) {
+        if (BexPatternValidator.isUnconstrainedPattern(pattern)) {
             return true;
         }
         if (candidate == null
@@ -207,10 +208,22 @@ public final class BexTypeMatcher {
             BexValue candidate,
             FrozenNode pattern,
             CandidatePosition position) {
-        FrozenNode frozen = freezeCandidate(
-                candidate, position);
-        return frozen != null
-                && matcher.matchesType(frozen, pattern);
+        FrozenNode frozen = freezeCandidate(candidate, position);
+        if (frozen == null) return false;
+        if (candidate.isExact()) {
+            if (candidate.canonicalTypeIdentities() != null) {
+                return FrozenTypeMatcher.withVerifiedTypeEvidence(
+                        reference -> blue.processing().runtimeAccess()
+                                .materializeTypeReferenceForMatching(reference),
+                        candidate.canonicalTypeIdentities()).matchesType(frozen, pattern);
+            }
+            // Legacy exact pairs retain canonical Source but no resolver sidecar.
+            // Re-establish demanded evidence from that Source, preserving failures.
+            return new NodeTypeMatcher(blue.processing().runtimeAccess())
+                    .matchesTypeOrThrow(BexFrozenWriter.toFrozen(candidate).toNode(),
+                            pattern.toNode(), ResolutionLimits.NO_LIMITS);
+        }
+        return matcher.matchesType(frozen, pattern);
     }
 
     private FrozenNode freezeCandidate(

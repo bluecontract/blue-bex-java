@@ -91,12 +91,17 @@ class BexAccumulatorPointerConsistencyTest {
                 "path", op("$document", "/missing")
         ))));
         assertThrows(BexException.class, () -> runExpr(op("$event", op("$document", "/missing"))));
-        assertThrows(BexException.class, () -> runExpr(op("$document", op("$literal", null))));
-        assertThrows(BexException.class, () -> runExpr(op("$pointerSet", obj(
+        BexExecutionContext runtimeNull = BexExecutionContext.builder()
+                .document(defaultDocumentView())
+                .binding("nullPath", BexValues.nullValue())
+                .gasLimit(1_000_000).build();
+        assertThrows(BexException.class, () -> runStep(
+                stepExpr(op("$document", op("$binding", "nullPath"))), runtimeNull));
+        assertThrows(BexException.class, () -> runStep(stepExpr(op("$pointerSet", obj(
                 "object", obj("a", 1),
-                "path", op("$literal", null),
+                "path", op("$binding", "nullPath"),
                 "val", 2
-        ))));
+        ))), runtimeNull));
     }
 
     @Test

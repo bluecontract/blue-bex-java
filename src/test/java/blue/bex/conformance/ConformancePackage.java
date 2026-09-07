@@ -46,9 +46,9 @@ final class ConformancePackage {
     static final String REGISTRY_ROOT = ROOT + "registry/";
     static final String REGISTRY_MANIFEST = REGISTRY_ROOT + "manifest.yaml";
 
-    static final int FILE_COUNT = 147;
-    static final int VECTOR_COUNT = 60;
-    static final int BEHAVIOR_FIXTURE_COUNT = 105;
+    static final int FILE_COUNT = 162;
+    static final int VECTOR_COUNT = 75;
+    static final int BEHAVIOR_FIXTURE_COUNT = 120;
     static final int GAS_FIXTURE_COUNT = 30;
     static final int OPERATOR_COUNT = 86;
 
@@ -200,7 +200,17 @@ final class ConformancePackage {
      */
     static Node syntaxNode(Object value) {
         if (value == null) {
-            return new Node();
+            /*
+             * BEX syntax owns its null literal independently of Blue Source
+             * preprocessing. Normalize YAML null to the registered $null
+             * expression before freezing: a Blue source-null marker is
+             * invalid after preprocessing, while a Java-null graph child is
+             * not a valid immutable Language snapshot.
+             */
+            Map<String, Node> properties =
+                    new LinkedHashMap<String, Node>();
+            properties.put("$null", new Node().value(Boolean.TRUE));
+            return new Node().properties(properties);
         }
         if (value instanceof Map) {
             Map<String, Node> properties =

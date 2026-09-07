@@ -1,0 +1,327 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-06
+vectors:
+- BEX-EMPTY-06
+category: e
+description: Null and undefined roots fail every exact-Blue boundary atomically after deterministic boundary charges, discarding already buffered patches, events, and overlay mutations.
+program:
+  expr:
+    $nodeBlueId:
+      $null: true
+context:
+  rootDocument:
+    original: keep
+    patchValue: buffered
+    eventValue:
+      kind: buffered
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  errorClass: output-conversion-error
+  totalGas: 14
+  changes: []
+  events: []
+  assertions:
+  - actual: gas.nodeIdentityRequested
+    op: equals
+    expected: 1
+  - actual: gas.blueOutputBoundary
+    op: equals
+    expected: 1
+  - actual: gas.semanticIdentityMergeCount
+    op: equals
+    expected: 0
+  - actual: runtime.bufferedEffectsCommitted
+    op: equals
+    expected: false
+  - actual: runtime.overlayValue
+    op: equals
+    expected:
+      original: keep
+      patchValue: buffered
+      eventValue:
+        kind: buffered
+  cases:
+  - name: root-null
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $return:
+          $null: true
+    errorClass: output-conversion-error
+    totalGas: 41
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 1
+    - actual: gas.eventAppended
+      op: equals
+      expected: 1
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 0
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered
+  - name: root-undefined
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $return:
+          $document: /missing
+    errorClass: output-conversion-error
+    totalGas: 45
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 1
+    - actual: gas.eventAppended
+      op: equals
+      expected: 1
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 0
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered
+  - name: patch-null
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $appendChange:
+          op: replace
+          path: /x
+          val:
+            $null: true
+    errorClass: output-conversion-error
+    totalGas: 46
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 2
+    - actual: gas.eventAppended
+      op: equals
+      expected: 1
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 0
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered
+  - name: event-null
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $appendEvent:
+          $null: true
+    errorClass: output-conversion-error
+    totalGas: 46
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 1
+    - actual: gas.eventAppended
+      op: equals
+      expected: 2
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 0
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered
+  - name: intrinsic-exact-null
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $return:
+          $intrinsic:
+            type:
+              blueId: 5Zbnaiu1hzRNEpuQmKNHuSmkiq5VqdZ5ros49gwGB674
+            exact: true
+            x:
+              $null: true
+    errorClass: output-conversion-error
+    totalGas: 49
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 1
+    - actual: gas.eventAppended
+      op: equals
+      expected: 1
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 0
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 2
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered
+  - name: node-blue-id-undefined
+    program:
+      do:
+      - $appendChange:
+          op: add
+          path: /buffered
+          val:
+            $document: /patchValue
+      - $appendEvent:
+          $document: /eventValue
+      - $return:
+          $nodeBlueId:
+            $document: /missing
+    errorClass: output-conversion-error
+    totalGas: 51
+    changes: []
+    events: []
+    assertions:
+    - actual: gas.blueOutputBoundary
+      op: equals
+      expected: 3
+    - actual: gas.semanticIdentityMergeCount
+      op: equals
+      expected: 0
+    - actual: gas.patchAppended
+      op: equals
+      expected: 1
+    - actual: gas.eventAppended
+      op: equals
+      expected: 1
+    - actual: gas.nodeIdentityRequested
+      op: equals
+      expected: 1
+    - actual: host.runtimeChildMergeCount
+      op: equals
+      expected: 1
+    - actual: runtime.bufferedEffectsCommitted
+      op: equals
+      expected: false
+    - actual: runtime.overlayValue
+      op: equals
+      expected:
+        original: keep
+        patchValue: buffered
+        eventValue:
+          kind: buffered

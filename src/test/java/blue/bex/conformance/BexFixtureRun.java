@@ -39,6 +39,8 @@ final class BexFixtureRun {
     final boolean failedChargePresent;
     final long semanticIdentityMergeCount;
     final boolean bufferedEffectsCommitted;
+    final Object overlayValue;
+    final Object outputBoundaryValue;
     final Object result;
     final Object changes;
     final Object events;
@@ -68,6 +70,8 @@ final class BexFixtureRun {
                   boolean failedChargePresent,
                   long semanticIdentityMergeCount,
                   boolean bufferedEffectsCommitted,
+                  Object overlayValue,
+                  Object outputBoundaryValue,
                   Object result,
                   Object changes,
                   Object events) {
@@ -96,6 +100,8 @@ final class BexFixtureRun {
         this.failedChargePresent = failedChargePresent;
         this.semanticIdentityMergeCount = semanticIdentityMergeCount;
         this.bufferedEffectsCommitted = bufferedEffectsCommitted;
+        this.overlayValue = overlayValue;
+        this.outputBoundaryValue = outputBoundaryValue;
         this.result = result;
         this.changes = changes;
         this.events = events;

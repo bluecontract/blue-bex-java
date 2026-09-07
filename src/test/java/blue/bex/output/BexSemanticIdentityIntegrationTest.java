@@ -45,7 +45,6 @@ import static blue.bex.test.BexTestFixtures.stepDo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -85,6 +84,54 @@ class BexSemanticIdentityIntegrationTest {
                 hostedValue.value().get("name").asText());
         assertEquals("value", hostedValue.value().asText());
         assertTrue(hostedValue.semanticValue().isExact());
+    }
+
+    @Test
+    void transientOutputRetainsAvailableCanonicalChildContentForHostAdmission() {
+        Node workflow = obj("run", obj("steps", list(op("$unknownFutureOperator", true))));
+        FrozenNode canonical = FrozenNode.fromNode(workflow);
+        FrozenNode differentSemantic = FrozenNode.fromResolvedNode(obj("resolvedOnly", true));
+        BexValue exactContracts = BexValues.exact(canonical, differentSemantic, canonical.blueId());
+        BexValue constructed = BexValues.fromSimple(map("quantity", 7, "contracts", exactContracts));
+        RecordingBoundary boundary = new RecordingBoundary();
+        admission(boundary).admit(constructed, BexOutputKind.ROOT_RESULT);
+        Node supplied = boundary.inputs.get(0).getContracts();
+        assertFalse(supplied.isReferenceOnly());
+        assertEquals(canonical.blueId(), DirectBlueIdCalculator.calculateBlueId(supplied));
+    }
+
+    @Test
+    void returnedEventsRetainTheirInlineTypeSource() {
+        BexEngine engine = BexEngine.builder().build();
+        Node program = stepDo(list(
+                op("$appendEvent", obj("type", obj("name", "Local Event"), "amount", 7)),
+                op("$return", op("$events", true))));
+        BexExecutionResult result = engine.compileAndExecute(
+                BexProgramSource.inline(frozen(program)),
+                BexExecutionContext.builder().document(defaultDocumentView()).build());
+        assertEquals(1, result.events().events().size());
+        assertEquals(result.events().events().get(0).exactBlueId(),
+                result.value().at(Collections.singletonList("0")).exactBlueId());
+        assertEquals("Local Event", result.value().at(Collections.singletonList("0")).get("type").get("name").asText());
+    }
+
+    @Test
+    void canonicalPayloadRejectsConflictingTypeSourceEvidence() {
+        try (blue.language.runtime.BlueLanguage language =
+                blue.language.runtime.BlueLanguage.builder().build()) {
+            blue.language.merge.ResolvedSnapshot first = language.snapshots().resolve(
+                    new Node().type(new Node().name("First Type"))
+                            .properties("amount", new Node().value(7)));
+            blue.language.merge.ResolvedSnapshot second = language.snapshots().resolve(
+                    new Node().type(new Node().name("Second Type"))
+                            .properties("amount", new Node().value(7)));
+            BexValue conflicting = BexValues.exact(first.frozenCanonicalRoot(),
+                    second.frozenResolvedRoot(), first.blueId(), second.canonicalTypeIdentities());
+            BexException failure = assertThrows(BexException.class, () -> admission(
+                    BexSemanticIdentityBoundary.STANDALONE).admit(
+                    BexValues.fromSimple(map("child", conflicting)), BexOutputKind.ROOT_RESULT));
+            assertTrue(failure.getMessage().contains("type Source conflicts"));
+        }
     }
 
     @Test
@@ -311,7 +358,6 @@ class BexSemanticIdentityIntegrationTest {
                 BexValues.scalar(BigInteger.valueOf(7L)),
                 BexValues.scalar(new BigDecimal("7.5")),
                 BexValues.scalar(true),
-                BexValues.nullValue(),
                 BexValues.fromSimple(Arrays.asList("x", 1)),
                 BexValues.fromSimple(map(
                         "outer", map("inner", 1),
@@ -341,7 +387,7 @@ class BexSemanticIdentityIntegrationTest {
         BexAdmittedValue initial = admission.admit(
                 first, BexOutputKind.NODE_IDENTITY);
         assertSame(initial, admission.admit(
-                first, BexOutputKind.PATCH_VALUE));
+                first, BexOutputKind.ROOT_RESULT));
         BexAdmittedValue recreated = admission.admit(
                 sameStructureDifferentOrder,
                 BexOutputKind.EVENT);
@@ -358,13 +404,13 @@ class BexSemanticIdentityIntegrationTest {
     }
 
     @Test
-    void memoizedHostIdentityPreservesNullThenEmptyObjectShapes() {
-        assertMemoizedNullAndEmptyObjectShapes(true);
+    void nullIsRejectedBeforeAnEmptyObjectIsAdmitted() {
+        assertNullRejectedIndependentlyOfEmptyObject(true);
     }
 
     @Test
-    void memoizedHostIdentityPreservesEmptyObjectThenNullShapes() {
-        assertMemoizedNullAndEmptyObjectShapes(false);
+    void emptyObjectAdmissionDoesNotMakeNullAdmissible() {
+        assertNullRejectedIndependentlyOfEmptyObject(false);
     }
 
     @Test
@@ -638,7 +684,7 @@ class BexSemanticIdentityIntegrationTest {
         assertSame(failure, observed);
     }
 
-    private static void assertMemoizedNullAndEmptyObjectShapes(
+    private static void assertNullRejectedIndependentlyOfEmptyObject(
             boolean nullFirst) {
         RecordingBoundary boundary = new RecordingBoundary();
         BexOutputAdmission admission = admission(boundary);
@@ -646,12 +692,10 @@ class BexSemanticIdentityIntegrationTest {
         BexValue suppliedEmptyObject =
                 BexValues.fromSimple(Collections.emptyMap());
 
-        BexAdmittedValue admittedNull;
         BexAdmittedValue admittedEmptyObject;
         if (nullFirst) {
-            admittedNull = admission.admit(
-                    suppliedNull,
-                    BexOutputKind.ROOT_RESULT);
+            assertThrows(BexException.class, () -> admission.admit(
+                    suppliedNull, BexOutputKind.ROOT_RESULT));
             admittedEmptyObject = admission.admit(
                     suppliedEmptyObject,
                     BexOutputKind.ROOT_RESULT);
@@ -659,30 +703,18 @@ class BexSemanticIdentityIntegrationTest {
             admittedEmptyObject = admission.admit(
                     suppliedEmptyObject,
                     BexOutputKind.ROOT_RESULT);
-            admittedNull = admission.admit(
-                    suppliedNull,
-                    BexOutputKind.ROOT_RESULT);
+            assertThrows(BexException.class, () -> admission.admit(
+                    suppliedNull, BexOutputKind.ROOT_RESULT));
         }
 
-        assertEquals(2, boundary.calls);
-        assertEquals(2L, admission.semanticIdentityMergeCount());
-        assertNotSame(admittedNull, admittedEmptyObject);
-        assertTrue(admittedNull.value().isExact());
-        assertEquals("null", BexValues.kind(
-                admittedNull.value()));
-        assertNull(admittedNull.value().toSimple());
+        assertEquals(1, boundary.calls);
+        assertEquals(1L, admission.semanticIdentityMergeCount());
         assertTrue(admittedEmptyObject.value().isExact());
         assertEquals("object", BexValues.kind(
                 admittedEmptyObject.value()));
         assertEquals(
                 Collections.emptyMap(),
                 admittedEmptyObject.value().toSimple());
-        assertEquals(
-                admittedNull.nodeBlueId(),
-                admittedEmptyObject.nodeBlueId());
-        assertEquals(
-                admittedNull.value().exactBlueId(),
-                admittedEmptyObject.value().exactBlueId());
     }
 
     private static void assertAdmittedScalar(

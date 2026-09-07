@@ -38,6 +38,11 @@ public interface BexValue {
         throw new IllegalStateException("Transient BEX values do not have a Node BlueId");
     }
 
+    /** Optional type evidence retained by the boundary that established this exact value. */
+    default blue.language.identity.CanonicalTypeIdentityLookup canonicalTypeIdentities() {
+        return null;
+    }
+
     boolean isUndefined();
     boolean isNull();
     boolean isScalar();

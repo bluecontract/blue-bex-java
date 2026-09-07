@@ -26,13 +26,26 @@ final class AdmittedExactBexValue implements BexValue {
     AdmittedExactBexValue(FrozenNode frozenValue,
                           String blueId,
                           BexValue suppliedValue) {
+        this(frozenValue, frozenValue, blueId, suppliedValue);
+    }
+
+    AdmittedExactBexValue(FrozenNode frozenValue,
+                          FrozenNode resolvedValue,
+                          String blueId,
+                          BexValue suppliedValue) {
+        this(frozenValue, resolvedValue, blueId, suppliedValue, null);
+    }
+
+    AdmittedExactBexValue(FrozenNode frozenValue, FrozenNode resolvedValue,
+                          String blueId, BexValue suppliedValue,
+                          blue.language.identity.CanonicalTypeIdentityLookup typeIdentities) {
         this(
                 BexValues.exact(
                         Objects.requireNonNull(
                                 frozenValue, "frozenValue"),
-                        frozenValue,
+                        Objects.requireNonNull(resolvedValue, "resolvedValue"),
                         Objects.requireNonNull(
-                                blueId, "blueId")),
+                                blueId, "blueId"), typeIdentities),
                 suppliedValue);
     }
 
@@ -47,6 +60,11 @@ final class AdmittedExactBexValue implements BexValue {
         this.suppliedValue = suppliedValue != null
                 ? suppliedValue
                 : BexValues.UNDEFINED;
+    }
+
+    @Override
+    public blue.language.identity.CanonicalTypeIdentityLookup canonicalTypeIdentities() {
+        return establishedValue.canonicalTypeIdentities();
     }
 
     @Override
@@ -66,8 +84,7 @@ final class AdmittedExactBexValue implements BexValue {
 
     @Override
     public boolean isNull() {
-        return establishedValue.isNull()
-                && !usesEmptyObjectShapeWitness();
+        return establishedValue.isNull();
     }
 
     @Override
@@ -77,8 +94,7 @@ final class AdmittedExactBexValue implements BexValue {
 
     @Override
     public boolean isObject() {
-        return establishedValue.isObject()
-                || usesEmptyObjectShapeWitness();
+        return establishedValue.isObject();
     }
 
     @Override
@@ -183,19 +199,6 @@ final class AdmittedExactBexValue implements BexValue {
                     "Admitted exact value has no frozen host representation");
         }
         return ((FrozenNodeBexValue) establishedValue).canonicalNode();
-    }
-
-    /*
-     * Blue's resolved frozen representation retains an empty object member as
-     * an empty node, which is also the representation of BEX null. The exact
-     * host value remains authoritative for every modeled field and for
-     * identity; the supplied value is used only as the otherwise-lost shape
-     * witness when it is precisely an empty object.
-     */
-    private boolean usesEmptyObjectShapeWitness() {
-        return establishedValue.isNull()
-                && suppliedValue.isObject()
-                && suppliedValue.size() == 0;
     }
 
     @Override

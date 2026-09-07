@@ -18,26 +18,36 @@ operation that actually inspects content.
 
 A transient value is converted recursively to runtime Blue content:
 
-- undefined root fails;
-- undefined object members are omitted;
+- a null or undefined root fails;
+- null or undefined object members are omitted;
+- a null list member becomes the exact positional placeholder
+  `{ $empty: true }`;
 - an undefined list member fails;
-- null becomes the Blue null/empty-node form;
+- explicit empty objects and lists remain present values;
 - scalar kinds use deterministic Blue scalar rules;
 - objects and lists traverse in the order required by BEX;
 - exact descendants remain exact rather than being reconstructed;
 - the final node is validated before direct identity establishment.
+
+These rules apply recursively, including reserved members. In particular,
+`{type: null}` admits as `{}`, while `{type: {}}` retains the explicit empty
+inline type. A null patch, event, request root, or other root-valued output is
+an admission failure; an explicit `{}` in the same position is valid content.
 
 The host's `BexSemanticIdentityBoundary` establishes the ordinary BlueId exactly
 once. The admitted result retains both exact identity and the run-local semantic
 cursor, so a later `$resultValue`, variable, event, or changeset read does not
 repeat conversion or hashing.
 
-## Runtime content, not Source content
+## Runtime admission with Source-equivalent empty semantics
 
-Output is runtime Blue content. It is not a Source document waiting for
-preprocessing. A root or nested `blue` directive is invalid, and admission never
-runs Source preprocessing, complete resolution, canonicalization, or
-minimization.
+Output is runtime Blue content, not an arbitrary Source document. The boundary
+nevertheless applies the same position-sensitive null and empty-container rules
+as Source preprocessing so the same authored shape has the same canonical
+meaning on both sides of the boundary. It does not execute `blue` imports or
+other Source transformation directives. After positional normalization, the
+Language runtime validates the payload and canonicalizes identity-bearing
+inline types before direct identity establishment.
 
 Other fail-closed rules include:
 
@@ -70,4 +80,6 @@ commit. Hosted execution preserves the host failure classification and merges a
 successful child identity/gas effect exactly once.
 
 See [Values and identity](values-and-identity.md) and
-[Gas and exhaustion](gas-and-exhaustion.md).
+[Gas and exhaustion](gas-and-exhaustion.md). The rationale and accepted
+compatibility decision are recorded in
+[Review decision: BEX null at the Blue boundary](REVIEW_COMMENT_BEX_NULL_BOUNDARY.md).

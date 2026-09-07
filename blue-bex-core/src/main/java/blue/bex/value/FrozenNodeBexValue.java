@@ -2,6 +2,7 @@ package blue.bex.value;
 
 import blue.bex.BexException;
 import blue.language.model.Node;
+import blue.language.identity.CanonicalTypeIdentityLookup;
 import blue.language.snapshot.FrozenNode;
 import blue.language.merge.ResolvedSnapshot;
 
@@ -27,30 +28,39 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     private final FrozenNode initialSemanticNode;
     private final String retainedExactBlueId;
     private final Function<String, ResolvedSnapshot> referenceMaterializer;
+    private final CanonicalTypeIdentityLookup typeIdentities;
+    private volatile CanonicalTypeIdentityLookup materializedTypeIdentities;
     private volatile FrozenNode materializedCanonicalNode;
     private volatile FrozenNode materializedSemanticNode;
     private volatile List<String> canonicalKeys;
 
     FrozenNodeBexValue(FrozenNode canonicalNode, FrozenNode semanticNode) {
-        this(canonicalNode, semanticNode, null, null);
+        this(canonicalNode, semanticNode, null, null, null);
     }
 
     FrozenNodeBexValue(FrozenNode canonicalNode,
                        FrozenNode semanticNode,
                        String retainedExactBlueId) {
-        this(canonicalNode, semanticNode, retainedExactBlueId, null);
+        this(canonicalNode, semanticNode, retainedExactBlueId, null, null);
+    }
+
+    FrozenNodeBexValue(FrozenNode canonicalNode, FrozenNode semanticNode,
+                       String retainedExactBlueId, CanonicalTypeIdentityLookup typeIdentities) {
+        this(canonicalNode, semanticNode, retainedExactBlueId, null, typeIdentities);
     }
 
     private FrozenNodeBexValue(
             FrozenNode canonicalNode,
             FrozenNode semanticNode,
             String retainedExactBlueId,
-            Function<String, ResolvedSnapshot> referenceMaterializer) {
+            Function<String, ResolvedSnapshot> referenceMaterializer,
+            CanonicalTypeIdentityLookup typeIdentities) {
         this.canonicalIdentityNode = canonicalNode;
         this.initialSemanticNode =
                 semanticNode != null ? semanticNode : canonicalNode;
         this.retainedExactBlueId = retainedExactBlueId;
         this.referenceMaterializer = referenceMaterializer;
+        this.typeIdentities = typeIdentities;
     }
 
     FrozenNode node() {
@@ -78,7 +88,12 @@ final class FrozenNodeBexValue extends AbstractBexValue {
                 canonicalIdentityNode,
                 initialSemanticNode,
                 retainedExactBlueId,
-                materializer);
+                materializer, canonicalTypeIdentities());
+    }
+
+    @Override
+    public CanonicalTypeIdentityLookup canonicalTypeIdentities() {
+        return materializedTypeIdentities != null ? materializedTypeIdentities : typeIdentities;
     }
 
     @Override
@@ -101,7 +116,9 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     @Override
     public boolean isNull() {
         FrozenNode semantic = semanticNode();
-        return semantic != null && semantic.isEmptyNode();
+        return semantic != null
+                && semantic.isEmptyNode()
+                && semantic.isInlineValue();
     }
 
     @Override
@@ -117,8 +134,12 @@ final class FrozenNodeBexValue extends AbstractBexValue {
     public boolean isObject() {
         FrozenNode semantic = semanticNode();
         return semantic != null
+                && semantic.getValue() == null
+                && semantic.getItems() == null
                 && (semantic.getProperties() != null
-                || hasObjectCompatibleLanguageFields(semantic));
+                || hasObjectCompatibleLanguageFields(semantic)
+                || (semantic.isEmptyNode()
+                && !semantic.isInlineValue()));
     }
 
     @Override
@@ -327,7 +348,9 @@ final class FrozenNodeBexValue extends AbstractBexValue {
             return out;
         }
         if (semantic.getProperties() != null
-                || hasObjectCompatibleLanguageFields(semantic)) {
+                || hasObjectCompatibleLanguageFields(semantic)
+                || (semantic.isEmptyNode()
+                && !semantic.isInlineValue())) {
             LinkedHashMap<String, Object> out = new LinkedHashMap<>();
             for (String key : keys()) {
                 BexValue value = get(key);
@@ -368,7 +391,7 @@ final class FrozenNodeBexValue extends AbstractBexValue {
                 exactCanonical,
                 exactSemantic,
                 null,
-                referenceMaterializer);
+                referenceMaterializer, canonicalTypeIdentities());
     }
 
     private FrozenNode canonicalProperty(String key) {
@@ -508,6 +531,7 @@ final class FrozenNodeBexValue extends AbstractBexValue {
                     ? loadedSemantic
                     : loadedCanonical;
             if (semanticNeedsContent) {
+                materializedTypeIdentities = snapshot.canonicalTypeIdentities();
                 materializedSemanticNode = loadedSemantic;
             }
         }

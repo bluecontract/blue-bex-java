@@ -27,7 +27,7 @@ final class PointerSetBexValue extends AbstractBexValue {
                        BexValue value,
                        String op,
                        boolean sparseListRemoval) {
-        if (base == null || base.isUndefined() || base.isNull()) {
+        if (base == null || base.isUndefined()) {
             base = BexValues.map(Collections.<String, BexValue>emptyMap());
         }
         if (!base.isObject() && !base.isList()) {
@@ -78,7 +78,7 @@ final class PointerSetBexValue extends AbstractBexValue {
             return isOmittedLeaf() ? BexValues.UNDEFINED : value;
         }
         BexValue child = base.get(key);
-        if (child.isUndefined() || child.isNull()) {
+        if (child.isUndefined()) {
             child = BexValues.map(Collections.<String, BexValue>emptyMap());
         }
         return new PointerSetBexValue(
@@ -160,7 +160,7 @@ final class PointerSetBexValue extends AbstractBexValue {
             return value;
         }
         BexValue child = base.get(String.valueOf(targetListIndex));
-        if (child.isUndefined() || child.isNull()) {
+        if (child.isUndefined()) {
             child = BexValues.map(Collections.<String, BexValue>emptyMap());
         }
         return new PointerSetBexValue(
@@ -181,7 +181,7 @@ final class PointerSetBexValue extends AbstractBexValue {
                                      String op) {
         BexValue current = base;
         for (int index = 0; index < segments.size(); index++) {
-            if (current.isUndefined() || current.isNull()) {
+            if (current.isUndefined()) {
                 current = BexValues.map(
                         Collections.<String, BexValue>emptyMap());
             }

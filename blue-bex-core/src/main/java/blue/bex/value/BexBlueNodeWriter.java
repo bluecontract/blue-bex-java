@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class BexBlueNodeWriter {
      * canonical BEX key order and validated as direct Blue identity input.</p>
      */
     public static Node toNode(BexValue value) {
-        return convert(value, false);
+        return convert(value, ExactMode.REFERENCE);
     }
 
     /**
@@ -41,12 +42,23 @@ public final class BexBlueNodeWriter {
      * evidence by replacing those descendants with provider-only references.
      */
     public static Node toSemanticNode(BexValue value) {
-        return convert(value, true);
+        return convert(value, ExactMode.SEMANTIC);
     }
 
-    private static Node convert(BexValue value, boolean inlineExact) {
+    /**
+     * Retains available canonical exact children for host Source admission.
+     * Pure references stay references; resolved views are never substituted
+     * for the identity-bearing content of an exact child.
+     */
+    public static Node toSourceNode(BexValue value) {
+        return convert(value, ExactMode.CANONICAL);
+    }
+
+    private enum ExactMode { REFERENCE, CANONICAL, SEMANTIC }
+
+    private static Node convert(BexValue value, ExactMode exactMode) {
         try {
-            return toNode(value, Position.ROOT, inlineExact);
+            return toNode(value, Position.BOUNDARY_ROOT, exactMode);
         } catch (BexException ex) {
             if (ex.getMessage() != null
                     && ex.getMessage().startsWith(
@@ -64,28 +76,33 @@ public final class BexBlueNodeWriter {
 
     private static Node toNode(BexValue value,
                                Position position,
-                               boolean inlineExact) {
+                               ExactMode exactMode) {
         if (value == null || value.isUndefined()) {
             throw new BexException("Undefined cannot be emitted as a Blue value");
         }
         if (value.isExact()) {
-            if (inlineExact) {
+            if (exactMode == ExactMode.SEMANTIC) {
                 return value.toNode();
+            }
+            if (exactMode == ExactMode.CANONICAL) {
+                return BexExactSourceWriter.toSource(value);
             }
             String blueId = BlueIds.requireBlueIdOrCyclicMember(
                     value.exactBlueId(), "BEX exact output blueId");
             return new Node().blueId(blueId);
         }
         if (value.isNull()) {
-            return position == Position.LIST_ITEM
-                    ? Nodes.emptyPlaceholder()
-                    : new Node();
+            if (position == Position.LIST_ITEM) {
+                return Nodes.emptyPlaceholder();
+            }
+            throw new BexException(
+                    "Null cannot be emitted as a Blue boundary root");
         }
         if (value.isScalar()) {
             return scalarNode(BexValues.rawScalar(value));
         }
         if (value.isList()) {
-            return new Node().items(toNodeList(value, inlineExact));
+            return new Node().items(toNodeList(value, exactMode));
         }
         if (!value.isObject()) {
             throw new BexException("Unsupported BEX output value kind");
@@ -106,7 +123,7 @@ public final class BexBlueNodeWriter {
         boolean hasItemsPayload = false;
         for (String key : value.keys()) {
             BexValue child = value.get(key);
-            if (child == null || child.isUndefined()) {
+            if (isOmittedObjectMember(child)) {
                 continue;
             }
             if ("name".equals(key)) {
@@ -114,13 +131,13 @@ public final class BexBlueNodeWriter {
             } else if ("description".equals(key)) {
                 node.description(requiredText(child, "description"));
             } else if ("type".equals(key)) {
-                node.type(toNode(child, Position.METADATA, inlineExact));
+                node.type(toNode(child, Position.OBJECT_MEMBER, exactMode));
             } else if ("itemType".equals(key)) {
-                node.itemType(toNode(child, Position.METADATA, inlineExact));
+                node.itemType(toNode(child, Position.OBJECT_MEMBER, exactMode));
             } else if ("keyType".equals(key)) {
-                node.keyType(toNode(child, Position.METADATA, inlineExact));
+                node.keyType(toNode(child, Position.OBJECT_MEMBER, exactMode));
             } else if ("valueType".equals(key)) {
-                node.valueType(toNode(child, Position.METADATA, inlineExact));
+                node.valueType(toNode(child, Position.OBJECT_MEMBER, exactMode));
             } else if ("mergePolicy".equals(key)) {
                 node.mergePolicy(requiredText(child, "mergePolicy"));
             } else if ("value".equals(key)) {
@@ -131,7 +148,7 @@ public final class BexBlueNodeWriter {
                 if (!child.isList()) {
                     throw new BexException("Blue items field must be a list");
                 }
-                node.items(toNodeList(child, inlineExact));
+                node.items(toNodeList(child, exactMode));
             } else if ("blueId".equals(key)) {
                 String blueId = BlueIds.requireBlueIdOrCyclicMember(
                         requiredText(child, "blueId"),
@@ -145,12 +162,12 @@ public final class BexBlueNodeWriter {
                 node.blueId(blueId);
             } else if ("contracts".equals(key)) {
                 node.contracts(toObjectNode(
-                        child, "contracts", inlineExact));
+                        child, "contracts", exactMode));
             } else if ("schema".equals(key)) {
-                node.schema(toSchema(child, inlineExact));
+                node.schema(toSchema(child, exactMode));
             } else {
                 properties.put(key, toNode(
-                        child, Position.OBJECT_MEMBER, inlineExact));
+                        child, Position.OBJECT_MEMBER, exactMode));
             }
         }
 
@@ -163,10 +180,16 @@ public final class BexBlueNodeWriter {
         }
         if (!properties.isEmpty()) {
             node.properties(properties);
+        } else if (Nodes.isEmptyNode(node)) {
+            /*
+             * A transient BEX object that has no retained members is still
+             * exact object content.  Keep an explicit empty object payload so
+             * downstream Language presence, schema, mapping, and identity
+             * paths cannot confuse it with a temporary fieldless builder.
+             */
+            node.properties(Collections.<String, Node>emptyMap());
         }
-        return position == Position.LIST_ITEM && Nodes.isEmptyNode(node)
-                ? Nodes.emptyPlaceholder()
-                : node;
+        return node;
     }
 
     public static boolean hasLanguageField(BexValue value) {
@@ -204,55 +227,65 @@ public final class BexBlueNodeWriter {
     }
 
     private static void rejectForbiddenFields(BexValue value) {
-        if (!value.get("properties").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("properties"))) {
             throw new BexException(
                     "\"properties\" is an internal Blue field and must not appear in BEX output");
         }
-        if (!value.get("constraints").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("constraints"))) {
             throw new BexException(
                     "Blue constraints field is invalid in Blue Language 1.0; use schema");
         }
-        if (!value.get("allowMultiple").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("allowMultiple"))) {
             throw new BexException(
                     "Blue allowMultiple field is invalid in Blue Language 1.0");
         }
-        if (!value.get("options").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("options"))) {
             throw new BexException(
                     "Blue options field is invalid in Blue Language 1.0");
         }
-        if (!value.get("blue").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("blue"))) {
             throw new BexException(
                     "Computed BEX output must not contain the Blue preprocessing field \"blue\"");
         }
         for (String control : Arrays.asList("$previous", "$pos", "$replace")) {
-            if (!value.get(control).isUndefined()) {
+            if (!isOmittedObjectMember(value.get(control))) {
                 throw new BexException(
                         "Computed BEX output must not contain Blue list-control field " + control);
             }
         }
-        if (!value.get("$empty").isUndefined()) {
+        if (!isOmittedObjectMember(value.get("$empty"))) {
             throw new BexException(
                     "\"$empty\" list placeholder must have exact shape { \"$empty\": true }");
         }
     }
 
     private static boolean isEmptyPlaceholder(BexValue value) {
-        if (!value.isObject() || value.size() != 1) {
+        if (!value.isObject()) {
             return false;
         }
         BexValue marker = value.get("$empty");
-        return !marker.isUndefined()
-                && marker.isScalar()
-                && marker.asBoolean()
-                && Boolean.TRUE.equals(BexValues.rawScalar(marker));
+        if (isOmittedObjectMember(marker)
+                || !marker.isScalar()
+                || !marker.asBoolean()
+                || !Boolean.TRUE.equals(BexValues.rawScalar(marker))) {
+            return false;
+        }
+        int retainedMembers = 0;
+        for (String key : value.keys()) {
+            if (!isOmittedObjectMember(value.get(key))) {
+                retainedMembers++;
+            }
+        }
+        return retainedMembers == 1;
     }
 
     private static void validateBlueIdReferenceShape(BexValue value) {
-        if (value.get("blueId").isUndefined()) {
+        if (isOmittedObjectMember(value.get("blueId"))) {
             return;
         }
         for (String key : value.keys()) {
-            if (!"blueId".equals(key) && !value.get(key).isUndefined()) {
+            if (!"blueId".equals(key)
+                    && !isOmittedObjectMember(value.get(key))) {
                 throw new BexException(
                         "Blue blueId reference node cannot contain sibling field: " + key);
             }
@@ -297,37 +330,34 @@ public final class BexBlueNodeWriter {
 
     private static Node toObjectNode(BexValue value,
                                      String field,
-                                     boolean inlineExact) {
-        if (value.isNull()) {
-            return null;
-        }
+                                     ExactMode exactMode) {
         if (!value.isObject()) {
             throw new BexException("Blue " + field + " field must be an object");
         }
-        return toNode(value, Position.METADATA, inlineExact);
+        return toNode(value, Position.OBJECT_MEMBER, exactMode);
     }
 
     private static List<Node> toNodeList(BexValue value,
-                                         boolean inlineExact) {
+                                         ExactMode exactMode) {
         ArrayList<Node> items = new ArrayList<>();
         for (int i = 0; i < value.size(); i++) {
             BexValue item = value.get(String.valueOf(i));
             if (item == null || item.isUndefined()) {
                 throw new BexException("Undefined cannot appear in a Blue list");
             }
-            items.add(toNode(item, Position.LIST_ITEM, inlineExact));
+            items.add(toNode(item, Position.LIST_ITEM, exactMode));
         }
         return items;
     }
 
     private static Schema toSchema(BexValue value,
-                                   boolean inlineExact) {
+                                   ExactMode exactMode) {
         if (value.isNull() || value.isUndefined()) {
             return null;
         }
         if (value.isExact()) {
             Node exactReference = toNode(
-                    value, Position.METADATA, false);
+                value, Position.OBJECT_MEMBER, ExactMode.REFERENCE);
             Schema schema = new Schema();
             schema.blueId(exactReference.getBlueId());
             return schema;
@@ -336,43 +366,50 @@ public final class BexBlueNodeWriter {
             throw new BexException("Blue schema field must be an object");
         }
         validateSchemaKeys(value);
-        if (!value.get("blueId").isUndefined()) {
-            if (value.size() != 1) {
+        BexValue schemaBlueId = value.get("blueId");
+        if (!isOmittedObjectMember(schemaBlueId)) {
+            int retainedMembers = 0;
+            for (String key : value.keys()) {
+                if (!isOmittedObjectMember(value.get(key))) {
+                    retainedMembers++;
+                }
+            }
+            if (retainedMembers != 1) {
                 throw new BexException("Blue schema blueId reference must be pure");
             }
             Schema schema = new Schema();
             schema.blueId(BlueIds.requireBlueIdOrCyclicMember(
-                    requiredText(value.get("blueId"), "schema.blueId"),
+                    requiredText(schemaBlueId, "schema.blueId"),
                     "BEX output schema.blueId"));
             return schema;
         }
         Schema schema = new Schema();
-        setSchemaNode(schema, value, "required", inlineExact);
-        setSchemaNode(schema, value, "minLength", inlineExact);
-        setSchemaNode(schema, value, "maxLength", inlineExact);
-        setSchemaNode(schema, value, "minimum", inlineExact);
-        setSchemaNode(schema, value, "maximum", inlineExact);
-        setSchemaNode(schema, value, "exclusiveMinimum", inlineExact);
-        setSchemaNode(schema, value, "exclusiveMaximum", inlineExact);
-        setSchemaNode(schema, value, "multipleOf", inlineExact);
-        setSchemaNode(schema, value, "minItems", inlineExact);
-        setSchemaNode(schema, value, "maxItems", inlineExact);
-        setSchemaNode(schema, value, "uniqueItems", inlineExact);
-        setSchemaNode(schema, value, "minFields", inlineExact);
-        setSchemaNode(schema, value, "maxFields", inlineExact);
-        setSchemaList(schema, value, "enum", inlineExact);
+        setSchemaNode(schema, value, "required", exactMode);
+        setSchemaNode(schema, value, "minLength", exactMode);
+        setSchemaNode(schema, value, "maxLength", exactMode);
+        setSchemaNode(schema, value, "minimum", exactMode);
+        setSchemaNode(schema, value, "maximum", exactMode);
+        setSchemaNode(schema, value, "exclusiveMinimum", exactMode);
+        setSchemaNode(schema, value, "exclusiveMaximum", exactMode);
+        setSchemaNode(schema, value, "multipleOf", exactMode);
+        setSchemaNode(schema, value, "minItems", exactMode);
+        setSchemaNode(schema, value, "maxItems", exactMode);
+        setSchemaNode(schema, value, "uniqueItems", exactMode);
+        setSchemaNode(schema, value, "minFields", exactMode);
+        setSchemaNode(schema, value, "maxFields", exactMode);
+        setSchemaList(schema, value, "enum", exactMode);
         return schema;
     }
 
     private static void setSchemaNode(Schema schema,
                                       BexValue source,
                                       String key,
-                                      boolean inlineExact) {
+                                      ExactMode exactMode) {
         BexValue value = source.get(key);
-        if (value.isUndefined()) {
+        if (isOmittedObjectMember(value)) {
             return;
         }
-        Node node = toNode(value, Position.METADATA, inlineExact);
+        Node node = toNode(value, Position.OBJECT_MEMBER, exactMode);
         if ("required".equals(key)) schema.required(node);
         else if ("minLength".equals(key)) schema.minLength(node);
         else if ("maxLength".equals(key)) schema.maxLength(node);
@@ -391,21 +428,24 @@ public final class BexBlueNodeWriter {
     private static void setSchemaList(Schema schema,
                                       BexValue source,
                                       String key,
-                                      boolean inlineExact) {
+                                      ExactMode exactMode) {
         BexValue value = source.get(key);
-        if (value.isUndefined()) {
+        if (isOmittedObjectMember(value)) {
             return;
         }
         if (!value.isList()) {
             throw new BexException("Blue schema " + key + " field must be a list");
         }
         if ("enum".equals(key)) {
-            schema.enumValues(toNodeList(value, inlineExact));
+            schema.enumValues(toNodeList(value, exactMode));
         }
     }
 
     private static void validateSchemaKeys(BexValue value) {
         for (String key : value.keys()) {
+            if (isOmittedObjectMember(value.get(key))) {
+                continue;
+            }
             if (!SCHEMA_KEYS.contains(key) && !"blueId".equals(key)) {
                 throw new BexException("Unsupported Blue schema field: " + key);
             }
@@ -430,10 +470,15 @@ public final class BexBlueNodeWriter {
                 "enum"));
     }
 
+    private static boolean isOmittedObjectMember(BexValue value) {
+        return value == null
+                || value.isUndefined()
+                || (!value.isExact() && value.isNull());
+    }
+
     private enum Position {
-        ROOT,
+        BOUNDARY_ROOT,
         OBJECT_MEMBER,
-        LIST_ITEM,
-        METADATA
+        LIST_ITEM
     }
 }

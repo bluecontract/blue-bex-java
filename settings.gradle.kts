@@ -41,10 +41,16 @@ val publishedOnlyTasks = setOf(
     "publish",
     "jreleaserFullRelease"
 )
+val stagedPublicationRequested = gradle.startParameter.taskNames
+    .map { it.substringAfterLast(':') }
+    .any {
+        it.startsWith("publish") && it.endsWith("ToStagingRepository")
+    }
 val requestedPublishedOnlyTask = gradle.startParameter.taskNames
     .map { it.substringAfterLast(':') }
     .firstOrNull {
-        it in publishedOnlyTasks || it.startsWith("publish") ||
+        it in publishedOnlyTasks ||
+            (it.startsWith("publish") && !stagedPublicationRequested) ||
             it.startsWith("jreleaser")
     }
 if (requestedPublishedOnlyTask != null) {

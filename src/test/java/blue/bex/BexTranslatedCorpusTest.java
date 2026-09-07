@@ -236,8 +236,8 @@ class BexTranslatedCorpusTest {
         cases.add(changes("generate-limitrange",
                 obj("kind", "Namespace", "metadata", obj("name", "team-b")),
                 list(patch("add", pointerJoin("generated", "LimitRange", doc("/metadata/name"), "defaults"),
-                        obj("kind", "LimitRange", "metadata", obj("name", "defaults", "namespace", doc("/metadata/name")), "spec", obj("limits", list(obj("type", "Container", "defaultRequest", obj("cpu", "100m", "memory", "128Mi"))))))),
-                l(p("add", "/generated/LimitRange/team-b/defaults", m("kind", "LimitRange", "metadata", m("name", "defaults", "namespace", "team-b"), "spec", m("limits", l(m("defaultRequest", m("cpu", "100m", "memory", "128Mi"), "type", "Container"))))))));
+                        obj("kind", "LimitRange", "metadata", obj("name", "defaults", "namespace", doc("/metadata/name")), "spec", obj("limits", list(obj("type", obj("name", "Container"), "defaultRequest", obj("cpu", "100m", "memory", "128Mi"))))))),
+                l(p("add", "/generated/LimitRange/team-b/defaults", m("kind", "LimitRange", "metadata", m("name", "defaults", "namespace", "team-b"), "spec", m("limits", l(m("defaultRequest", m("cpu", "100m", "memory", "128Mi"), "type", m("name", "Container")))))))));
         cases.add(changes("generate-poddisruptionbudget",
                 obj("kind", "Deployment", "metadata", obj("name", "api", "namespace", "prod", "labels", obj("app", "api"))),
                 list(patch("add", pointerJoin("generated", "PodDisruptionBudget", doc("/metadata/namespace"), doc("/metadata/name")),
@@ -382,13 +382,13 @@ class BexTranslatedCorpusTest {
     }
 
     private CorpusCase validate(String source, Node document, Node violation) {
-        Node invalid = obj("changeset", list(), "events", list(obj("type", "Policy/Violation", "policy", source)));
+        Node invalid = obj("changeset", list(), "events", list(obj("type", obj("name", "Policy/Violation"), "policy", source)));
         Node program = stepDo(list(
                 op("$returnIf", obj("cond", violation, "expr", invalid)),
                 op("$return", obj("changeset", list(), "events", list()))
         ));
         return CorpusCase.value("kyverno-validate", source, program, document,
-                m("changeset", l(), "events", l(m("policy", source, "type", "Policy/Violation"))));
+                m("changeset", l(), "events", l(m("policy", source, "type", m("name", "Policy/Violation")))));
     }
 
     private CorpusCase changes(String source, Node document, Node changes, Object expectedChangeset) {

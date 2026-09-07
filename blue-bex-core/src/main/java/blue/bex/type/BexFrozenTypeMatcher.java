@@ -33,7 +33,7 @@ final class BexFrozenTypeMatcher {
             FrozenNode candidate,
             FrozenNode pattern,
             BexTypeMatchWorkRecorder work) {
-        if (pattern.isEmptyNode()) {
+        if (BexPatternValidator.isUnconstrainedPattern(pattern)) {
             return true;
         }
         if (pattern.isReferenceOnly()) {

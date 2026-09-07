@@ -708,22 +708,73 @@ public final class BexConformanceReportMain {
         return artifacts;
     }
 
-    private static Map<String, Object> specificationEvidence(
+    static Map<String, Object> specificationEvidence(
             Path projectDir,
             Map<String, String> baseline) throws IOException {
+        String specificationPath = "specifications/blue-bex-specification-2.0.md";
         Path specification = projectDir.resolve("specifications")
                 .resolve("blue-bex-specification-2.0.md");
         String actual = Files.isRegularFile(specification)
                 ? sha256(specification)
                 : "unavailable";
         String expected = baseline.get("specificationSha256");
+        String pinPath = "src/test/resources/hosted-release/"
+                + "published-specification.properties";
+        Path pinFile = projectDir.resolve(pinPath);
+        Map<String, String> pin = Files.isRegularFile(
+                pinFile, LinkOption.NOFOLLOW_LINKS)
+                ? readEvidence(pinFile)
+                : Collections.<String, String>emptyMap();
+        String pinnedIdentity = pin.get("specification.sha256");
+        boolean validPin = "blue-bex-published-specification/1.0"
+                .equals(pin.get("schema"))
+                && specificationPath.equals(pin.get("specification.path"))
+                && pinnedIdentity != null
+                && ConformancePackage.SHA_256.matcher(pinnedIdentity).matches();
         return map(
                 "path",
-                "specifications/blue-bex-specification-2.0.md",
+                specificationPath,
                 "sha256", actual,
                 "baselineSha256", expected,
                 "matchesBaseline",
-                actual.equals(expected));
+                actual.equals(expected),
+                "currentSpecificationAvailable",
+                ConformancePackage.SHA_256.matcher(actual).matches(),
+                "publishedPinPath", pinPath,
+                "publishedPinValid", validPin,
+                "publishedSpecificationSha256", pinnedIdentity,
+                "publishedLanguageCoordinate", pin.get("language.coordinate"),
+                "matchesPublishedSpecification", actual.equals(pinnedIdentity));
+    }
+
+    static String specificationIdentityFailure(
+            Map<String, Object> dependencyResolution,
+            Map<String, Object> specification) {
+        if ("staged-repository".equals(dependencyResolution.get("mode"))) {
+            return Boolean.TRUE.equals(
+                    specification.get("currentSpecificationAvailable"))
+                    ? null
+                    : "current-specification-unavailable";
+        }
+        if ("standalone-published".equals(dependencyResolution.get("mode"))) {
+            if (!Boolean.TRUE.equals(specification.get("publishedPinValid"))) {
+                return "published-specification-pin-invalid";
+            }
+            Object pinnedCoordinate = specification.get("publishedLanguageCoordinate");
+            if (!(pinnedCoordinate instanceof String)
+                    || ((String) pinnedCoordinate).isEmpty()
+                    || !pinnedCoordinate.equals(
+                            dependencyResolution.get("declaredCoordinate"))) {
+                return "published-specification-language-coordinate-differs";
+            }
+            return Boolean.TRUE.equals(
+                    specification.get("matchesPublishedSpecification"))
+                    ? null
+                    : "specification-identity-differs-from-published-pin";
+        }
+        return Boolean.TRUE.equals(specification.get("matchesBaseline"))
+                ? null
+                : "specification-identity-differs-from-baseline";
     }
 
     static Map<String, Object> versionAutomationEvidence(
@@ -747,7 +798,8 @@ public final class BexConformanceReportMain {
                 dependencyMode);
         boolean explicitStageCandidate = stagedCandidate
                 && projectVersion.matches(
-                        "[0-9]+\\.[0-9]+\\.[0-9]+-rc\\.[0-9]+");
+                        "[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+"
+                                + "|-dev\\.[0-9a-f]{40})");
         return map(
                 "path", ".cz.toml",
                 "sha256", actual,
@@ -1129,7 +1181,7 @@ public final class BexConformanceReportMain {
                 failures,
                 passingBehavior
                         == ConformancePackage.BEHAVIOR_FIXTURE_COUNT,
-                "behavior-fixtures-not-105-of-105");
+                "behavior-fixtures-not-120-of-120");
         require(
                 failures,
                 Boolean.TRUE.equals(
@@ -1196,10 +1248,11 @@ public final class BexConformanceReportMain {
                 failures,
                 gatePassed(releaseGates, "java8Bytecode"),
                 "packaged-java8-bytecode-gate-not-passing");
-        require(
-                failures,
-                Boolean.TRUE.equals(specification.get("matchesBaseline")),
-                "specification-identity-differs-from-baseline");
+        String specificationFailure = specificationIdentityFailure(
+                dependencyResolution, specification);
+        if (specificationFailure != null) {
+            failures.add(specificationFailure);
+        }
         require(
                 failures,
                 Boolean.TRUE.equals(

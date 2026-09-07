@@ -2,10 +2,10 @@
   "schema": "blue-bex-public-api-classification/2.0",
   "inventory": {
     "path": "src/test/resources/hosted-release/required-public-api.txt",
-    "sha256": "a330de486f74df49ddf45b3bf896753f6a326e08b7e6f84a8c9aef3bc46cbd43",
+    "sha256": "29c96b2b5eb6c17977b61a7ce9f453e59c76573107109160cf2c276ce3728415",
     "manifestSchema": "blue-bex-binary-api-manifest/1.0",
     "publicTypeCount": 103,
-    "publicDescriptorCount": 1036
+    "publicDescriptorCount": 1046
   },
   "classifications": {
     "stable API": [

@@ -1,0 +1,25 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-07
+vectors:
+- BEX-EMPTY-07
+category: e
+description: A null reserved type member is omitted before ordinary Language validation.
+program:
+  expr:
+    type:
+      $null: true
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    type: null
+  assertions:
+  - actual: output.boundaryValue
+    op: equals
+    expected: {}

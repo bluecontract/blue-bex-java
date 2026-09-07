@@ -1,6 +1,6 @@
 {
   "schema": "blue-bex-sdk-stage-baseline/1.0",
-  "status": "retired-after-publication",
+  "status": "candidate-source-lock",
   "language": {
     "candidateVersion": "3.1.0-rc.21",
     "sourceCommit": "e0dfc897ea7d158895325fae2bf84e103b8c1989",
@@ -20,15 +20,16 @@
     }
   },
   "bex": {
-    "candidateVersion": "1.1.0-rc.4",
-    "candidateVersionSelection": "-PbexLocalStageVersion=1.1.0-rc.4",
+    "candidateVersion": "commit-bound-development",
+    "candidateVersionSelection": "-PbexLocalStageVersion=1.1.0-dev.<40-char-source-commit>",
+    "currentSpecificationSha256": "560c18300bbaba312ad1b8a9bb53ea0655627a2228360d5074a923fb7de539de",
     "historicalReleaseVersion": "1.1.0-rc.3",
     "historicalReleaseMetadata": ".cz.toml"
   },
   "policy": {
-    "dependencyMode": "retired-staged-repository",
-    "publishedEvidenceComparison": "superseded-by-authenticated-standalone-published-release",
-    "artifactAcceptance": "historical candidate evidence is not accepted for publication",
-    "publication": "public gates consume authenticated Maven Central artifacts only"
+    "dependencyMode": "isolated-staged-repository",
+    "publishedEvidenceComparison": "development candidate only; not a public release claim",
+    "artifactAcceptance": "exact version, source commit, manifest, and artifact hashes required",
+    "publication": "downstream development consumers use the sealed local repository only"
   }
 }

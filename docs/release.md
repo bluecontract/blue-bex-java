@@ -12,7 +12,7 @@ required for publication.
 
 This mandatory gate resolves the exact reviewed modular Language release from
 Maven Central and requires
-all ordinary/conformance/hosted tests, 60 vectors, 105 behavior fixtures, 30 gas
+all ordinary/conformance/hosted tests, 75 vectors, 120 behavior fixtures, 30 gas
 microfixtures, 86 operator checks, Java 8 bytecode, API reports, runtime smoke,
 artifact construction, BEX-owned archive determinism, and current dependency and
 source evidence.
@@ -21,18 +21,59 @@ Success requires zero failed, skipped, or unclassified evidence and
 `workingReady = true`. An included-build Language checkout is not a supported
 input to this gate.
 
-## Retired SDK candidate stage
+## Commit-bound development candidate stage
 
-The isolated SDK stage was used before Language `3.1.0-rc.21` was published.
-Its source lock remains as historical evidence in
-`gradle/verification/sdk-stage-language-baseline.json`, but its status is
-`retired-after-publication` and it is not accepted by a public BEX gate.
+Cross-repository development uses immutable, commit-bound versions rather than
+inventing an RC number or resolving from Maven Local. Language is supplied as
+`3.1.0-dev.<40-character-source-commit>` from its sealed repository. BEX is
+built as `1.1.0-dev.<40-character-source-commit>` and seals its own downstream
+repository with:
 
-The ledger truthfully records that the staged candidate used Language commit
-`e0dfc897ea7d158895325fae2bf84e103b8c1989` while `3.1.0-rc.20` was the
-published release. The final `3.1.0-rc.21` tag instead resolves to commit
-`5c4e5c88fa75d6cbc52b2e8772f14f2ac5246f52`. Current release evidence is kept
-only in the latest-Language baseline and published API inspection.
+```bash
+./gradlew assembleImmutableDevelopmentRepository \
+  -PblueLanguageRepository=/absolute/path/to/immutable-language-repository \
+  -PblueLanguageVersion=3.1.0-dev.<language-source-commit> \
+  -PbexLocalStageVersion=1.1.0-dev.<bex-source-commit> \
+  -PbexSdkStagingRepository=/absolute/path/to/fresh-mutable-bex-stage \
+  -PbexDevelopmentRepository=/absolute/path/to/immutable-bex-repository
+```
+
+The staged Language repository is authoritative for the `blue.language` group;
+Maven Central is excluded for that group, so missing candidate modules fail
+closed. The BEX target is never overwritten. An existing destination is
+accepted only when its complete byte tree is identical. Its
+`artifact-manifest.json` and checksum bind the BEX source commit and tree,
+record `stagePurpose: DEVELOPMENT`, `releaseReadinessClaimed: false`,
+`builtWithJava: 17`, and `sourceDirty: false`, and bind the exact Language
+version/source/manifest, BEX specification identity, fixture/registry/gas
+package identities, and every runtime/POM/source/Javadoc artifact hash.
+
+This lane is development evidence only. Public release gates continue to
+consume authenticated Maven Central artifacts.
+
+## Local RC candidate stage
+
+The same immutable export supports the existing `1.1.0-rc.N` line when its
+Language input uses `3.1.0-rc.N`. For this closeout the selected coordinates
+are BEX `1.1.0-rc.5` and Language `3.1.0-rc.24`. Use
+`exportDevelopmentRepository` with `-PbexLocalStageVersion=1.1.0-rc.5` and
+the exact Language version and sealed repository properties above.
+
+RC export requires clean exact source commits, Java 17, and the complete
+seven-module Language publication set, including conformance, sources and
+Javadoc. Language uses `blue-local-rc-maven-repository/1.0`; BEX emits
+`blue-bex-local-rc-repository/1.0`. Both record `stagePurpose: LOCAL_RC` and
+`releaseReadinessClaimed: false`. Existing destination bytes remain immutable.
+
+Run `bexSdkStageVerify` against those exact inputs with
+`-PbexSdkStageBaseline=/absolute/path/to/reviewed-sdk-stage-baseline.json`.
+The baseline uses the existing `blue-bex-sdk-stage-baseline/1.0` schema and
+binds the Language version and source commit plus the final BEX source commit
+and specification digest. An external source lock avoids embedding a commit's
+own hash in its tracked contents. The RC gate verifies clean BEX source and
+the complete Language repository file set and checksums. This local gate
+does not authorize publication; final integrated acceptance must be retained
+separately against the exported bytes.
 
 ## Strict public gate
 

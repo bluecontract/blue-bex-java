@@ -64,13 +64,66 @@ class BexPointerSet20Test {
                 obj("object", list("a", "b"),
                         "path", "/2",
                         "val", "z"))));
-        assertEquals(
-                m("parent", m("child", "z")),
-                BexValues.pointerSet(
+        BexException nullIntermediate = assertThrows(
+                BexException.class,
+                () -> BexValues.pointerSet(
                         BexValues.fromSimple(m("parent", null)),
                         Arrays.asList("parent", "child"),
                         BexValues.scalar("z"),
+                        "set"));
+        assertEquals(
+                "$pointerSet encountered incompatible intermediate scalar",
+                nullIntermediate.getMessage());
+    }
+
+    @Test
+    void pointerSetDistinguishesMissingContainersFromPresentRuntimeNull() {
+        BexException nullRoot = assertThrows(
+                BexException.class,
+                () -> BexValues.pointerSet(
+                        BexValues.nullValue(),
+                        Collections.singletonList("child"),
+                        BexValues.scalar("z"),
+                        "set"));
+        assertEquals(
+                "$pointerSet base must be an object or list",
+                nullRoot.getMessage());
+
+        assertEquals(
+                m("parent", m("child", "z")),
+                BexValues.pointerSet(
+                        BexValues.fromSimple(m()),
+                        Arrays.asList("parent", "child"),
+                        BexValues.scalar("z"),
                         "set").toSimple());
+
+        BexException evaluatedNullRoot = assertThrows(
+                BexException.class,
+                () -> runExpr(op(
+                        "$pointerSet",
+                        obj("object", op("$null", true),
+                                "path", "/child",
+                                "val", "z"))));
+        assertTrue(evaluatedNullRoot.getMessage().startsWith(
+                "$pointerSet encountered incompatible intermediate scalar"));
+
+        BexException evaluatedNullIntermediate = assertThrows(
+                BexException.class,
+                () -> runExpr(op(
+                        "$pointerSet",
+                        obj("object", obj("parent", op("$null", true)),
+                                "path", "/parent/child",
+                                "val", "z"))));
+        assertTrue(evaluatedNullIntermediate.getMessage().startsWith(
+                "$pointerSet encountered incompatible intermediate scalar"));
+
+        BexExecutionResult terminalNull = runExpr(op(
+                "$pointerSet",
+                obj("object", op("$document", "/state"),
+                        "path", "/ready",
+                        "val", op("$null", true))));
+        assertTrue(terminalNull.value().get("ready").isNull());
+        assertEquals(m("ready", null), simple(terminalNull.value()));
     }
 
     @Test

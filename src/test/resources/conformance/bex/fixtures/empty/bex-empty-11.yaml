@@ -1,0 +1,321 @@
+schema: blue-bex-fixture/2.0
+id: bex-empty-11
+vectors:
+- BEX-EMPTY-11
+category: e
+description: Undefined, null, and exact empty object remain distinct through variables, function arguments, kind tests, selection, pre-output keys, constructors, and Blue output admission.
+program:
+  functions:
+    observe:
+      args:
+        input:
+          description: untyped acceptance-matrix argument
+      expr:
+        kind:
+          $kind:
+            $var: input
+        isUndefined:
+          $isKind:
+            val:
+              $var: input
+            kind: undefined
+        isNull:
+          $isKind:
+            val:
+              $var: input
+            kind: "null"
+        isObject:
+          $isKind:
+            val:
+              $var: input
+            kind: object
+  do:
+  - $let:
+      name: undefinedValue
+      expr:
+        $document: /missing
+  - $let:
+      name: nullValue
+      expr:
+        $null: true
+  - $let:
+      name: emptyObjectValue
+      expr: {}
+  - $return:
+      kinds:
+        undefined:
+          $kind:
+            $var: undefinedValue
+        "null":
+          $kind:
+            $var: nullValue
+        emptyObject:
+          $kind:
+            $var: emptyObjectValue
+      isKind:
+        undefinedIsUndefined:
+          $isKind:
+            val:
+              $var: undefinedValue
+            kind: undefined
+        undefinedIsNull:
+          $isKind:
+            val:
+              $var: undefinedValue
+            kind: "null"
+        undefinedIsObject:
+          $isKind:
+            val:
+              $var: undefinedValue
+            kind: object
+        nullIsUndefined:
+          $isKind:
+            val:
+              $var: nullValue
+            kind: undefined
+        nullIsNull:
+          $isKind:
+            val:
+              $var: nullValue
+            kind: "null"
+        nullIsObject:
+          $isKind:
+            val:
+              $var: nullValue
+            kind: object
+        emptyObjectIsUndefined:
+          $isKind:
+            val:
+              $var: emptyObjectValue
+            kind: undefined
+        emptyObjectIsNull:
+          $isKind:
+            val:
+              $var: emptyObjectValue
+            kind: "null"
+        emptyObjectIsObject:
+          $isKind:
+            val:
+              $var: emptyObjectValue
+            kind: object
+      exists:
+        undefined:
+          $exists:
+            $var: undefinedValue
+        "null":
+          $exists:
+            $var: nullValue
+        emptyObject:
+          $exists:
+            $var: emptyObjectValue
+      equality:
+        nullEqualsUndefined:
+          $eq:
+          - $var: nullValue
+          - $var: undefinedValue
+        nullEqualsNull:
+          $eq:
+          - $var: nullValue
+          - $var: nullValue
+        nullEqualsEmptyObject:
+          $eq:
+          - $var: nullValue
+          - $var: emptyObjectValue
+      coalesce:
+        undefined:
+          $coalesce:
+          - $var: undefinedValue
+          - undefined-fallback
+        "null":
+          $coalesce:
+          - $var: nullValue
+          - null-fallback
+        emptyObject:
+          $coalesce:
+          - $var: emptyObjectValue
+          - empty-object-fallback
+      choose:
+        undefined:
+          $choose:
+            cond:
+              $var: undefinedValue
+            then: truthy
+            else: falsey
+        "null":
+          $choose:
+            cond:
+              $var: nullValue
+            then: truthy
+            else: falsey
+        emptyObject:
+          $choose:
+            cond:
+              $var: emptyObjectValue
+            then: truthy
+            else: falsey
+      preOutputKeys:
+        $keys:
+          undefinedMember:
+            $var: undefinedValue
+          nullMember:
+            $var: nullValue
+          emptyObjectMember:
+            $var: emptyObjectValue
+      functionArguments:
+        undefined:
+          $call:
+            function: observe
+            args:
+              input:
+                $var: undefinedValue
+        "null":
+          $call:
+            function: observe
+            args:
+              input:
+                $var: nullValue
+        emptyObject:
+          $call:
+            function: observe
+            args:
+              input:
+                $var: emptyObjectValue
+      constructors:
+        objectFromNull:
+          $object:
+            $var: nullValue
+        listFromNull:
+          $list:
+            $var: nullValue
+      undefinedMember:
+        $var: undefinedValue
+      nullMember:
+        $var: nullValue
+      emptyObjectMember:
+        $var: emptyObjectValue
+context:
+  rootDocument: {}
+  event: {}
+  processingEvent: {}
+  currentContract: {}
+  steps: {}
+  bindings: {}
+  documentScope: /
+expected:
+  result:
+    kinds:
+      undefined: undefined
+      "null": "null"
+      emptyObject: object
+    isKind:
+      undefinedIsUndefined: true
+      undefinedIsNull: false
+      undefinedIsObject: false
+      nullIsUndefined: false
+      nullIsNull: true
+      nullIsObject: false
+      emptyObjectIsUndefined: false
+      emptyObjectIsNull: false
+      emptyObjectIsObject: true
+    exists:
+      undefined: false
+      "null": true
+      emptyObject: true
+    equality:
+      nullEqualsUndefined: false
+      nullEqualsNull: true
+      nullEqualsEmptyObject: false
+    coalesce:
+      undefined: undefined-fallback
+      "null": null-fallback
+      emptyObject: empty-object-fallback
+    choose:
+      undefined: falsey
+      "null": falsey
+      emptyObject: falsey
+    preOutputKeys:
+    - emptyObjectMember
+    - nullMember
+    functionArguments:
+      undefined:
+        kind: undefined
+        isUndefined: true
+        isNull: false
+        isObject: false
+      "null":
+        kind: "null"
+        isUndefined: false
+        isNull: true
+        isObject: false
+      emptyObject:
+        kind: object
+        isUndefined: false
+        isNull: false
+        isObject: true
+    constructors:
+      objectFromNull: {}
+      listFromNull: []
+    nullMember: null
+    emptyObjectMember: {}
+  assertions:
+  - actual: output.semantic
+    op: equals
+    expected:
+      kinds:
+        undefined: undefined
+        "null": "null"
+        emptyObject: object
+      isKind:
+        undefinedIsUndefined: true
+        undefinedIsNull: false
+        undefinedIsObject: false
+        nullIsUndefined: false
+        nullIsNull: true
+        nullIsObject: false
+        emptyObjectIsUndefined: false
+        emptyObjectIsNull: false
+        emptyObjectIsObject: true
+      exists:
+        undefined: false
+        "null": true
+        emptyObject: true
+      equality:
+        nullEqualsUndefined: false
+        nullEqualsNull: true
+        nullEqualsEmptyObject: false
+      coalesce:
+        undefined: undefined-fallback
+        "null": null-fallback
+        emptyObject: empty-object-fallback
+      choose:
+        undefined: falsey
+        "null": falsey
+        emptyObject: falsey
+      preOutputKeys:
+      - emptyObjectMember
+      - nullMember
+      functionArguments:
+        undefined:
+          kind: undefined
+          isUndefined: true
+          isNull: false
+          isObject: false
+        "null":
+          kind: "null"
+          isUndefined: false
+          isNull: true
+          isObject: false
+        emptyObject:
+          kind: object
+          isUndefined: false
+          isNull: false
+          isObject: true
+      constructors:
+        objectFromNull: {}
+        listFromNull: []
+      emptyObjectMember: {}
+  - actual: output.boundaryValue.nullMember
+    op: absent
+  - actual: output.boundaryValue.emptyObjectMember
+    op: equals
+    expected: {}
