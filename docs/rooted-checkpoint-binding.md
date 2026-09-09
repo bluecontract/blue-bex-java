@@ -1,10 +1,10 @@
 # Rooted checkpoint development binding
 
-Selected Language source: `627d7ce9cca9e18040ddd0400dffe7655eb06c76`.
-Selected version: `3.1.0-dev.627d7ce9cca9e18040ddd0400dffe7655eb06c76`.
-Artifact manifest: `sha256:380d53e00703dc0c8254d5235277b55a4ca35667de19a29f61f6fdff8e7c502e`.
-Contracts specification: `sha256:527ed42f6ccac62a05918fac493ecc3729ec6f57d97b0cf1814d9ab752a6d523`.
-Contracts release: `sha256:984cd65fa9a7d698aa2a895533c0b059c68ab526ef38f8d9cf1510cdb654da01`.
+Selected Language source: `3ee576244a1951583e42eec3a8c29a4f703a73e9`.
+Selected version: `3.1.0-dev.3ee576244a1951583e42eec3a8c29a4f703a73e9`.
+Artifact manifest: `sha256:4783676d68dd5b146d7257e297ec3095bcf3021d744e82431ba54e00be2aa329`.
+Contracts specification: `sha256:08755625c221dc9b64c6ea61707326581bfa91167644e08061fd23373cb7f172`.
+Contracts release: `sha256:fcde2e3af19a583743fb485d113531d993156a183cb414587fb75d873b905b51`.
 
 This exact dependency rebind changes no BEX runtime behavior.
 Use the immutable exporter. Final component and MyOS acceptance remain required.
