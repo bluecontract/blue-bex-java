@@ -23,6 +23,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValues;
+import blue.bex.value.BexFrozenWriter;
 import blue.bex.test.TestBlue;
 import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
@@ -1095,15 +1096,20 @@ class BexHostedRuntimeWorkSessionTest {
         FrozenNode resolvedEvent = FrozenNode.fromResolvedNode(event);
         assertFalse(childId.equals(resolvedEvent.at("/message/request/child").blueId()),
                 "The input exercises the distinct resolved-list identity lane");
+        ExactEventIdentityEvidence admittedEvent = ExactEventIdentityEvidence.verify(null, event, eventId, null);
+        FrozenNode canonicalEvent = admittedEvent.frozenEvent();
+        assertTrue(canonicalEvent.isStrictCanonical(), "The existing input admission retains its canonical cursor");
         try (TestBlue blue = new TestBlue()) {
             ProcessorInvocationState execution = new ProcessorInvocationState(
                     blue.getDocumentProcessor(), Nodes.emptyObject());
             execution.preflightScope("/");
             try (ProcessorExecutionContext processorContext = execution.createContext(
-                    "/", execution.bundleForScope("/"), event, event, resolvedEvent,
+                    "/", execution.bundleForScope("/"), event, event, canonicalEvent,
                     eventId, eventId, Collections.<ExactBlueValue>emptyList(), null, null, false)) {
                 long gasBefore = execution.runtime().gasMeter().totalGas();
                 BexExecutionContext context = BexContractsExecutionContext.builder(processorContext).build();
+                assertSame(canonicalEvent, processorContext.frozenEvent());
+                assertSame(canonicalEvent, BexFrozenWriter.toFrozen(context.event()));
                 assertEquals(gasBefore, execution.runtime().gasMeter().totalGas(),
                         "Read-only event wrapping must not enter semantic output admission");
                 assertEquals(eventId, context.event().exactBlueId());
