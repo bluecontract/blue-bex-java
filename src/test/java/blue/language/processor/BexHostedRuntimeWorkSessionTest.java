@@ -23,6 +23,7 @@ import blue.bex.result.BexExecutionResult;
 import blue.bex.result.BexMetricsRecorder;
 import blue.bex.runtime.BexRuntime;
 import blue.bex.value.BexValues;
+import blue.bex.value.BexFrozenWriter;
 import blue.bex.test.TestBlue;
 import blue.bex.test.TestGasLedgerCapability;
 import blue.language.provider.NodeProvider;
@@ -1076,6 +1077,76 @@ class BexHostedRuntimeWorkSessionTest {
         assertEquals(1, host.deterministicFinalizations);
         assertEquals(0, host.unavailableFinalizations);
         assertEquals(0, host.successfulSubmissions);
+    }
+
+    @Test
+    void hostedCanonicalEventChildWithListRetainsItsExactIdentity() {
+        Node child = new Node().name("inline source with an unavailable peer")
+                .contracts(new Node().properties("embedded", new Node()
+                        .type(new Node().blueId(blue.language.processor.registry.RuntimeBlueIds.PROCESS_EMBEDDED))
+                        .properties("paths", new Node().items(Collections.singletonList(new Node()
+                                .type(new Node().blueId(blue.language.model.wire.BlueLanguageConstants.TEXT_TYPE_BLUE_ID))
+                                .value("/peer"))))))
+                .properties("peer", new Node().blueId(DirectBlueIdCalculator.calculateBlueId(
+                        new Node().properties("state", new Node().value("unavailable-here")))));
+        Node event = new Node().properties("message", new Node().properties("request",
+                new Node().properties("child", child)));
+        String eventId = DirectBlueIdCalculator.calculateBlueId(event);
+        String childId = DirectBlueIdCalculator.calculateBlueId(child);
+        FrozenNode resolvedEvent = FrozenNode.fromResolvedNode(event);
+        assertFalse(childId.equals(resolvedEvent.at("/message/request/child").blueId()),
+                "The input exercises the distinct resolved-list identity lane");
+        ExactEventIdentityEvidence admittedEvent = ExactEventIdentityEvidence.verify(null, event, eventId, null);
+        FrozenNode canonicalEvent = admittedEvent.frozenEvent();
+        assertTrue(canonicalEvent.isStrictCanonical(), "The existing input admission retains its canonical cursor");
+        try (TestBlue blue = new TestBlue()) {
+            ProcessorInvocationState execution = new ProcessorInvocationState(
+                    blue.getDocumentProcessor(), Nodes.emptyObject());
+            execution.preflightScope("/");
+            try (ProcessorExecutionContext processorContext = execution.createContext(
+                    "/", execution.bundleForScope("/"), event, event, canonicalEvent,
+                    eventId, eventId, Collections.<ExactBlueValue>emptyList(), null, null, false)) {
+                long gasBefore = execution.runtime().gasMeter().totalGas();
+                BexExecutionContext context = BexContractsExecutionContext.builder(processorContext).build();
+                assertSame(canonicalEvent, processorContext.frozenEvent());
+                assertSame(canonicalEvent, BexFrozenWriter.toFrozen(context.event()));
+                assertEquals(gasBefore, execution.runtime().gasMeter().totalGas(),
+                        "Read-only event wrapping must not enter semantic output admission");
+                assertEquals(eventId, context.event().exactBlueId());
+                assertEquals(childId, context.event().at(java.util.Arrays.asList(
+                        "message", "request", "child")).exactBlueId());
+                assertEquals("/peer", context.event().at(java.util.Arrays.asList(
+                        "message", "request", "child", "contracts", "embedded", "paths", "0")).asText());
+                BexExecutionResult result = BexEngine.builder().build().compileAndExecute(
+                        BexProgramSource.expression(frozen(op("$binding", "event/message/request/child"))), context);
+                assertEquals(childId, result.output().nodeBlueId());
+                assertFalse(result.output().reconstructed());
+                processorContext.applyBufferedEffects();
+            }
+        }
+    }
+
+    @Test
+    void hostedEventCanonicalPromotionRequiresItsMatchingRootCapability() {
+        Node event = new Node().properties("paths", new Node().items(
+                Collections.singletonList(new Node().value("/peer"))));
+        FrozenNode resolvedEvent = FrozenNode.fromResolvedNode(event);
+        String otherId = DirectBlueIdCalculator.calculateBlueId(new Node().value("other-event"));
+        try (TestBlue blue = new TestBlue()) {
+            ProcessorInvocationState execution = new ProcessorInvocationState(
+                    blue.getDocumentProcessor(), Nodes.emptyObject());
+            execution.preflightScope("/");
+            // This package-private seam deliberately supplies a mismatched root
+            // capability to test the adapter gate; it is not external admission.
+            try (ProcessorExecutionContext processorContext = execution.createContext(
+                    "/", execution.bundleForScope("/"), event, event, resolvedEvent,
+                    otherId, otherId, Collections.<ExactBlueValue>emptyList(), null, null, false)) {
+                BexExecutionContext context = BexContractsExecutionContext.builder(processorContext).build();
+                assertEquals(resolvedEvent.blueId(), context.event().exactBlueId(),
+                        "Shape alone cannot promote unbound resolved bytes to canonical evidence");
+                assertFalse(FrozenNode.fromNode(event).blueId().equals(context.event().exactBlueId()));
+            }
+        }
     }
 
     @Test

@@ -433,7 +433,7 @@ class BexConformanceReportTruthfulnessTest {
         Map<String, Object> dependency = new LinkedHashMap<String, Object>();
         dependency.put("mode", "standalone-published");
         dependency.put("declaredCoordinate",
-                "blue.language:blue-language-java:3.1.0-rc.24");
+                "blue.language:blue-language-java:3.1.0-rc.25");
         return dependency;
     }
 
