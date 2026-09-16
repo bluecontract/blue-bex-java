@@ -1,0 +1,6 @@
+// Only the isolated experiment opts in; normal/release builds are unchanged.
+allprojects {
+    tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        maxParallelForks = 4
+    }
+}

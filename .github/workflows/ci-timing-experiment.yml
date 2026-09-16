@@ -1,0 +1,100 @@
+name: BEX CI timing experiment (no publication)
+
+on:
+  push:
+    branches: [codex/ci/bex-parallel-experiment]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bex-ci-timing-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/codex/ci/bex-parallel-experiment'
+    name: Measure ${{ matrix.group }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [baseline, verification, benchmarks, four-forks]
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: corretto
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: corretto
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set isolated cache and reproducible source timestamp
+        run: |
+          echo "GRADLE_USER_HOME=$RUNNER_TEMP/bex-experiment-gradle" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - name: Bootstrap Gradle before timing
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon --version; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+      - name: Execute complete validation group
+        run: python .github/scripts/ci-timing-experiment.py '${{ matrix.group }}'
+      - name: Preserve measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bex-timing-${{ matrix.group }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/bex-ci-timing-output/
+      - name: Preserve build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bex-reports-${{ matrix.group }}
+          retention-days: 7
+          path: |
+            **/build/test-results/**
+            **/build/reports/**
+
+  summary:
+    if: always() && github.ref == 'refs/heads/codex/ci/bex-parallel-experiment'
+    needs: measure
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bex-timing-*
+          path: measurements
+      - name: Verify complete coverage and compare timing
+        env:
+          MEASUREMENT_RESULT: ${{ needs.measure.result }}
+        run: |
+          test "$MEASUREMENT_RESULT" = success
+          python .github/scripts/ci-timing-experiment.py summary measurements
