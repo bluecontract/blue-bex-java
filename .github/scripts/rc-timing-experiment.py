@@ -50,7 +50,9 @@ def validate_final(report, exit_code, log, commit, expected_tag):
         require(report.get(field) == 'passed', 'Unverified gate: ' + field)
     failures = re.findall(r'^> Task (\S+) FAILED$', log, re.MULTILINE)
     require(failures == [':' + FINAL_TASK], 'Unexpected failed Gradle task')
-    require("Execution failed for task ':generateBexReleaseReport'." in log
+    require(re.search(r"^Execution failed for task ':generateBexReleaseReport'"
+                      r"(?: \(registered by plugin 'blue\.bex\.root-orchestration'\))?\.$",
+                      log, re.MULTILINE)
             and 'BEX public release remains fail-closed; see ' in log
             and 'BUILD FAILED' in log, 'Missing expected final failure evidence')
 

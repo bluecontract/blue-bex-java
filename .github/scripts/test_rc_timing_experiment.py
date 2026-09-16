@@ -30,6 +30,17 @@ class ExpectedFailure(unittest.TestCase):
     def test_accept_only_expected_tag_failure(self):
         rc.validate_final(self.report, 1, self.log, self.commit, self.tag)
 
+    def test_accept_gradle_96_registration_annotation(self):
+        log = self.log.replace(
+            "Execution failed for task ':generateBexReleaseReport'.",
+            "Execution failed for task ':generateBexReleaseReport' "
+            "(registered by plugin 'blue.bex.root-orchestration').")
+        rc.validate_final(self.report, 1, log, self.commit, self.tag)
+        with self.assertRaisesRegex(ValueError, 'Missing expected final failure evidence'):
+            rc.validate_final(self.report, 1, log.replace('blue.bex.root-orchestration',
+                                                        'unrelated.plugin'),
+                              self.commit, self.tag)
+
     def test_reject_report_mutations(self):
         for key, value in [('blockers', []), ('blockers', self.report['blockers'] + ['tests failed']),
                            ('releaseReady', True), ('bexCommit', 'b' * 40),
