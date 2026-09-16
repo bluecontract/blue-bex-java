@@ -1,12 +1,6 @@
 name: BEX full RC verification timing (no publication)
 
 on:
-  push:
-    branches: [codex/ci/bex-parallel-experiment]
-    paths:
-      - '.github/scripts/rc-timing-experiment.py'
-      - '.github/scripts/test_rc_timing_experiment.py'
-      - '.github/workflows/rc-timing-experiment.yml'
   workflow_dispatch:
 
 permissions:

@@ -38,19 +38,32 @@ exception. Any other failure remains a failed job.
 
 ## Measurements
 
-The completed pre-integration paired experiment is run
-[35110189502](https://github.com/bluecontract/blue-bex-java/actions/runs/35110189502),
-commit `b8c59dc8c0886eba4fe2f93fbfc9dbe2de56507a`:
+The completed all-Java25 paired experiment is run
+[35116423386](https://github.com/bluecontract/blue-bex-java/actions/runs/35116423386),
+commit `304063131d2aceac510f282e44337232465d29fd`:
 
 | Computation | Before | After |
 | --- | ---: | ---: |
-| Four builds plus release verification, including repeated publish/JReleaser prerequisites | 34:36.74 | 12:22.52 |
+| Four builds plus release verification, including repeated publish/JReleaser prerequisites | 34:47.53 | 12:36.02 |
 
-Reduction: **64.25% / 22:14.21**. Both variants have identical 968 JUnit cases,
+Reduction: **63.78% / 22:11.52**. Both variants have identical 968 JUnit cases,
 42 JMH cases, four independent inventories of 965 JUnit cases and ten identical
 release artifacts per independent build. Candidate time includes transfer/join.
-This measurement used runtime 25 with historical Javadoc8/build-logic17; the
-new all-Java25 production topology is separately validated before merge.
+All compilation, test, Javadoc and build-logic toolchains use Java25.
+
+The actual shared production topology also passed without publication in PR12,
+run [35116490725](https://github.com/bluecontract/blue-bex-java/actions/runs/35116490725):
+11:09.24 measured fanout-to-final, 11:44 including source preparation/setup/upload.
+Its PR merge source was `c3b64b7b955120bb40c16d67075560dbf58786e0`.
+Do not mix this separate runner result with the paired baseline when computing
+percentage improvement. Actual Build and validate run
+[35116490662](https://github.com/bluecontract/blue-bex-java/actions/runs/35116490662)
+also passed: verification 1:43, serious JMH 7:49, total workflow about8:10.
+
+The later documentation/manual-trigger cleanup changes none of the measured
+build commands, toolchains or verification code. Historical timing experiments
+are manually triggered; normal PR checks run the production verification paths.
+CPU utilization/PSS were not sampled by these BEX experiments.
 
 The original public RC took 46:05. About 10:40 was actual JReleaser signing,
 upload, remote processing and release work. That external portion is unmeasured

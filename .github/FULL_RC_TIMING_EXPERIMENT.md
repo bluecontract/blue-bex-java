@@ -140,7 +140,7 @@ git diff --check
 ```
 
 Heavy verification remains CI_PENDING until baseline, all four independent builds,
-parallel final verification and summary pass. A push changing these experiment
-files on `codex/ci/bex-parallel-experiment` starts the guarded workflow. Read-only
+parallel final verification and summary pass. The historical experiment is now manual-only (`workflow_dispatch`) and remains
+guarded to `codex/ci/bex-parallel-experiment`. Read-only
 tokens, no secrets and nonpersisted checkout credentials are used. No production
 branch, tags or existing release workflow is modified.
