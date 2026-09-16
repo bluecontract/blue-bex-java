@@ -13,7 +13,11 @@ on:
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [verification, benchmarks]
     env:
       CI: true
     defaults:
@@ -36,6 +40,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run clean published-Language verification
+        if: matrix.group == 'verification'
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/blue-bex-gradle-home
         run: >-
@@ -51,6 +56,7 @@ jobs:
           :examples:writeLanguageDependencyEvidence
 
       - name: Run serious benchmark gate
+        if: matrix.group == 'benchmarks'
         env:
           GRADLE_USER_HOME: ${{ runner.temp }}/blue-bex-gradle-home
         run: ./gradlew --no-daemon :blue-bex-conformance:jmh
@@ -59,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bex-evidence
+          name: bex-evidence-${{ matrix.group }}
           path: |
             blue-bex-java/**/build/reports/**
             blue-bex-java/**/build/test-results/**
@@ -68,7 +74,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bex-artifacts
+          name: bex-artifacts-${{ matrix.group }}
           path: |
             blue-bex-java/blue-bex-core/build/libs/**
             blue-bex-java/blue-bex-contracts/build/libs/**

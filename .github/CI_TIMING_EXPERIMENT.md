@@ -1,5 +1,9 @@
 # BEX validation timing experiment
 
+This document describes the historical isolated experiment. The subsequent
+production workflow integration and Java25 migration are documented in
+[CI_RELEASE_OPTIMIZATION.md](CI_RELEASE_OPTIMIZATION.md).
+
 Branch: `codex/ci/bex-parallel-experiment`, based on `next` at
 `ab72af14ee54c6123e6d80349956af373a887680`.
 

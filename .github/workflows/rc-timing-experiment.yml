@@ -32,10 +32,6 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
-          java-version: '8'
-          distribution: corretto
-      - uses: actions/setup-java@v4
-        with:
           java-version: '25'
           distribution: corretto
       - uses: actions/setup-node@v4
@@ -80,10 +76,6 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
-          java-version: '8'
-          distribution: corretto
-      - uses: actions/setup-java@v4
-        with:
           java-version: '25'
           distribution: corretto
       - uses: actions/setup-node@v4
@@ -123,10 +115,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '8'
-          distribution: corretto
       - uses: actions/setup-java@v4
         with:
           java-version: '25'

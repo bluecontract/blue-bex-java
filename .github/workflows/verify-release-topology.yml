@@ -1,0 +1,14 @@
+name: BEX release topology on Java 25 (no publication)
+on:
+  push:
+    branches: [codex/ci/bex-parallel-experiment]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    uses: ./.github/workflows/release-verification.yml
+    with:
+      mode: verify

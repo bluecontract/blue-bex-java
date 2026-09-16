@@ -26,6 +26,16 @@ tasks.matching {
     dependsOn("bexReleaseVerify")
 }
 
+// A combined release invocation verifies once, stages all Maven publications,
+// then uploads them. Ordering alone does not select publication in verify mode.
+tasks.named("jreleaserFullRelease") {
+    mustRunAfter(
+        ":blue-bex-core:publish",
+        ":blue-bex-contracts:publish",
+        ":blue-bex-java:publish"
+    )
+}
+
 if (System.getenv("CI") != null) {
     jreleaser {
         signing {

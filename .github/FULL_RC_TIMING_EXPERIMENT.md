@@ -1,5 +1,9 @@
 # Full BEX RC verification timing, without publication
 
+This document describes the historical isolated experiment. The subsequent
+production workflow integration and Java25 migration are documented in
+[CI_RELEASE_OPTIMIZATION.md](CI_RELEASE_OPTIMIZATION.md).
+
 ## Task brief
 
 Goal: measure Release RC computation, including the release-verification graph
