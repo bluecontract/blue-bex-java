@@ -22,7 +22,10 @@ spec.loader.exec_module(central)
 
 def release_tasks(mode):
     v.require(mode in ['verify', 'rc', 'stable'], 'Unknown release mode')
-    return ['bexReleaseVerify'] + ([] if mode == 'verify' else ['publish', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
+    if mode == 'verify':
+        return ['bexReleaseVerify']
+    return ['bexReleaseVerify', 'publish'] + (['bexReserveRcVersion'] if mode == 'rc' else []) + [
+        'jreleaserDeploy', '-PbexSeparateMavenWait=true']
 
 
 def validate_mode(mode, ref):
@@ -95,20 +98,33 @@ def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def deployment_proof(source, mode):
+def verified_source(source, mode):
     validate_mode(mode, os.environ['GITHUB_REF'])
-    v.require(mode in ['rc', 'stable'], 'Metadata requires production mode')
+    v.require(mode in ['rc', 'stable'], 'Verification requires production mode')
     ident = dict(GITHUB_SHA=os.environ['PREPARED_COMMIT'], GITHUB_RUN_ID=os.environ['GITHUB_RUN_ID'],
                  GITHUB_RUN_ATTEMPT=os.environ['PREPARED_ATTEMPT'])
     tag = 'v' + re.search(r'^version = "([^"]+)"', (source / '.cz.toml').read_text(), re.M)[1]
     v.require(git('rev-parse', 'HEAD') == ident['GITHUB_SHA']
               and git('rev-parse', 'HEAD^{tree}') == os.environ['PREPARED_TREE']
               and not git('status', '--porcelain')
-              and tag in git('tag', '--points-at', 'HEAD').splitlines(), 'Metadata source changed')
+              and tag in git('tag', '--points-at', 'HEAD').splitlines(), 'Verified source changed')
     report = source / 'build/reports/bex-release/final.json'
     strict = json.loads(report.read_text())
     v.require(strict.get('releaseReady') is True and strict.get('blockers') == []
               and strict.get('bexCommit') == ident['GITHUB_SHA'], 'Missing strict release authorization')
+    return ident, tag, report
+
+
+def reserve_rc_version(source, mode):
+    v.require(mode == 'rc', 'Only RC reserves a version')
+    _, tag, _ = verified_source(source, mode)
+    # One atomic, non-forced update prevents an uploaded version from being reused.
+    subprocess.run(['git', 'push', '--atomic', 'origin', 'HEAD:refs/heads/next',
+                    f'refs/tags/{tag}:refs/tags/{tag}'], check=True)
+
+
+def deployment_proof(source, mode):
+    ident, tag, report = verified_source(source, mode)
     properties = source / 'build/jreleaser/maven-central-submitted.properties'
     central.deployment_id(properties.read_text())
     staging = source / 'build/staging-deploy'
@@ -142,6 +158,9 @@ def main():
     source = Path.cwd()
     proof = temp / 'bex-release-output/deployment-proof.json'
     published = temp / 'bex-release-output/maven-publication.json'
+    if operation == 'reserve':
+        reserve_rc_version(source, mode)
+        return
     if operation in ['metadata', 'metadata-check']:
         validate_metadata_proof(source, mode, proof, published)
         if operation == 'metadata':
