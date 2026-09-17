@@ -15,8 +15,8 @@ spec.loader.exec_module(ci)
 class ReleaseCommands(unittest.TestCase):
     def test_single_production_graph_and_nonpublishing_verification(self):
         self.assertEqual(ci.release_tasks('verify'), ['bexReleaseVerify'])
-        for mode in ['rc', 'stable']:
-            self.assertEqual(ci.release_tasks(mode), ['bexReleaseVerify', 'publish', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
+        self.assertEqual(ci.release_tasks('rc'), ['bexReleaseVerify', 'publish', 'bexReserveRcVersion', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
+        self.assertEqual(ci.release_tasks('stable'), ['bexReleaseVerify', 'publish', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
         with self.assertRaises(ValueError):
             ci.release_tasks('unknown')
 
@@ -130,6 +130,93 @@ class PartialRerunInputs(unittest.TestCase):
             for key in ident:
                 with self.subTest(key=key), self.assertRaises((ValueError, FileNotFoundError)):
                     ci.v.restore(downloads, root / ('bad-' + key), dict(ident, **{key: 'wrong'}))
+
+
+class RcReservation(unittest.TestCase):
+    def test_atomic_push_to_local_bare_remote_rejects_diverged_next_without_tag(self):
+        previous = Path.cwd()
+        for conflict in [False, True]:
+            with self.subTest(conflict=conflict), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                remote, source = root / 'remote.git', root / 'source'
+                def run(*args):
+                    return subprocess.check_output(['git', *args], text=True, stderr=subprocess.STDOUT).strip()
+                try:
+                    run('init', '--bare', str(remote))
+                    run('init', '-b', 'next', str(source))
+                    os.chdir(source)
+                    run('config', 'user.email', 'test@example.invalid')
+                    run('config', 'user.name', 'Fixture')
+                    run('remote', 'add', 'origin', str(remote))
+                    (source / 'version').write_text('base')
+                    run('add', 'version')
+                    run('commit', '-m', 'base')
+                    base = run('rev-parse', 'HEAD')
+                    run('push', 'origin', 'HEAD:refs/heads/next')
+                    (source / 'version').write_text('candidate')
+                    run('commit', '-am', 'candidate')
+                    candidate = run('rev-parse', 'HEAD')
+                    tag = 'v1.0.0-rc.1'
+                    run('tag', '-a', tag, '-m', 'candidate')
+                    if conflict:
+                        run('checkout', '--detach', base)
+                        (source / 'other').write_text('concurrent change')
+                        run('add', 'other')
+                        run('commit', '-m', 'concurrent')
+                        concurrent = run('rev-parse', 'HEAD')
+                        run('push', 'origin', 'HEAD:refs/heads/next')
+                        run('checkout', '--detach', candidate)
+                    with patch.object(ci, 'verified_source', return_value=({}, tag, None)):
+                        if conflict:
+                            with self.assertRaises(subprocess.CalledProcessError): ci.reserve_rc_version(source, 'rc')
+                            self.assertEqual(run('--git-dir=' + str(remote), 'rev-parse', 'refs/heads/next'), concurrent)
+                            self.assertEqual(run('--git-dir=' + str(remote), 'tag', '--list'), '')
+                        else:
+                            ci.reserve_rc_version(source, 'rc')
+                            self.assertEqual(run('--git-dir=' + str(remote), 'rev-parse', 'refs/heads/next'), candidate)
+                            self.assertEqual(run('--git-dir=' + str(remote), 'rev-parse', tag + '^{}'), candidate)
+                finally:
+                    os.chdir(previous)
+
+    def test_only_strict_verified_rc_can_reserve_exact_commit_and_tag_atomically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            (source / '.cz.toml').write_text('version = "1.0.0-rc.1"\n')
+            report = source / 'build/reports/bex-release/final.json'
+            report.parent.mkdir(parents=True)
+            strict = dict(releaseReady=True, blockers=[], bexCommit='a'*40)
+            report.write_text(json.dumps(strict))
+            env = dict(GITHUB_REF='refs/heads/next', GITHUB_SHA='c'*40, GITHUB_RUN_ID='123',
+                       GITHUB_RUN_ATTEMPT='2', PREPARED_COMMIT='a'*40, PREPARED_TREE='b'*40,
+                       PREPARED_ATTEMPT='1')
+            git_results = {('rev-parse','HEAD'):'a'*40, ('rev-parse','HEAD^{tree}'):'b'*40,
+                           ('status','--porcelain'):'', ('tag','--points-at','HEAD'):'v1.0.0-rc.1'}
+            with patch.dict(os.environ, env), patch.object(ci, 'git', side_effect=lambda *args: git_results[args]), \
+                 patch.object(ci.subprocess, 'run') as push:
+                ci.reserve_rc_version(source, 'rc')
+                push.assert_called_once_with(['git', 'push', '--atomic', 'origin',
+                    'HEAD:refs/heads/next', 'refs/tags/v1.0.0-rc.1:refs/tags/v1.0.0-rc.1'], check=True)
+                push.reset_mock()
+                for mode in ['verify', 'stable', 'unknown']:
+                    with self.subTest(mode=mode), self.assertRaises(ValueError):
+                        ci.reserve_rc_version(source, mode)
+                for changes in [dict(GITHUB_REF='refs/heads/main'), dict(PREPARED_COMMIT='d'*40),
+                                dict(PREPARED_TREE='d'*40)]:
+                    with patch.dict(os.environ, changes), self.assertRaises(ValueError):
+                        ci.reserve_rc_version(source, 'rc')
+                for invalid in [dict(strict, releaseReady=False), dict(strict, blockers=['blocked']),
+                                dict(strict, bexCommit='d'*40)]:
+                    report.write_text(json.dumps(invalid))
+                    with self.assertRaises(ValueError): ci.reserve_rc_version(source, 'rc')
+                report.write_text(json.dumps(strict))
+                for key, value in [(('status','--porcelain'),' M source'), (('tag','--points-at','HEAD'),'')]:
+                    original = git_results[key]
+                    git_results[key] = value
+                    with self.assertRaises(ValueError): ci.reserve_rc_version(source, 'rc')
+                    git_results[key] = original
+                push.assert_not_called()
+                push.side_effect = subprocess.CalledProcessError(1, ['git', 'push'])
+                with self.assertRaises(subprocess.CalledProcessError): ci.reserve_rc_version(source, 'rc')
 
 
 class MetadataProof(unittest.TestCase):

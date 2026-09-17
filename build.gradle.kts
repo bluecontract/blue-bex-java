@@ -48,6 +48,17 @@ tasks.matching {
         "bexReleaseMetadataGate" else "bexReleaseVerify")
 }
 
+// Reserve the verified RC commit and exact tag before any remote deployment.
+// Selected only by the RC orchestration; stable and verification graphs omit it.
+val reserveRcVersion = tasks.register<Exec>("bexReserveRcVersion") {
+    dependsOn("bexReleaseVerify")
+    commandLine("python3", ".github/scripts/release-ci.py",
+        System.getenv("RELEASE_MODE") ?: "invalid", "reserve")
+}
+tasks.named("jreleaserDeploy") {
+    mustRunAfter(reserveRcVersion)
+}
+
 // A combined release invocation verifies once, stages all Maven publications,
 // then uploads them. Ordering alone does not select publication in verify mode.
 tasks.matching { it.name in setOf("jreleaserFullRelease", "jreleaserDeploy") }.configureEach {

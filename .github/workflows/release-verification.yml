@@ -156,9 +156,6 @@ jobs:
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
         run: python .github/scripts/release-ci.py "$RELEASE_MODE" metadata
-      - name: Push successful RC commit and tag
-        if: inputs.mode == 'rc'
-        run: git push origin HEAD:next --follow-tags
       - uses: actions/upload-artifact@v4
         if: always()
         with:

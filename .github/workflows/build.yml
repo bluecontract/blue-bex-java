@@ -51,6 +51,16 @@ jobs:
                    if line.startswith(':') and line.endswith(' SKIPPED')]
           assert tasks == [':bexReleaseMetadataGate', ':jreleaserFullRelease'], tasks
           PYCODE
+          ./gradlew --no-daemon --max-workers=1 bexReleaseVerify publish bexReserveRcVersion jreleaserDeploy -PbexSeparateMavenWait=true --dry-run > "$RUNNER_TEMP/bex-rc-graph.txt"
+          python3 - <<'PYCODE'
+          import os
+          from pathlib import Path
+          tasks = [line.split()[0] for line in (Path(os.environ['RUNNER_TEMP']) / 'bex-rc-graph.txt').read_text().splitlines()
+                   if line.startswith(':') and line.endswith(' SKIPPED')]
+          for task in [':bexReleaseVerify', ':bexReserveRcVersion', ':jreleaserDeploy']:
+              assert tasks.count(task) == 1, (task, tasks)
+          assert tasks.index(':bexReleaseVerify') < tasks.index(':bexReserveRcVersion') < tasks.index(':jreleaserDeploy'), tasks
+          PYCODE
 
       - name: Run clean published-Language verification
         if: matrix.group == 'verification'
