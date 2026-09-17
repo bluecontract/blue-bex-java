@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Shared release evidence preparation. Never creates tags or invokes publication."""
-import importlib.util
 import json
 import math
 import os
@@ -11,26 +10,36 @@ import subprocess
 import sys
 import tarfile
 import time
+import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
 
-spec = importlib.util.spec_from_file_location('build_timing', Path(__file__).with_name('ci-timing-experiment.py'))
-build_timing = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(build_timing)
 INDEPENDENT = ['clean', 'assemble', 'bexConformance', 'sourceReleaseArchive']
 FINAL_TASK = 'generateBexReleaseReport'
+
+
+def inventory(root):
+    tests = []
+    for path in root.glob('**/build/test-results/**/TEST-*.xml'):
+        for case in ET.parse(path).getroot().iter('testcase'):
+            state = next((tag for tag in ['failure', 'error', 'skipped']
+                          if case.find(tag) is not None), 'passed')
+            tests.append([str(path.relative_to(root)), case.get('classname'),
+                          case.get('name'), state])
+    return sorted(tests)
+
+
+def benchmark_inventory(root):
+    path = root / 'blue-bex-conformance/build/reports/jmh/results.json'
+    if not path.exists():
+        return []
+    return sorted(json.dumps([row['benchmark'], row.get('params', {}), row['mode']],
+                             sort_keys=True) for row in json.loads(path.read_text()))
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
-
-
-def identity():
-    result = {k: os.environ[k] for k in ['GITHUB_SHA', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT']}
-    require(subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-            == result['GITHUB_SHA'], 'Checkout HEAD mismatch')
-    return result
 
 
 def validate_final(report, exit_code, log, commit, expected_tag):
@@ -112,7 +121,7 @@ def independent(root, index, source, ident, logs):
     manifest(checkout, directory / 'manifest.sha256')
     row = dict(group='independent-' + str(index), identity=ident, success=True,
                started_at=start, finished_at=time.time(), commands=INDEPENDENT,
-               tests=build_timing.inventory(checkout),
+               execution_attempt=os.environ['GITHUB_RUN_ATTEMPT'], tests=inventory(checkout),
                manifest=(directory / 'manifest.sha256').read_text())
     row['elapsed_s'] = row['finished_at'] - start
     require(row['tests'], 'Independent build has no JUnit results')
@@ -143,7 +152,7 @@ def package(directory, destination):
 
 def restore(downloads, root, ident):
     for index in range(1, 5):
-        path = downloads / ('bex-rc-input-' + str(index)) / 'inputs.tar.gz'
+        path = downloads / ('bex-rc-input-' + ident['GITHUB_RUN_ATTEMPT'] + '-' + str(index)) / 'inputs.tar.gz'
         destination = root / str(index)
         destination.mkdir(parents=True)
         with tarfile.open(path) as archive:

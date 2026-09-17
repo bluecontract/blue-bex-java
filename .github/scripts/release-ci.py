@@ -60,15 +60,16 @@ def prepare(mode, output):
     subprocess.run(['git', 'bundle', 'create', str(output / 'source.bundle'), 'HEAD', '--tags'], check=True)
     (output / 'identity.json').write_text(json.dumps(meta, indent=2))
     with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-        out.write('commit=' + meta['commit'] + '\ntree=' + meta['tree'] + '\n')
+        out.write('commit=' + meta['commit'] + '\ntree=' + meta['tree'] + '\nattempt=' + meta['attempt'] + '\n')
 
 
 def restore_source(mode, directory):
     validate_mode(mode, os.environ['GITHUB_REF'])
     meta = json.loads((directory / 'identity.json').read_text())
+    # Partial reruns keep the successful producer's source generation.
     expected = dict(commit=os.environ['PREPARED_COMMIT'], tree=os.environ['PREPARED_TREE'],
                     workflowCommit=os.environ['GITHUB_SHA'], run=os.environ['GITHUB_RUN_ID'],
-                    attempt=os.environ['GITHUB_RUN_ATTEMPT'], mode=mode)
+                    attempt=os.environ['PREPARED_ATTEMPT'], mode=mode)
     validate_identity(meta, expected)
     subprocess.run(['git', 'fetch', str(directory / 'source.bundle'), 'HEAD', '--tags'], check=True)
     subprocess.run(['git', 'checkout', '--detach', meta['commit']], check=True)
@@ -116,14 +117,15 @@ def main():
     else:
         v.require(report.get('releaseReady') is True and report.get('blockers') == [], 'Release gate not ready')
     independent = [json.loads((root / str(i) / 'receipt.json').read_text()) for i in range(1, 5)]
-    receipt = dict(identity=ident, mode=mode, success=True,
+    receipt = dict(identity=ident, execution_attempt=os.environ['GITHUB_RUN_ATTEMPT'], mode=mode, success=True,
                    elapsed_s=time.time()-min(r['started_at'] for r in independent),
-                   strict_report=report, tests=v.build_timing.inventory(source),
-                   benchmarks=v.build_timing.benchmark_inventory(source), independent=independent)
+                   strict_report=report, tests=v.inventory(source),
+                   benchmarks=v.benchmark_inventory(source), independent=independent)
     (logs / 'receipt.json').write_text(json.dumps(receipt, indent=2))
     with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
         out.write(f"## BEX {mode}: complete release graph\n\n"
                   f"Four-build fanout + transfer/join + final graph: {receipt['elapsed_s']:.2f}s. "
+                  f"Elapsed time includes any rerun waiting gaps. "
                   f"JUnit cases: {len(receipt['tests'])}; JMH cases: {len(receipt['benchmarks'])}. "
                   f"Release-ready: {report['releaseReady']}.\n")
 

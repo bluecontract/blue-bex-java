@@ -30,6 +30,7 @@ jobs:
     outputs:
       commit: ${{ steps.source.outputs.commit }}
       tree: ${{ steps.source.outputs.tree }}
+      attempt: ${{ steps.source.outputs.attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,25 +67,28 @@ jobs:
       - uses: ./.github/actions/release-setup
       - uses: actions/download-artifact@v4
         with:
-          name: bex-release-source-${{ github.run_attempt }}
+          name: bex-release-source-${{ needs.prepare.outputs.attempt }}
           path: ${{ runner.temp }}/bex-release-source
       - name: Independent clean build of prepared source
         env:
           RELEASE_MODE: ${{ inputs.mode }}
           PREPARED_COMMIT: ${{ needs.prepare.outputs.commit }}
           PREPARED_TREE: ${{ needs.prepare.outputs.tree }}
+          PREPARED_ATTEMPT: ${{ needs.prepare.outputs.attempt }}
           BUILD_INDEX: ${{ matrix.index }}
         run: python .github/scripts/release-ci.py "$RELEASE_MODE" independent "$BUILD_INDEX"
       - uses: actions/upload-artifact@v4
         with:
-          name: bex-rc-input-${{ matrix.index }}
+          name: bex-rc-input-${{ needs.prepare.outputs.attempt }}-${{ matrix.index }}
+          # Retrying one matrix job replaces only its slot in this source generation.
+          overwrite: true
           path: ${{ runner.temp }}/bex-release-output/inputs.tar.gz
           retention-days: 2
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bex-independent-log-${{ matrix.index }}
+          name: bex-independent-log-${{ matrix.index }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/bex-release-output/*.log
           retention-days: 7
   final:
@@ -100,17 +104,18 @@ jobs:
       - uses: ./.github/actions/release-setup
       - uses: actions/download-artifact@v4
         with:
-          name: bex-release-source-${{ github.run_attempt }}
+          name: bex-release-source-${{ needs.prepare.outputs.attempt }}
           path: ${{ runner.temp }}/bex-release-source
       - uses: actions/download-artifact@v4
         with:
-          pattern: bex-rc-input-*
+          pattern: bex-rc-input-${{ needs.prepare.outputs.attempt }}-*
           path: ${{ runner.temp }}/bex-release-downloads
       - name: Verify complete release graph without publication
         if: inputs.mode == 'verify'
         env:
           PREPARED_COMMIT: ${{ needs.prepare.outputs.commit }}
           PREPARED_TREE: ${{ needs.prepare.outputs.tree }}
+          PREPARED_ATTEMPT: ${{ needs.prepare.outputs.attempt }}
         run: python .github/scripts/release-ci.py verify join
       - name: Verify, stage and release in one Gradle graph
         if: inputs.mode != 'verify'
@@ -118,6 +123,7 @@ jobs:
           RELEASE_MODE: ${{ inputs.mode }}
           PREPARED_COMMIT: ${{ needs.prepare.outputs.commit }}
           PREPARED_TREE: ${{ needs.prepare.outputs.tree }}
+          PREPARED_ATTEMPT: ${{ needs.prepare.outputs.attempt }}
           JRELEASER_GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
           JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
           JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.MAVENCENTRAL_PASSWORD }}
@@ -131,7 +137,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bex-release-evidence
+          name: bex-release-evidence-${{ github.run_attempt }}
           retention-days: 7
           path: |
             ${{ runner.temp }}/bex-release-output/

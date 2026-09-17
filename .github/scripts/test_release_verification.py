@@ -6,7 +6,7 @@ from unittest.mock import patch
 from pathlib import Path
 import unittest
 
-spec = importlib.util.spec_from_file_location('rc', Path(__file__).with_name('rc-timing-experiment.py'))
+spec = importlib.util.spec_from_file_location('rc', Path(__file__).with_name('release-verification.py'))
 rc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rc)
 
@@ -58,53 +58,12 @@ class ExpectedFailure(unittest.TestCase):
             with self.subTest(log=log), self.assertRaises(ValueError):
                 rc.validate_final(self.report, 1, log, self.commit, self.tag)
 
-    def test_summary_requires_each_baseline_phase_and_equivalent_coverage(self):
-        ident = {'GITHUB_SHA': self.commit, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1'}
-        timing = dict(identity=ident, success=True, started_at=100., finished_at=110., elapsed_s=10.)
-        outputs = dict(tests=[['module/TEST-X.xml', 'X', 'case', 'passed']],
-                       benchmarks=['benchmark'], strict_report=self.report)
-        independent = [dict(timing, group='independent-' + str(i), commands=rc.INDEPENDENT,
-                            tests=outputs['tests'], manifest='same real archive hash') for i in range(1, 5)]
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            rows = {}
-            for mode in ['baseline', 'parallel']:
-                rows[mode] = dict(timing, **outputs, group=mode,
-                                  coverage=['four-independent-builds', 'full-rc-compute'],
-                                  independent=independent, repeatability={'status': 'passed'},
-                                  verification_phases=[dict(outputs, phase=p, elapsed_s=1.)
-                                                       for p in rc.verification_phases(mode)])
-                folder = root / ('bex-rc-result-' + mode)
-                folder.mkdir()
-                (folder / 'receipt.json').write_text(json.dumps(rows[mode]))
-            with patch.dict(rc.os.environ, GITHUB_STEP_SUMMARY=str(root / 'summary.md')):
-                rc.summary(root, ident)
-                baseline = root / 'bex-rc-result-baseline/receipt.json'
-                changed = copy.deepcopy(rows['baseline'])
-                changed['verification_phases'].pop()
-                baseline.write_text(json.dumps(changed))
-                with self.assertRaisesRegex(ValueError, 'Missing or unexpected'):
-                    rc.summary(root, ident)
-                changed = copy.deepcopy(rows['baseline'])
-                changed['verification_phases'][1]['tests'] = []
-                baseline.write_text(json.dumps(changed))
-                with self.assertRaisesRegex(ValueError, 'changed coverage'):
-                    rc.summary(root, ident)
-
     def test_reject_wrong_exit_or_dirty_source(self):
         with self.assertRaises(ValueError):
             rc.validate_final(self.report, 0, self.log, self.commit, self.tag)
         self.report['sourceState']['clean'] = False
         with self.assertRaises(ValueError):
             rc.validate_final(self.report, 1, self.log, self.commit, self.tag)
-
-class FullRcCompute(unittest.TestCase):
-    def test_baseline_repeats_release_gate_for_both_publication_graphs(self):
-        self.assertEqual(rc.verification_phases('baseline'),
-                         ['readiness', 'publish-prerequisites', 'jreleaser-prerequisites'])
-        self.assertEqual(rc.verification_phases('parallel'), ['readiness'])
-        with self.assertRaises(ValueError):
-            rc.verification_phases('publish')
 
 class Transport(unittest.TestCase):
     def test_stale_or_failed_receipt_rejected(self):
@@ -147,7 +106,7 @@ class Transport(unittest.TestCase):
 
     def test_restore_requires_all_four_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp, self.assertRaises(FileNotFoundError):
-            rc.restore(Path(tmp) / 'absent', Path(tmp) / 'restored', {})
+            rc.restore(Path(tmp) / 'absent', Path(tmp) / 'restored', {'GITHUB_RUN_ATTEMPT': '1'})
 
 if __name__ == '__main__':
     unittest.main()
