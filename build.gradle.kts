@@ -13,6 +13,27 @@ allprojects {
     version = rootProject.version
 }
 
+// Only the post-publication metadata invocation may reuse verified evidence.
+val metadataOnly = providers.gradleProperty("bexReleaseMetadataOnly").orNull
+require(metadataOnly == null || metadataOnly == "true") { "Invalid metadata phase flag" }
+if (metadataOnly == "true") {
+    require(System.getenv("CI") != null && gradle.startParameter.taskNames ==
+        listOf("jreleaserFullRelease", "--exclude-deployer=mavenCentral")) {
+        "Metadata phase requires only jreleaserFullRelease with Maven Central excluded"
+    }
+    tasks.register<Exec>("bexReleaseMetadataGate") {
+        commandLine("python3", ".github/scripts/release-ci.py",
+            System.getenv("RELEASE_MODE") ?: "invalid", "metadata-check")
+    }
+    tasks.withType<org.jreleaser.gradle.plugin.tasks.JReleaserFullReleaseTask>().configureEach {
+        doFirst {
+            require(excludedDeployerTypes.get() == listOf("mavenCentral")) {
+                "Metadata phase must exclude the Maven Central deployer"
+            }
+        }
+    }
+}
+
 tasks.matching {
     it.name in setOf(
         "jreleaserAnnounce",
@@ -23,7 +44,18 @@ tasks.matching {
         "jreleaserUpload"
     )
 }.configureEach {
-    dependsOn("bexReleaseVerify")
+    dependsOn(if (metadataOnly == "true" && name == "jreleaserFullRelease")
+        "bexReleaseMetadataGate" else "bexReleaseVerify")
+}
+
+// A combined release invocation verifies once, stages all Maven publications,
+// then uploads them. Ordering alone does not select publication in verify mode.
+tasks.matching { it.name in setOf("jreleaserFullRelease", "jreleaserDeploy") }.configureEach {
+    mustRunAfter(
+        ":blue-bex-core:publish",
+        ":blue-bex-contracts:publish",
+        ":blue-bex-java:publish"
+    )
 }
 
 if (System.getenv("CI") != null) {
@@ -45,6 +77,8 @@ if (System.getenv("CI") != null) {
                         url.set("https://central.sonatype.com/api/v1/publisher")
                         applyMavenCentralRules.set(true)
                         snapshotSupported.set(true)
+                        skipPublicationCheck.set(providers.gradleProperty("bexSeparateMavenWait")
+                            .map { it == "true" }.orElse(false))
                         stagingRepository("build/staging-deploy")
                     }
                 }
