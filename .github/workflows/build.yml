@@ -39,6 +39,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Validate release orchestration without publication
+        if: matrix.group == 'verification'
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .github/scripts -p 'test*.py'
+          ./gradlew --no-daemon --max-workers=1 jreleaserFullRelease --exclude-deployer=mavenCentral -PbexReleaseMetadataOnly=true --dry-run > "$RUNNER_TEMP/bex-metadata-graph.txt"
+          python3 - <<'PYCODE'
+          import os
+          from pathlib import Path
+          tasks = [line.split()[0] for line in (Path(os.environ['RUNNER_TEMP']) / 'bex-metadata-graph.txt').read_text().splitlines()
+                   if line.startswith(':') and line.endswith(' SKIPPED')]
+          assert tasks == [':bexReleaseMetadataGate', ':jreleaserFullRelease'], tasks
+          PYCODE
+
       - name: Run clean published-Language verification
         if: matrix.group == 'verification'
         env:

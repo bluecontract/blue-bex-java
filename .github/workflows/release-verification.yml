@@ -117,7 +117,7 @@ jobs:
           PREPARED_TREE: ${{ needs.prepare.outputs.tree }}
           PREPARED_ATTEMPT: ${{ needs.prepare.outputs.attempt }}
         run: python .github/scripts/release-ci.py verify join
-      - name: Verify, stage and release in one Gradle graph
+      - name: Verify, sign and submit Maven Central deployment
         if: inputs.mode != 'verify'
         env:
           RELEASE_MODE: ${{ inputs.mode }}
@@ -131,6 +131,29 @@ jobs:
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
         run: python .github/scripts/release-ci.py "$RELEASE_MODE" join
+      - name: Wait for Maven Central publication
+        if: inputs.mode != 'verify'
+        timeout-minutes: 35
+        env:
+          JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
+          JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.MAVENCENTRAL_PASSWORD }}
+        run: >-
+          python .github/scripts/wait-maven-central.py build/jreleaser/maven-central-submitted.properties
+          --receipt "${{ runner.temp }}/bex-release-output/maven-publication.json"
+      - name: Create release metadata after Maven Central publication
+        if: inputs.mode != 'verify'
+        env:
+          RELEASE_MODE: ${{ inputs.mode }}
+          PREPARED_COMMIT: ${{ needs.prepare.outputs.commit }}
+          PREPARED_TREE: ${{ needs.prepare.outputs.tree }}
+          PREPARED_ATTEMPT: ${{ needs.prepare.outputs.attempt }}
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+          JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
+          JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.MAVENCENTRAL_PASSWORD }}
+          JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
+          JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+        run: python .github/scripts/release-ci.py "$RELEASE_MODE" metadata
       - name: Push successful RC commit and tag
         if: inputs.mode == 'rc'
         run: git push origin HEAD:next --follow-tags

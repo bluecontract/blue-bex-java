@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Prepare one source, fan out real builds, and run the release graph once."""
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -13,11 +15,14 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('verification', Path(__file__).with_name('release-verification.py'))
 v = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(v)
+spec = importlib.util.spec_from_file_location('central', Path(__file__).with_name('wait-maven-central.py'))
+central = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(central)
 
 
 def release_tasks(mode):
     v.require(mode in ['verify', 'rc', 'stable'], 'Unknown release mode')
-    return ['bexReleaseVerify'] + ([] if mode == 'verify' else ['publish', 'jreleaserFullRelease'])
+    return ['bexReleaseVerify'] + ([] if mode == 'verify' else ['publish', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
 
 
 def validate_mode(mode, ref):
@@ -86,10 +91,65 @@ def restore_source(mode, directory):
     return dict(GITHUB_SHA=meta['commit'], GITHUB_RUN_ID=meta['run'], GITHUB_RUN_ATTEMPT=meta['attempt'])
 
 
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def deployment_proof(source, mode):
+    validate_mode(mode, os.environ['GITHUB_REF'])
+    v.require(mode in ['rc', 'stable'], 'Metadata requires production mode')
+    ident = dict(GITHUB_SHA=os.environ['PREPARED_COMMIT'], GITHUB_RUN_ID=os.environ['GITHUB_RUN_ID'],
+                 GITHUB_RUN_ATTEMPT=os.environ['PREPARED_ATTEMPT'])
+    tag = 'v' + re.search(r'^version = "([^"]+)"', (source / '.cz.toml').read_text(), re.M)[1]
+    v.require(git('rev-parse', 'HEAD') == ident['GITHUB_SHA']
+              and git('rev-parse', 'HEAD^{tree}') == os.environ['PREPARED_TREE']
+              and not git('status', '--porcelain')
+              and tag in git('tag', '--points-at', 'HEAD').splitlines(), 'Metadata source changed')
+    report = source / 'build/reports/bex-release/final.json'
+    strict = json.loads(report.read_text())
+    v.require(strict.get('releaseReady') is True and strict.get('blockers') == []
+              and strict.get('bexCommit') == ident['GITHUB_SHA'], 'Missing strict release authorization')
+    properties = source / 'build/jreleaser/maven-central-submitted.properties'
+    central.deployment_id(properties.read_text())
+    staging = source / 'build/staging-deploy'
+    artifacts = {str(p.relative_to(staging)): sha256(p) for p in sorted(staging.rglob('*')) if p.is_file()}
+    v.require(artifacts, 'Missing staged artifacts')
+    return dict(identity=ident, mode=mode, execution_attempt=os.environ['GITHUB_RUN_ATTEMPT'],
+                workflow_commit=os.environ['GITHUB_SHA'], tree=os.environ['PREPARED_TREE'], tag=tag,
+                report_sha256=sha256(report), properties_sha256=sha256(properties), artifacts=artifacts)
+
+
+def write_deployment_proof(source, ident, mode, path):
+    proof = deployment_proof(source, mode)
+    v.require(proof['identity'] == ident, 'Deployment source identity mismatch')
+    path.write_text(json.dumps(proof, indent=2))
+
+
+def validate_metadata_proof(source, mode, proof, published):
+    expected = deployment_proof(source, mode)
+    v.require(json.loads(proof.read_text()) == expected, 'Deployment evidence changed')
+    receipt = json.loads(published.read_text())
+    deployment = central.deployment_id((source / 'build/jreleaser/maven-central-submitted.properties').read_text())
+    v.require(receipt == dict(deploymentId=deployment, deploymentState='PUBLISHED',
+                             propertiesSha256=expected['properties_sha256']),
+              'Maven Central publication not confirmed for this deployment')
+
+
 def main():
     mode, operation = sys.argv[1:3]
     validate_mode(mode, os.environ['GITHUB_REF'])
     temp = Path(os.environ['RUNNER_TEMP'])
+    source = Path.cwd()
+    proof = temp / 'bex-release-output/deployment-proof.json'
+    published = temp / 'bex-release-output/maven-publication.json'
+    if operation in ['metadata', 'metadata-check']:
+        validate_metadata_proof(source, mode, proof, published)
+        if operation == 'metadata':
+            os.environ['SOURCE_DATE_EPOCH'] = git('show', '-s', '--format=%ct', 'HEAD')
+            v.gradle(source, temp / 'bex-release-work/gradle-root-release',
+                     ['jreleaserFullRelease', '--exclude-deployer=mavenCentral', '-PbexReleaseMetadataOnly=true'],
+                     temp / 'bex-release-output/metadata.log')
+        return
     if operation == 'prepare':
         prepare(mode, temp / 'bex-release-source')
         return
@@ -109,6 +169,11 @@ def main():
     home, args = v.prepare_release_inputs(root, source, ident, logs)
     # One Gradle graph shares all checks naturally. Production keeps the exact
     # strict tagged-source gate ahead of local staging and remote release.
+    if mode != 'verify':
+        (source / 'build/jreleaser/output.properties').unlink(missing_ok=True)
+        (source / 'build/jreleaser/maven-central-submitted.properties').unlink(missing_ok=True)
+        proof.unlink(missing_ok=True)
+        published.unlink(missing_ok=True)
     tasks = release_tasks(mode) + args[1:]
     code = v.gradle(source, home, tasks, logs / 'release.log', allow_failure=mode == 'verify')
     report = json.loads((source / 'build/reports/bex-release/final.json').read_text())
@@ -116,6 +181,9 @@ def main():
         v.validate_final(report, code, (logs / 'release.log').read_text(), ident['GITHUB_SHA'], expected_tag())
     else:
         v.require(report.get('releaseReady') is True and report.get('blockers') == [], 'Release gate not ready')
+        shutil.copy2(source / 'build/jreleaser/output.properties',
+                     source / 'build/jreleaser/maven-central-submitted.properties')
+        write_deployment_proof(source, ident, mode, proof)
     independent = [json.loads((root / str(i) / 'receipt.json').read_text()) for i in range(1, 5)]
     receipt = dict(identity=ident, execution_attempt=os.environ['GITHUB_RUN_ATTEMPT'], mode=mode, success=True,
                    elapsed_s=time.time()-min(r['started_at'] for r in independent),
@@ -123,8 +191,8 @@ def main():
                    benchmarks=v.benchmark_inventory(source), independent=independent)
     (logs / 'receipt.json').write_text(json.dumps(receipt, indent=2))
     with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
-        out.write(f"## BEX {mode}: complete release graph\n\n"
-                  f"Four-build fanout + transfer/join + final graph: {receipt['elapsed_s']:.2f}s. "
+        out.write(f"## BEX {mode}: release verification and submission\n\n"
+                  f"Four-build fanout + transfer/join + verification/submission: {receipt['elapsed_s']:.2f}s. "
                   f"Elapsed time includes any rerun waiting gaps. "
                   f"JUnit cases: {len(receipt['tests'])}; JMH cases: {len(receipt['benchmarks'])}. "
                   f"Release-ready: {report['releaseReady']}.\n")

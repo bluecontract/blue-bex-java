@@ -16,7 +16,7 @@ class ReleaseCommands(unittest.TestCase):
     def test_single_production_graph_and_nonpublishing_verification(self):
         self.assertEqual(ci.release_tasks('verify'), ['bexReleaseVerify'])
         for mode in ['rc', 'stable']:
-            self.assertEqual(ci.release_tasks(mode), ['bexReleaseVerify', 'publish', 'jreleaserFullRelease'])
+            self.assertEqual(ci.release_tasks(mode), ['bexReleaseVerify', 'publish', 'jreleaserDeploy', '-PbexSeparateMavenWait=true'])
         with self.assertRaises(ValueError):
             ci.release_tasks('unknown')
 
@@ -101,6 +101,48 @@ class PartialRerunInputs(unittest.TestCase):
             for key in ident:
                 with self.subTest(key=key), self.assertRaises((ValueError, FileNotFoundError)):
                     ci.v.restore(downloads, root / ('bad-' + key), dict(ident, **{key: 'wrong'}))
+
+
+class MetadataProof(unittest.TestCase):
+    def test_metadata_requires_same_verified_source_and_published_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            (source / '.cz.toml').write_text('version = "1.0.0-rc.1"\n')
+            report = source / 'build/reports/bex-release/final.json'
+            report.parent.mkdir(parents=True)
+            report.write_text(json.dumps(dict(releaseReady=True, blockers=[], bexCommit='a'*40)))
+            props = source / 'build/jreleaser/maven-central-submitted.properties'
+            props.parent.mkdir(parents=True)
+            props.write_text('deployMavenCentralSonatypeDeploymentId=28570f16-da32-4c14-bd2e-c1acc0782365\n')
+            staged = source / 'build/staging-deploy/x.jar'
+            staged.parent.mkdir(parents=True)
+            staged.write_bytes(b'verified artifact')
+            env = dict(GITHUB_REF='refs/heads/next', GITHUB_SHA='c'*40, GITHUB_RUN_ID='123',
+                       GITHUB_RUN_ATTEMPT='2', PREPARED_COMMIT='a'*40, PREPARED_TREE='b'*40,
+                       PREPARED_ATTEMPT='1')
+            ident = dict(GITHUB_SHA='a'*40, GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1')
+            git_results = {('rev-parse','HEAD'):'a'*40, ('rev-parse','HEAD^{tree}'):'b'*40,
+                           ('status','--porcelain'):'', ('tag','--points-at','HEAD'):'v1.0.0-rc.1'}
+            proof = source / 'proof.json'
+            published = source / 'published.json'
+            with patch.dict(os.environ, env), patch.object(ci, 'git', side_effect=lambda *args: git_results[args]):
+                ci.write_deployment_proof(source, ident, 'rc', proof)
+                with self.assertRaises(FileNotFoundError): ci.validate_metadata_proof(source, 'rc', proof, published)
+                published.write_text(json.dumps(dict(deploymentId='28570f16-da32-4c14-bd2e-c1acc0782365',
+                    deploymentState='PUBLISHED', propertiesSha256=ci.sha256(props))))
+                ci.validate_metadata_proof(source, 'rc', proof, published)
+                for changes in [dict(GITHUB_RUN_ID='other'), dict(GITHUB_RUN_ATTEMPT='3'),
+                                dict(PREPARED_ATTEMPT='2'), dict(PREPARED_TREE='d'*40), dict(GITHUB_SHA='d'*40)]:
+                    with self.subTest(changes=changes), patch.dict(os.environ, changes), self.assertRaises(ValueError):
+                        ci.validate_metadata_proof(source, 'rc', proof, published)
+                for file in [report, props, staged, published]:
+                    original=file.read_bytes()
+                    file.write_bytes(b'{}' if file.suffix == '.json' else b'changed')
+                    with self.subTest(file=file), self.assertRaises(ValueError):
+                        ci.validate_metadata_proof(source, 'rc', proof, published)
+                    file.write_bytes(original)
+                git_results[('status','--porcelain')]=' M build.gradle.kts'
+                with self.assertRaises(ValueError): ci.validate_metadata_proof(source, 'rc', proof, published)
 
 if __name__ == '__main__':
     unittest.main()
