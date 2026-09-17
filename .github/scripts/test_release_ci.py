@@ -50,6 +50,23 @@ class ReleaseCommands(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 ci.validate_identity(bad, expected)
 
+class ReleaseWorkflowConfiguration(unittest.TestCase):
+    def test_branch_is_explicit_in_the_executing_reusable_job(self):
+        workflow = Path(__file__).parents[1] / 'workflows/release-verification.yml'
+        final = workflow.read_text().split('  final:\n', 1)[1].split('    steps:\n', 1)[0]
+        self.assertIn("JRELEASER_BRANCH: ${{ inputs.mode == 'rc' && 'next' || 'main' }}", final)
+        for branch in ['next', 'main']:
+            with patch.dict(os.environ, JRELEASER_BRANCH=branch), patch.object(ci.v, 'run') as run:
+                ci.v.gradle(Path('/source'), Path('/home'), ['jreleaserConfig'], Path('/log'))
+                self.assertEqual(run.call_args.args[2]['JRELEASER_BRANCH'], branch)
+
+    def test_release_chore_bypasses_the_real_rc_concurrency_group(self):
+        workflow = (Path(__file__).parents[1] / 'workflows/release-rc.yml').read_text()
+        self.assertIn("${{ startsWith(github.event.head_commit.message, 'chore: release ') && format('bex-release-rc-skip-{0}', github.run_id) || 'bex-release-rc' }}", workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
+        self.assertIn("startsWith(github.event.head_commit.message, 'chore: release ') == false", workflow)
+
+
 class PreparedSource(unittest.TestCase):
     def test_real_untagged_bundle_roundtrip_and_wrong_run_rejected(self):
         previous = Path.cwd()

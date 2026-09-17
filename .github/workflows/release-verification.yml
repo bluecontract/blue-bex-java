@@ -95,6 +95,8 @@ jobs:
     needs: [prepare, independent]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      JRELEASER_BRANCH: ${{ inputs.mode == 'rc' && 'next' || 'main' }}
     steps:
       - uses: actions/checkout@v4
         with:
