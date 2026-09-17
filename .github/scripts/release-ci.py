@@ -147,7 +147,7 @@ def main():
         if operation == 'metadata':
             os.environ['SOURCE_DATE_EPOCH'] = git('show', '-s', '--format=%ct', 'HEAD')
             v.gradle(source, temp / 'bex-release-work/gradle-root-release',
-                     ['jreleaserFullRelease', '--exclude-deployer=mavenCentral', '-PbexReleaseMetadataOnly=true'],
+                     ['jreleaserFullRelease', '--exclude-deployer-name=sonatype', '-PbexReleaseMetadataOnly=true'],
                      temp / 'bex-release-output/metadata.log')
         return
     if operation == 'prepare':

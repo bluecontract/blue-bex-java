@@ -18,7 +18,7 @@ val metadataOnly = providers.gradleProperty("bexReleaseMetadataOnly").orNull
 require(metadataOnly == null || metadataOnly == "true") { "Invalid metadata phase flag" }
 if (metadataOnly == "true") {
     require(System.getenv("CI") != null && gradle.startParameter.taskNames ==
-        listOf("jreleaserFullRelease", "--exclude-deployer=mavenCentral")) {
+        listOf("jreleaserFullRelease", "--exclude-deployer-name=sonatype")) {
         "Metadata phase requires only jreleaserFullRelease with Maven Central excluded"
     }
     tasks.register<Exec>("bexReleaseMetadataGate") {
@@ -27,7 +27,7 @@ if (metadataOnly == "true") {
     }
     tasks.withType<org.jreleaser.gradle.plugin.tasks.JReleaserFullReleaseTask>().configureEach {
         doFirst {
-            require(excludedDeployerTypes.get() == listOf("mavenCentral")) {
+            require(excludedDeployerNames.get() == listOf("sonatype")) {
                 "Metadata phase must exclude the Maven Central deployer"
             }
         }

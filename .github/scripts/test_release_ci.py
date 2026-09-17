@@ -20,6 +20,18 @@ class ReleaseCommands(unittest.TestCase):
         with self.assertRaises(ValueError):
             ci.release_tasks('unknown')
 
+    def test_metadata_excludes_named_deployer_after_proof_validation(self):
+        for mode, ref in [('rc', 'refs/heads/next'), ('stable', 'refs/heads/main')]:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                env = dict(GITHUB_REF=ref, RUNNER_TEMP=tmp)
+                with patch.dict(os.environ, env), patch.object(ci.sys, 'argv', ['release-ci.py', mode, 'metadata']), \
+                     patch.object(ci, 'validate_metadata_proof') as proof, patch.object(ci, 'git', return_value='123'), \
+                     patch.object(ci.v, 'gradle') as gradle:
+                    ci.main()
+                    proof.assert_called_once()
+                    self.assertEqual(gradle.call_args.args[2], [
+                        'jreleaserFullRelease', '--exclude-deployer-name=sonatype', '-PbexReleaseMetadataOnly=true'])
+
     def test_production_modes_require_their_exact_branch(self):
         ci.validate_mode('rc', 'refs/heads/next')
         ci.validate_mode('stable', 'refs/heads/main')
