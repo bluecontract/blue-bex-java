@@ -26,7 +26,7 @@ public final class Java8LibraryConventionsPlugin implements Plugin<Project> {
                 project.getExtensions().getByType(JavaPluginExtension.class);
         JavaToolchainService toolchains =
                 project.getExtensions().getByType(JavaToolchainService.class);
-        java.getToolchain().getLanguageVersion().set(JavaLanguageVersion.of(25));
+        java.getToolchain().getLanguageVersion().set(JavaLanguageVersion.of(17));
         java.setSourceCompatibility(JavaVersion.VERSION_1_8);
         java.setTargetCompatibility(JavaVersion.VERSION_1_8);
         java.withSourcesJar();
@@ -38,7 +38,7 @@ public final class Java8LibraryConventionsPlugin implements Plugin<Project> {
         });
         project.getTasks().withType(Javadoc.class).configureEach(task -> {
             task.getJavadocTool().set(toolchains.javadocToolFor(spec ->
-                    spec.getLanguageVersion().set(JavaLanguageVersion.of(25))));
+                    spec.getLanguageVersion().set(JavaLanguageVersion.of(17))));
             StandardJavadocDocletOptions options =
                     (StandardJavadocDocletOptions) task.getOptions();
             options.setEncoding(StandardCharsets.UTF_8.name());

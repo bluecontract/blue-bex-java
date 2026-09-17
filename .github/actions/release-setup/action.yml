@@ -1,11 +1,11 @@
-name: BEX Java 25 verification toolchain
+name: BEX Java 17 verification toolchain
 description: One JDK for compilation, tests, Javadoc and release verification
 runs:
   using: composite
   steps:
     - uses: actions/setup-java@v4
       with:
-        java-version: '25'
+        java-version: '17'
         distribution: corretto
     - uses: actions/setup-node@v4
       with:
